@@ -1,0 +1,161 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
+import * as UserModel from '../models/user';
+import * as CourseModel from '../models/course';
+import * as EnrollmentModel from '../models/enrollment';
+import * as PaymentModel from '../models/payment';
+import { query } from '../config/db';
+
+const router = Router();
+
+// All admin routes require admin role
+router.use(authenticate, authorize('admin'));
+
+// GET /admin/dashboard
+router.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const totalStudents = await UserModel.countUsers('student');
+    const totalInstructors = await UserModel.countUsers('instructor');
+    const totalCourses = await CourseModel.countCourses();
+    const publishedCourses = await CourseModel.countCourses(true);
+    const totalEnrollments = await EnrollmentModel.countEnrollments();
+    const revenueStats = await CourseModel.getRevenueStats();
+
+    // Recent users
+    const recentUsers = await UserModel.getAllUsers(10, 0);
+
+    // Recent payments
+    const recentPayments = await PaymentModel.getAllPayments(10, 0);
+
+    // Monthly revenue (last 6 months)
+    const monthlyRevenue = await query(
+      `SELECT
+         DATE_TRUNC('month', created_at)::date as month,
+         COALESCE(SUM(amount), 0) as revenue,
+         COUNT(*) as transactions
+       FROM payments
+       WHERE status = 'completed' AND created_at > NOW() - INTERVAL '6 months'
+       GROUP BY DATE_TRUNC('month', created_at)
+       ORDER BY month DESC`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          totalStudents,
+          totalInstructors,
+          totalCourses,
+          publishedCourses,
+          totalEnrollments,
+          totalRevenue: revenueStats.total_revenue,
+          averagePrice: revenueStats.average_price,
+        },
+        recentUsers,
+        recentPayments,
+        monthlyRevenue: monthlyRevenue.rows,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/users
+router.get('/users', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = (page - 1) * limit;
+    const role = req.query.role as string | undefined;
+
+    const users = await UserModel.getAllUsers(limit, offset);
+    const total = role ? await UserModel.countUsers(role) : await UserModel.countUsers();
+
+    res.json({
+      success: true,
+      data: users,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/courses
+router.get('/courses', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = (page - 1) * limit;
+
+    const courses = await CourseModel.getAllCourses(limit, offset);
+    const total = await CourseModel.countCourses();
+
+    res.json({
+      success: true,
+      data: courses,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/revenue
+router.get('/revenue', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const revenueStats = await CourseModel.getRevenueStats();
+
+    // Revenue by month
+    const monthlyRevenue = await query(
+      `SELECT
+         DATE_TRUNC('month', created_at)::date as month,
+         COALESCE(SUM(amount), 0) as revenue,
+         COUNT(*) as transactions
+       FROM payments
+       WHERE status = 'completed'
+       GROUP BY DATE_TRUNC('month', created_at)
+       ORDER BY month DESC
+       LIMIT 12`
+    );
+
+    // Revenue by course
+    const revenueByCourse = await query(
+      `SELECT
+         c.id, c.title, c.slug,
+         COUNT(p.id) as enrollments,
+         COALESCE(SUM(p.amount), 0) as revenue
+       FROM courses c
+       LEFT JOIN payments p ON c.id = p.course_id AND p.status = 'completed'
+       GROUP BY c.id, c.title, c.slug
+       ORDER BY revenue DESC
+       LIMIT 20`
+    );
+
+    // Revenue by provider
+    const revenueByProvider = await query(
+      `SELECT
+         provider,
+         COUNT(*) as transactions,
+         COALESCE(SUM(amount), 0) as revenue
+       FROM payments
+       WHERE status = 'completed'
+       GROUP BY provider`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        summary: revenueStats,
+        monthly: monthlyRevenue.rows,
+        byCourse: revenueByCourse.rows,
+        byProvider: revenueByProvider.rows,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;

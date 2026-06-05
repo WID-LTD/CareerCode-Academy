@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-200 dark:border-gray-800;
+  }
+
+  body {
+    @apply bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  ::selection {
+    @apply bg-primary-500/30 text-primary-900 dark:text-primary-100;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border border-white/20 dark:border-gray-800/50 shadow-lg;
+  }
+
+  .glass-card {
+    @apply glass rounded-2xl transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/5;
+  }
+
+  .glass-card-hover {
+    @apply glass-card hover:scale-[1.02] hover:border-primary-500/30;
+  }
+
+  .neon-glow {
+    @apply shadow-[0_0_5px_rgba(99,102,241,0.5),0_0_10px_rgba(99,102,241,0.3)];
+  }
+
+  .neon-glow-strong {
+    @apply shadow-[0_0_10px_rgba(99,102,241,0.8),0_0_20px_rgba(99,102,241,0.5),0_0_40px_rgba(99,102,241,0.3)];
+  }
+
+  .neon-border {
+    @apply border border-primary-500/50 shadow-[0_0_5px_rgba(99,102,241,0.3),inset_0_0_5px_rgba(99,102,241,0.1)];
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-primary-500 to-accent-500;
+  }
+
+  .gradient-bg {
+    @apply bg-gradient-to-br from-primary-500 via-primary-600 to-accent-600;
+  }
+
+  .gradient-bg-subtle {
+    @apply bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.gray.400') transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-400/50 rounded-full hover:bg-gray-500/50;
+  }
+
+  .dark .scrollbar-thin {
+    scrollbar-color: theme('colors.gray.600') transparent;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-600/50 rounded-full hover:bg-gray-500/50;
+  }
+}
