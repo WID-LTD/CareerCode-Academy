@@ -51,8 +51,8 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
           <div className="col-span-2 md:col-span-2 lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center">
-                <Code2 className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center overflow-hidden">
+                <img src="/screen.png" alt="CareerCode Logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-xl font-bold gradient-text">CareerCode</span>
             </Link>

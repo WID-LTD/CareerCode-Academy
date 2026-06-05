@@ -93,6 +93,34 @@ router.get(
   }
 );
 
+// GET /courses/slug/:slug
+router.get('/slug/:slug', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await CourseModel.getCourseBySlug(req.params.slug);
+    if (!course) {
+      throw new NotFoundError('Course');
+    }
+
+    const lessons = await LessonModel.getLessonsByCourse(course.id);
+    const reviews = await ReviewModel.getReviewsByCourse(course.id);
+    const averageRating = await ReviewModel.getAverageRating(course.id);
+    const enrollmentCount = await EnrollmentModel.countEnrollments(course.id);
+
+    res.json({
+      success: true,
+      data: {
+        ...course,
+        lessons,
+        reviews,
+        averageRating,
+        enrollmentCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /courses/:id
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -1,6 +1,16 @@
-import { Resend } from 'resend';
+let resendInstance: any = null;
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  if (!resendInstance) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key || key === 're_xxxxxxxxxxxx') {
+      return null;
+    }
+    const { Resend } = require('resend');
+    resendInstance = new Resend(key);
+  }
+  return resendInstance;
+}
 
 export async function sendMail(options: {
   to: string;
@@ -8,8 +18,10 @@ export async function sendMail(options: {
   html: string;
   text?: string;
 }): Promise<void> {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Email sent (dev mode):', options.to, options.subject);
+  const resend = getResend();
+
+  if (!resend || process.env.NODE_ENV === 'development') {
+    console.log('[Mail] Dev mode - skipped:', options.to, options.subject);
     return;
   }
 
@@ -22,9 +34,8 @@ export async function sendMail(options: {
   });
 
   if (error) {
-    console.error('Resend email error:', error);
-    throw new Error(`Failed to send email: ${error.message}`);
+    console.error('[Mail] Resend error:', error);
   }
 }
 
-export default resend;
+export default { sendMail };

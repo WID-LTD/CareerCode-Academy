@@ -52,8 +52,8 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 gradient-bg rounded-lg flex items-center justify-center">
-              <Code2 className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 gradient-bg rounded-lg flex items-center justify-center overflow-hidden">
+              <img src="/screen.png" alt="CareerCode Logo" className="w-full h-full object-contain" />
             </div>
             <span className="text-xl font-bold gradient-text">CareerCode</span>
           </Link>

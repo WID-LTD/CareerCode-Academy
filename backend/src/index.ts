@@ -81,6 +81,14 @@ app.use(errorHandler);
 // Database initialization
 async function initDatabase() {
   try {
+    const exists = await query(
+      `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')`
+    );
+    if (exists.rows[0].exists) {
+      console.log('Database tables already exist, skipping migration');
+      return;
+    }
+
     console.log('Initializing database...');
 
     await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
@@ -300,15 +308,15 @@ async function initDatabase() {
 async function start() {
   try {
     await initDatabase();
-
-    app.listen(PORT, () => {
-      console.log(`CareerCode Academy API running on port ${PORT}`);
-      console.log(`Health check: http://localhost:${PORT}/health`);
-    });
+    console.log('Database connected and tables initialized');
   } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+    console.warn('Database connection failed — server will start without DB:', (error as Error).message);
   }
+
+  app.listen(PORT, () => {
+    console.log(`CareerCode Academy API running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+  });
 }
 
 start();
