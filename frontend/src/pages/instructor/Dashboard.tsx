@@ -1,45 +1,48 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, DollarSign, TrendingUp, Star, Activity, Clock } from 'lucide-react';
+import { BookOpen, Users, DollarSign, TrendingUp, Star, Activity } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
-
-const stats = [
-  { icon: BookOpen, label: 'Active Courses', value: '6', change: '+2', color: 'text-blue-500', bg: 'bg-blue-500/10' },
-  { icon: Users, label: 'Total Students', value: '1,247', change: '+12%', color: 'text-purple-500', bg: 'bg-purple-500/10' },
-  { icon: DollarSign, label: 'Revenue', value: '$38,450', change: '+8%', color: 'text-green-500', bg: 'bg-green-500/10' },
-  { icon: TrendingUp, label: 'Avg Rating', value: '4.8', change: '+0.2', color: 'text-orange-500', bg: 'bg-orange-500/10' },
-];
-
-const recentActivity = [
-  { action: 'New enrollment', details: 'John Doe enrolled in Full-Stack Web Dev', time: '10 min ago', type: 'enrollment' },
-  { action: 'Assignment submitted', details: 'Emma Wilson submitted React Project', time: '1 hour ago', type: 'submission' },
-  { action: 'Course review', details: 'Michael Chen rated your course 5 stars', time: '3 hours ago', type: 'review' },
-  { action: 'New question', details: 'Sarah asked about CSS Grid in forum', time: '5 hours ago', type: 'question' },
-];
-
-const topCourses = [
-  { title: 'Full-Stack Web Development', students: 342, rating: 4.9, revenue: '$12,450', trend: 'up' },
-  { title: 'Data Science & ML', students: 287, rating: 4.8, revenue: '$9,800', trend: 'up' },
-  { title: 'Mobile App Development', students: 198, rating: 4.7, revenue: '$6,200', trend: 'up' },
-];
+import { useInstructorStore } from '@/store/instructorStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function InstructorDashboard() {
+  const { user } = useAuthStore();
+  const { stats, topCourses, recentActivity, isLoading, fetchDashboardStats } = useInstructorStore();
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  if (isLoading || !stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const statCards = [
+    { icon: BookOpen, label: 'Active Courses', value: stats.activeCourses.toString(), color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { icon: Users, label: 'Total Students', value: stats.totalStudents.toString(), color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { icon: DollarSign, label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { icon: TrendingUp, label: 'Avg Rating', value: stats.averageRating, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+  ];
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">Instructor Dashboard</h1>
-        <p className="text-gray-500">Welcome back, Dr. Rivera! Here's your overview.</p>
+        <p className="text-gray-500">Welcome back, {user?.name || 'Instructor'}! Here's your overview.</p>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <GlassCard key={stat.label} className="p-5" hover={false}>
             <div className="flex items-start justify-between mb-3">
               <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />
               </div>
-              <Badge variant="success" size="sm">{stat.change}</Badge>
             </div>
             <div className="text-2xl font-bold">{stat.value}</div>
             <div className="text-sm text-gray-500">{stat.label}</div>
@@ -52,7 +55,7 @@ export default function InstructorDashboard() {
           <GlassCard className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Top Performing Courses</h2>
-              <Badge variant="primary" size="sm">This Month</Badge>
+              <Badge variant="primary" size="sm">Overall</Badge>
             </div>
             <div className="space-y-4">
               {topCourses.map((course) => (
@@ -70,11 +73,14 @@ export default function InstructorDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-sm">{course.revenue}</div>
+                    <div className="font-semibold text-sm">${course.revenue.toLocaleString()}</div>
                     <Badge variant="success" size="sm">Active</Badge>
                   </div>
                 </div>
               ))}
+              {topCourses.length === 0 && (
+                <p className="text-gray-500 text-sm">No courses yet.</p>
+              )}
             </div>
           </GlassCard>
 
@@ -101,6 +107,9 @@ export default function InstructorDashboard() {
                   <div className="text-xs text-gray-400 flex-shrink-0">{activity.time}</div>
                 </div>
               ))}
+              {recentActivity.length === 0 && (
+                <p className="text-gray-500 text-sm">No recent activity.</p>
+              )}
             </div>
           </GlassCard>
         </div>
@@ -111,40 +120,19 @@ export default function InstructorDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Pending reviews</span>
-                <Badge variant="warning" size="sm">12</Badge>
+                <Badge variant="warning" size="sm">0</Badge>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Unread messages</span>
-                <Badge variant="primary" size="sm">5</Badge>
+                <Badge variant="primary" size="sm">0</Badge>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Upcoming live sessions</span>
-                <Badge variant="default" size="sm">3</Badge>
+                <Badge variant="default" size="sm">0</Badge>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Assignments to grade</span>
-                <Badge variant="danger" size="sm">18</Badge>
-              </div>
-            </div>
-          </GlassCard>
-
-          <GlassCard className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Schedule</h2>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                <div className="text-xs text-gray-400 mb-1">Today, 2:00 PM</div>
-                <div className="font-medium text-sm">Live Q&A Session</div>
-                <div className="text-xs text-gray-500">Full-Stack Web Dev</div>
-              </div>
-              <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                <div className="text-xs text-gray-400 mb-1">Tomorrow, 10:00 AM</div>
-                <div className="font-medium text-sm">Code Review Workshop</div>
-                <div className="text-xs text-gray-500">Data Science & ML</div>
-              </div>
-              <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                <div className="text-xs text-gray-400 mb-1">Jun 10, 3:00 PM</div>
-                <div className="font-medium text-sm">1-on-1 Mentorship</div>
-                <div className="text-xs text-gray-500">Student: Emma Wilson</div>
+                <Badge variant="danger" size="sm">0</Badge>
               </div>
             </div>
           </GlassCard>

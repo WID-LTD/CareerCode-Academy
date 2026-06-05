@@ -23,7 +23,7 @@ export default function CourseDetails() {
   const { slug } = useParams();
   const [expandedModule, setExpandedModule] = useState<number | null>(0);
   
-  const { currentCourse: course, isLoading, error, fetchCourseBySlug, enrollCourse } = useCourseStore();
+  const { currentCourse: course, isLoading, error, fetchCourseBySlug, enrollCourse, initializePayment } = useCourseStore();
   const [isEnrolling, setIsEnrolling] = useState(false);
 
   useEffect(() => {
@@ -36,11 +36,18 @@ export default function CourseDetails() {
     if (!course) return;
     setIsEnrolling(true);
     try {
-      await enrollCourse(course.id);
-      // Success logic here (e.g. redirect to payment or dashboard)
-      alert('Enrollment successful or added to cart!');
+      if (course.price > 0) {
+        // Paid course, initialize payment
+        const authUrl = await initializePayment(course.id, 'paystack');
+        // Redirect to Paystack checkout
+        window.location.href = authUrl;
+      } else {
+        // Free course, enroll directly
+        await enrollCourse(course.id);
+        alert('Enrollment successful! You can now start learning.');
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to enroll');
+      alert(err.response?.data?.message || err.message || 'Failed to enroll');
     } finally {
       setIsEnrolling(false);
     }

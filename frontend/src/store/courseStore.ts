@@ -53,6 +53,7 @@ interface CourseState {
   fetchCourses: (filters?: { category?: string; level?: string }) => Promise<void>;
   fetchCourseBySlug: (slug: string) => Promise<void>;
   enrollCourse: (courseId: string) => Promise<void>;
+  initializePayment: (courseId: string, provider?: string) => Promise<string>;
 }
 
 export const useCourseStore = create<CourseState>((set) => ({
@@ -104,6 +105,24 @@ export const useCourseStore = create<CourseState>((set) => ({
       set({ 
         isLoading: false, 
         error: error.response?.data?.message || 'Failed to enroll in course' 
+      });
+      throw error;
+    }
+  },
+
+  initializePayment: async (courseId: string, provider = 'paystack') => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post(`/payments/initialize`, {
+        courseId,
+        provider,
+      });
+      set({ isLoading: false });
+      return data.data.authorizationUrl;
+    } catch (error: any) {
+      set({ 
+        isLoading: false, 
+        error: error.response?.data?.message || 'Failed to initialize payment' 
       });
       throw error;
     }

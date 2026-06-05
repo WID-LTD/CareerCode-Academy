@@ -17,6 +17,7 @@ import Community from '@/pages/Community';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
 import NotFound from '@/pages/NotFound';
+import VerifyPayment from '@/pages/VerifyPayment';
 
 import StudentDashboard from '@/pages/student/Dashboard';
 import StudentMyCourses from '@/pages/student/MyCourses';
@@ -64,6 +65,7 @@ function App() {
           <Route path="/community" element={<Community />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/verify-payment" element={<VerifyPayment />} />
         </Route>
 
         <Route path="/student" element={<DashboardLayout requiredRole="student" />}>

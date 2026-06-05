@@ -5,6 +5,7 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as PaymentModel from '../models/payment';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
+import * as UserModel from '../models/user';
 import { NotFoundError, ConflictError } from '../utils/errors';
 
 const router = Router();
@@ -24,6 +25,9 @@ router.post(
     try {
       const { courseId, provider, currency } = req.body;
       const userId = req.user!.userId;
+
+      const user = await UserModel.getUserById(userId);
+      if (!user) throw new NotFoundError('User');
 
       const course = await CourseModel.getCourseById(courseId);
       if (!course) {
@@ -62,7 +66,31 @@ router.post(
       };
 
       if (provider === 'paystack') {
-        paymentData.authorizationUrl = `https://checkout.paystack.com/${reference}`;
+        const response = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            amount: Math.round(payment.amount * 100), // Paystack requires amount in kobo
+            reference: payment.reference,
+            currency: payment.currency,
+            callback_url: `${process.env.FRONTEND_URL}/verify-payment`,
+            metadata: {
+              userId,
+              courseId,
+            }
+          })
+        });
+
+        const paystackData: any = await response.json();
+        if (!paystackData.status) {
+           throw new Error(paystackData.message || 'Paystack initialization failed');
+        }
+        
+        paymentData.authorizationUrl = paystackData.data.authorization_url;
         paymentData.publicKey = process.env.PAYSTACK_PUBLIC_KEY;
       } else if (provider === 'flutterwave') {
         paymentData.authorizationUrl = `https://checkout.flutterwave.com/pay/${reference}`;
@@ -93,18 +121,39 @@ router.get(
         return res.status(403).json({ success: false, message: 'Forbidden' });
       }
 
-      // In production, verify with Paystack/Flutterwave API here
-      // For now, we simulate verification
       if (payment.status === 'pending') {
-        // Simulate payment verification
-        const status = (req.query.status as string) === 'success' ? 'completed' : 'failed';
-        await PaymentModel.updatePaymentStatus(reference, status as any, { verified: true });
-
-        if (status === 'completed') {
-          await EnrollmentModel.createEnrollment({
-            user_id: payment.user_id,
-            course_id: payment.course_id,
+        if (payment.provider === 'paystack') {
+          const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+            headers: {
+              Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            }
           });
+          const paystackData: any = await response.json();
+          
+          if (paystackData.status && paystackData.data.status === 'success') {
+            await PaymentModel.updatePaymentStatus(reference, 'completed', { verified: true });
+            await EnrollmentModel.createEnrollment({
+              user_id: payment.user_id,
+              course_id: payment.course_id,
+            });
+          } else {
+             // Let's assume failed if paystack verification explicitly returns failed,
+             // otherwise leave pending.
+             if (paystackData.data?.status === 'failed') {
+               await PaymentModel.updatePaymentStatus(reference, 'failed', { verified: true });
+             }
+          }
+        } else {
+          // Fallback simulation for other providers
+          const status = (req.query.status as string) === 'success' ? 'completed' : 'failed';
+          await PaymentModel.updatePaymentStatus(reference, status as any, { verified: true });
+
+          if (status === 'completed') {
+            await EnrollmentModel.createEnrollment({
+              user_id: payment.user_id,
+              course_id: payment.course_id,
+            });
+          }
         }
       }
 

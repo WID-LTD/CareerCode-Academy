@@ -19,6 +19,7 @@ import blogRoutes from './routes/blog.routes';
 import reviewRoutes from './routes/review.routes';
 import notificationRoutes from './routes/notification.routes';
 import forumRoutes from './routes/forum.routes';
+import instructorRoutes from './routes/instructor.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -69,6 +70,7 @@ app.use('/api/v1/blogs', blogRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/forum', forumRoutes);
+app.use('/api/v1/instructor', instructorRoutes);
 
 // 404 handler
 app.use((_req, res) => {
