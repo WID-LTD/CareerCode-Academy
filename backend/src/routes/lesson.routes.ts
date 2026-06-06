@@ -55,7 +55,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post(
   '/',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   uploadSingle('video'),
   validate(createLessonSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -92,7 +92,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   uploadSingle('video'),
   validate(updateLessonSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -129,7 +129,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const lesson = await LessonModel.getLessonById(req.params.id);

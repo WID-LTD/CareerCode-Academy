@@ -13,7 +13,7 @@ async function migrate() {
         name VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'instructor', 'admin')),
+        role VARCHAR(20) NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'instructor', 'admin', 'super_admin')),
         avatar TEXT,
         bio TEXT,
         is_verified BOOLEAN DEFAULT false,
@@ -25,6 +25,17 @@ async function migrate() {
       )
     `);
     console.log('✓ users table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(500) UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ refresh_tokens table created');
 
     await query(`
       CREATE TABLE IF NOT EXISTS courses (
@@ -45,10 +56,24 @@ async function migrate() {
     `);
     console.log('✓ courses table created');
 
+    // Create modules table
+    await query(`
+      CREATE TABLE IF NOT EXISTS modules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ modules table created');
+
     await query(`
       CREATE TABLE IF NOT EXISTS lessons (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        module_id UUID REFERENCES modules(id) ON DELETE SET NULL,
         title VARCHAR(200) NOT NULL,
         description TEXT NOT NULL,
         video_url TEXT,
@@ -204,11 +229,207 @@ async function migrate() {
     `);
     console.log('✓ forum_messages table created');
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS instructor_applications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        full_name VARCHAR(200) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        country VARCHAR(100),
+        state VARCHAR(100),
+        professional_title VARCHAR(200),
+        years_experience VARCHAR(50),
+        experience_years VARCHAR(50),
+        specialization VARCHAR(100),
+        github_url TEXT,
+        linkedin_url TEXT,
+        portfolio_url TEXT,
+        resume_url TEXT,
+        profile_image_url TEXT,
+        bio TEXT,
+        teaching_experience TEXT,
+        interested_courses TEXT,
+        availability VARCHAR(100),
+        motivation TEXT,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        notes TEXT,
+        review_notes TEXT,
+        reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ instructor_applications table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS course_proposals (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        level VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        learning_outcomes TEXT,
+        prerequisites TEXT,
+        duration INTEGER NOT NULL DEFAULT 0,
+        lesson_count INTEGER NOT NULL DEFAULT 0,
+        teaching_format VARCHAR(100),
+        technologies TEXT,
+        projects TEXT,
+        recommended_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        thumbnail_url TEXT,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        notes TEXT,
+        review_notes TEXT,
+        reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ course_proposals table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ announcements table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS live_classes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        meeting_url TEXT NOT NULL,
+        start_time TIMESTAMPTZ NOT NULL,
+        duration INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ live_classes table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS direct_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ direct_messages table created');
+
+    // New attendance table
+    await query(`
+      CREATE TABLE IF NOT EXISTS attendance (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        live_class_id UUID NOT NULL REFERENCES live_classes(id) ON DELETE CASCADE,
+        student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        attended_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(live_class_id, student_id)
+      )
+    `);
+    console.log('✓ attendance table created');
+
+    // New resources table
+    await query(`
+      CREATE TABLE IF NOT EXISTS resources (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+        title VARCHAR(200) NOT NULL,
+        file_url TEXT NOT NULL,
+        file_type VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ resources table created');
+
+    // Apply schema alterations dynamically for existing installations
+    // Create quizzes tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS quizzes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        time_limit INTEGER NOT NULL DEFAULT 0,
+        passing_score INTEGER NOT NULL DEFAULT 70,
+        max_attempts INTEGER NOT NULL DEFAULT 1,
+        published BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ quizzes table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS quiz_questions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+        question TEXT NOT NULL,
+        options JSONB NOT NULL DEFAULT '[]',
+        correct_answer VARCHAR(500) NOT NULL,
+        points INTEGER NOT NULL DEFAULT 1,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ quiz_questions table created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS quiz_attempts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        answers JSONB NOT NULL DEFAULT '[]',
+        score INTEGER NOT NULL DEFAULT 0,
+        passed BOOLEAN DEFAULT false,
+        attempted_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(quiz_id, user_id)
+      )
+    `);
+    console.log('✓ quiz_attempts table created');
+
+    await query('CREATE INDEX IF NOT EXISTS idx_quizzes_course ON quizzes(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quizzes_lesson ON quizzes(lesson_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz ON quiz_questions(quiz_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id)');
+
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS review_notes TEXT');
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL');
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ');
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS experience_years VARCHAR(50)');
+
+    await query('ALTER TABLE course_proposals ADD COLUMN IF NOT EXISTS review_notes TEXT');
+    await query('ALTER TABLE course_proposals ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL');
+    await query('ALTER TABLE course_proposals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ');
+
+    await query('ALTER TABLE lessons ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id) ON DELETE SET NULL');
+
     // Create indexes
+    await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_instructor ON courses(instructor_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(published)');
     await query('CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_lessons_module ON lessons(module_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_enrollments_user ON enrollments(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id)');
@@ -223,6 +444,11 @@ async function migrate() {
     await query('CREATE INDEX IF NOT EXISTS idx_reviews_course ON reviews(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON submissions(assignment_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_announcements_course ON announcements(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_live_classes_course ON live_classes(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_resources_course ON resources(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_modules_course ON modules(course_id)');
     console.log('✓ all indexes created');
 
     console.log('Migration completed successfully!');

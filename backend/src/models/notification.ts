@@ -64,3 +64,8 @@ export async function countUnread(userId: string): Promise<number> {
   const { rows } = await query('SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read = false', [userId]);
   return parseInt(rows[0].count, 10);
 }
+
+export async function countNotifications(userId: string): Promise<number> {
+  const { rows } = await query('SELECT COUNT(*) FROM notifications WHERE user_id = $1', [userId]);
+  return parseInt(rows[0].count, 10);
+}

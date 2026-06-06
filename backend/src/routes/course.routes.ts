@@ -70,7 +70,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.get(
   '/instructor',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -153,7 +153,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post(
   '/',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   uploadSingle('thumbnail'),
   validate(createCourseSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -179,7 +179,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   uploadSingle('thumbnail'),
   validate(updateCourseSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -213,7 +213,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const course = await CourseModel.getCourseById(req.params.id);

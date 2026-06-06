@@ -77,7 +77,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post(
   '/',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   validate(createAssignmentSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -111,7 +111,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   validate(updateAssignmentSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -137,7 +137,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const assignment = await AssignmentModel.getAssignmentById(req.params.id);
@@ -205,7 +205,7 @@ router.post(
 router.get(
   '/:id/submissions',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const assignment = await AssignmentModel.getAssignmentById(req.params.id);
@@ -230,7 +230,7 @@ router.get(
 router.put(
   '/submissions/:id/grade',
   authenticate,
-  authorize('instructor', 'admin'),
+  authorize('instructor', 'admin', 'super_admin'),
   validate(gradeSubmissionSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

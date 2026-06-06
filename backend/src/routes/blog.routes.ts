@@ -66,7 +66,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'instructor'),
+  authorize('admin', 'super_admin', 'instructor'),
   uploadSingle('image'),
   validate(createBlogSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -96,7 +96,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('admin', 'instructor'),
+  authorize('admin', 'super_admin', 'instructor'),
   uploadSingle('image'),
   validate(updateBlogSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -130,7 +130,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin', 'instructor'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const blog = await BlogModel.getBlogById(req.params.id);

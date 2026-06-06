@@ -6,7 +6,105 @@ import { io } from '../index'; // import the socket instance
 const router = Router();
 
 // All instructor routes require instructor role
-router.use(authenticate, authorize('instructor', 'admin'));
+router.use(authenticate, authorize('instructor', 'admin', 'super_admin'));
+
+// ----------------------------------------------------------------------
+// DASHBOARD STATS
+// ----------------------------------------------------------------------
+router.get('/dashboard/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+
+    // Active courses count
+    const coursesRes = await query('SELECT COUNT(*) as count FROM courses WHERE instructor_id = $1', [instructorId]);
+    const activeCourses = parseInt(coursesRes.rows[0].count, 10);
+
+    // Total students enrolled in instructor's courses
+    const studentsRes = await query(`
+      SELECT COUNT(DISTINCT e.user_id) as count
+      FROM enrollments e
+      JOIN courses c ON e.course_id = c.id
+      WHERE c.instructor_id = $1
+    `, [instructorId]);
+    const totalStudents = parseInt(studentsRes.rows[0].count, 10);
+
+    // Total revenue
+    const revenueRes = await query(`
+      SELECT COALESCE(SUM(p.amount), 0) as total
+      FROM payments p
+      JOIN courses c ON p.course_id = c.id
+      WHERE c.instructor_id = $1 AND p.status = 'completed'
+    `, [instructorId]);
+    const totalRevenue = parseFloat(revenueRes.rows[0].total);
+
+    // Average rating
+    const ratingRes = await query(`
+      SELECT COALESCE(AVG(r.rating), 0) as avg
+      FROM reviews r
+      JOIN courses c ON r.course_id = c.id
+      WHERE c.instructor_id = $1
+    `, [instructorId]);
+    const averageRating = parseFloat(ratingRes.rows[0].avg).toFixed(1);
+
+    // Top courses
+    const topCoursesRes = await query(`
+      SELECT c.title,
+             COUNT(DISTINCT e.user_id) as students,
+             COALESCE(AVG(r.rating), 0) as rating,
+             COALESCE(SUM(p.amount), 0) as revenue
+      FROM courses c
+      LEFT JOIN enrollments e ON c.id = e.course_id
+      LEFT JOIN reviews r ON c.id = r.course_id
+      LEFT JOIN payments p ON c.id = p.course_id AND p.status = 'completed'
+      WHERE c.instructor_id = $1
+      GROUP BY c.id, c.title
+      ORDER BY students DESC
+      LIMIT 5
+    `, [instructorId]);
+
+    // Recent activity
+    const recentActivityRes = await query(`
+      (SELECT 'enrollment' as type, c.title as details, e.enrolled_at as time
+       FROM enrollments e
+       JOIN courses c ON e.course_id = c.id
+       WHERE c.instructor_id = $1)
+      UNION ALL
+      (SELECT 'submission' as type, a.title as details, s.submitted_at as time
+       FROM submissions s
+       JOIN assignments a ON s.assignment_id = a.id
+       JOIN courses c ON a.course_id = c.id
+       WHERE c.instructor_id = $1)
+      ORDER BY time DESC
+      LIMIT 10
+    `, [instructorId]);
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          activeCourses,
+          totalStudents,
+          totalRevenue,
+          averageRating,
+        },
+        topCourses: topCoursesRes.rows.map(c => ({
+          title: c.title,
+          students: parseInt(c.students, 10),
+          rating: parseFloat(c.rating).toFixed(1),
+          revenue: parseFloat(c.revenue),
+        })),
+        recentActivity: recentActivityRes.rows.map(a => ({
+          action: a.type,
+          details: a.details,
+          time: a.time,
+          type: a.type,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ----------------------------------------------------------------------
 // COURSE PROPOSALS
@@ -14,11 +112,22 @@ router.use(authenticate, authorize('instructor', 'admin'));
 router.get('/course-proposals', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const instructorId = req.user!.userId;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+
     const { rows } = await query(
-      'SELECT * FROM course_proposals WHERE instructor_id = $1 ORDER BY created_at DESC',
-      [instructorId]
+      'SELECT * FROM course_proposals WHERE instructor_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [instructorId, limit, offset]
     );
-    res.json({ success: true, data: rows });
+    const countRes = await query('SELECT COUNT(*) FROM course_proposals WHERE instructor_id = $1', [instructorId]);
+    const total = parseInt(countRes.rows[0].count, 10);
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     next(error);
   }
@@ -30,20 +139,20 @@ router.post('/course-proposals', async (req: AuthRequest, res: Response, next: N
     const { 
       title, category, level, description, learning_outcomes, prerequisites,
       duration, lesson_count, teaching_format, technologies, projects, 
-      recommended_price, thumbnail_url 
+      recommended_price, thumbnail_url, notes
     } = req.body;
 
     const { rows } = await query(`
       INSERT INTO course_proposals (
         instructor_id, title, category, level, description, learning_outcomes, 
         prerequisites, duration, lesson_count, teaching_format, technologies, 
-        projects, recommended_price, thumbnail_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        projects, recommended_price, thumbnail_url, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `, [
       instructorId, title, category, level, description, learning_outcomes, 
       prerequisites, duration || 0, lesson_count || 0, teaching_format, technologies, 
-      projects, recommended_price || 0, thumbnail_url
+      projects, recommended_price || 0, thumbnail_url, notes
     ]);
 
     res.status(201).json({ success: true, data: rows[0] });
@@ -231,6 +340,76 @@ router.post('/live-classes', async (req: AuthRequest, res: Response, next: NextF
     `, [course_id, instructorId, title, description, meeting_url, start_time, duration]);
 
     res.status(201).json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ----------------------------------------------------------------------
+// ATTENDANCE
+// ----------------------------------------------------------------------
+// POST /instructor/live-classes/:id/attendance - Mark attendance (instructor marks students)
+router.post('/live-classes/:id/attendance', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const liveClassId = req.params.id;
+    const { studentIds } = req.body;
+
+    // Verify ownership of live class
+    const classRes = await query(
+      'SELECT * FROM live_classes WHERE id = $1 AND instructor_id = $2',
+      [liveClassId, instructorId]
+    );
+    if (classRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Live class not found or unauthorized' });
+    }
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'studentIds array is required' });
+    }
+
+    const marked: any[] = [];
+    for (const studentId of studentIds) {
+      try {
+        const { rows } = await query(`
+          INSERT INTO attendance (live_class_id, student_id)
+          VALUES ($1, $2)
+          ON CONFLICT (live_class_id, student_id) DO NOTHING
+          RETURNING *
+        `, [liveClassId, studentId]);
+        if (rows[0]) marked.push(rows[0]);
+      } catch {
+        // Skip invalid student IDs
+      }
+    }
+
+    res.json({ success: true, data: marked, count: marked.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /instructor/live-classes/:id/attendance - Get attendance for a live class
+router.get('/live-classes/:id/attendance', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const liveClassId = req.params.id;
+
+    // Get enrolled students + attendance status
+    const { rows } = await query(`
+      SELECT u.id, u.name, u.email, u.avatar,
+             CASE WHEN a.id IS NOT NULL THEN true ELSE false END as attended,
+             a.attended_at
+      FROM enrollments e
+      JOIN users u ON e.user_id = u.id
+      JOIN courses c ON e.course_id = c.id
+      JOIN live_classes lc ON lc.course_id = c.id
+      LEFT JOIN attendance a ON a.live_class_id = lc.id AND a.student_id = u.id
+      WHERE lc.id = $1 AND c.instructor_id = $2
+      ORDER BY u.name ASC
+    `, [liveClassId, instructorId]);
+
+    res.json({ success: true, data: rows });
   } catch (error) {
     next(error);
   }

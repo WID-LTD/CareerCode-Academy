@@ -1,0 +1,681 @@
+IMPLEMENT A COMPLETE PRODUCTION-READY CAREERCODE ACADEMY PLATFORM.
+
+IMPORTANT REQUIREMENTS:
+
+- Use React + TypeScript + Vite ✅
+- Use Tailwind CSS✅
+- Use Node.js + Express + TypeScript✅
+- Use NeonDB PostgreSQL✅
+- Use native PostgreSQL queries using node-postgres (pg)✅
+- DO NOT use Prisma
+- DO NOT use Drizzle ORM
+- DO NOT use MongoDB
+- DO NOT use Mongoose
+- DO NOT use mock data
+- DO NOT use placeholder arrays
+- DO NOT use fake dashboard statistics
+- DO NOT use hardcoded records
+
+Every page, dashboard, table, chart, metric, and report must be powered by live data from NeonDB.
+
+=================================================
+DATABASE✅
+=================================================
+
+Use NeonDB PostgreSQL.
+
+Use:
+
+pg
+dotenv
+
+Create a centralized database connection layer.
+
+Example architecture:
+
+backend/src/
+├── config/
+│   └── database.ts
+├── queries/
+├── controllers/
+├── services/
+├── routes/
+├── middleware/
+└── server.ts
+
+=================================================
+USER ROLES✅
+=================================================
+
+STUDENT
+
+INSTRUCTOR
+
+ADMIN
+
+SUPER_ADMIN
+
+=================================================
+AUTHENTICATION✅
+=================================================
+
+Implement:
+
+- Register
+- Login
+- Logout
+- Forgot Password
+- Reset Password
+- JWT Authentication
+- Refresh Tokens
+- Role-Based Authorization
+- Protected Routes
+
+Store users in PostgreSQL.
+
+Passwords must be hashed using bcrypt.
+
+=================================================
+PUBLIC WEBSITE✅
+=================================================
+
+Create:
+
+Home Page
+About Page
+Courses Page
+Contact Page
+Become An Instructor Page
+Apply Page
+Login Page
+Register Page
+
+=================================================
+STUDENT SYSTEM✅
+=================================================
+
+Student Dashboard
+
+Features:
+
+Dashboard Overview
+
+My Courses
+
+My Progress
+
+Assignments
+
+Submissions
+
+Announcements
+
+Notifications
+
+Profile Settings
+
+=================================================
+INSTRUCTOR APPLICATION SYSTEM✅
+=================================================
+
+Create:
+
+/become-an-instructor
+
+Application Form Fields:
+
+Full Name
+
+Email
+
+Phone
+
+Country
+
+State
+
+Professional Title
+
+Years Of Experience
+
+Specialization
+
+GitHub URL
+
+LinkedIn URL
+
+Portfolio URL
+
+Resume Upload
+
+Profile Image Upload
+
+Bio
+
+Teaching Experience
+
+Interested Courses
+
+Availability
+
+Motivation
+
+=================================================
+DATABASE TABLE✅
+=================================================
+
+instructor_applications
+
+Columns:
+
+id
+
+full_name
+
+email
+
+phone
+
+country
+
+state
+
+professional_title
+
+experience_years
+
+specialization
+
+github_url
+
+linkedin_url
+
+portfolio_url
+
+resume_url
+
+profile_image_url
+
+bio
+
+teaching_experience
+
+interested_courses
+
+availability
+
+motivation
+
+status
+
+review_notes
+
+reviewed_by
+
+reviewed_at
+
+created_at
+
+updated_at
+
+=================================================
+ADMIN REVIEW SYSTEM✅
+=================================================
+
+Admin Dashboard Section:
+
+Instructor Applications
+
+Features:
+
+View Applications
+
+Search Applications
+
+Filter Applications
+
+Approve Application
+
+Reject Application
+
+Add Notes
+
+Download Resume
+
+View Portfolio
+
+View GitHub
+
+=================================================
+APPROVAL WORKFLOW✅
+=================================================
+
+When approved:
+
+Create instructor account
+
+Assign role:
+
+INSTRUCTOR
+
+Generate temporary password
+
+Create notification
+
+Send email
+
+Grant instructor dashboard access
+
+=================================================
+INSTRUCTOR DASHBOARD✅
+=================================================
+
+Features:
+
+Dashboard Overview
+
+My Courses
+
+Course Analytics
+
+Students
+
+Assignments
+
+Submissions
+
+Grading
+
+Announcements
+
+Live Classes
+
+Messages
+
+Schedule
+
+Profile
+
+=================================================
+COURSE PROPOSAL SYSTEM✅👆🏻
+=================================================
+
+Allow instructors to submit courses.
+
+Create:
+
+/instructor/course-proposals
+
+Fields:
+
+Title
+
+Category
+
+Level
+
+Description
+
+Learning Outcomes
+
+Prerequisites
+
+Duration
+
+Lesson Count
+
+Teaching Format
+
+Technologies
+
+Projects
+
+Recommended Price
+
+Thumbnail
+
+Notes
+
+=================================================
+DATABASE TABLE
+=================================================
+
+course_proposals
+
+Columns:
+
+id
+
+instructor_id
+
+title
+
+category
+
+level
+
+description
+
+learning_outcomes
+
+prerequisites
+
+duration
+
+lesson_count
+
+delivery_format
+
+technologies
+
+projects
+
+recommended_price
+
+thumbnail_url
+
+notes
+
+status
+
+review_notes
+
+reviewed_by
+
+reviewed_at
+
+created_at
+
+updated_at
+
+=================================================
+COURSE MANAGEMENT
+=================================================
+
+Admin and Instructors can manage courses.
+
+Features:
+
+Create Course
+
+Edit Course
+
+Archive Course
+
+Publish Course
+
+Manage Modules
+
+Manage Lessons
+
+Manage Resources
+
+Manage Assignments
+
+=================================================
+DATABASE TABLES
+=================================================
+
+users
+
+courses
+
+modules
+
+lessons
+
+enrollments
+
+assignments
+
+submissions
+
+announcements
+
+notifications
+
+payments
+
+course_proposals
+
+instructor_applications
+
+live_classes
+
+attendance
+
+resources
+
+messages
+
+conversations
+
+=================================================
+PAYMENT SYSTEM
+=================================================
+
+Integrate:
+
+Paystack
+
+Implement:
+
+Initialize Payment
+
+Verify Payment
+
+Payment History
+
+Enrollment After Successful Payment
+
+=================================================
+ENROLLMENT SYSTEM
+=================================================
+
+Student clicks Enroll
+
+↓
+
+Paystack Payment
+
+↓
+
+Payment Verified
+
+↓
+
+Create Enrollment
+
+↓
+
+Grant Course Access
+
+=================================================
+ADMIN DASHBOARD
+=================================================
+
+Real-Time Analytics
+
+Show:
+
+Total Students
+
+Total Instructors
+
+Total Courses
+
+Total Enrollments
+
+Total Revenue
+
+Assignment Statistics
+
+Recent Activity
+
+Pending Instructor Applications
+
+Pending Course Proposals
+
+All statistics must come from PostgreSQL queries.
+
+Example:
+
+SELECT COUNT(*) FROM users WHERE role='STUDENT';
+
+SELECT COUNT(*) FROM courses;
+
+SELECT COUNT(*) FROM enrollments;
+
+Never use hardcoded values.
+
+=================================================
+REPORTING
+=================================================
+
+Generate reports from real database data.
+
+Reports:
+
+Enrollment Report
+
+Revenue Report
+
+Instructor Performance
+
+Student Progress
+
+Course Performance
+
+=================================================
+FILE UPLOADS
+=================================================
+
+Use:
+
+Supabase Storage
+
+or
+
+AWS S3
+
+DO NOT use Cloudinary.
+
+Support:
+
+Profile Images
+
+Resumes
+
+Assignments
+
+Resources
+
+Course Thumbnails
+
+Certificates
+
+=================================================
+EMAIL SYSTEM
+=================================================
+
+Use:
+
+Resend
+
+DO NOT use Nodemailer.
+
+Support:
+
+Welcome Email
+
+Password Reset
+
+Instructor Approval
+
+Course Enrollment
+
+Announcements
+
+=================================================
+API ARCHITECTURE
+=================================================
+
+Create REST APIs:
+
+/api/auth
+
+/api/users
+
+/api/courses
+
+/api/modules
+
+/api/lessons
+
+/api/enrollments
+
+/api/assignments
+
+/api/submissions
+
+/api/payments
+
+/api/instructor-applications
+
+/api/course-proposals
+
+/api/announcements
+
+/api/notifications
+
+/api/messages
+
+=================================================
+SECURITY
+=================================================
+
+Implement:
+
+JWT
+
+bcrypt
+
+Helmet
+
+Rate Limiting
+
+Input Validation
+
+Role Permissions
+
+CORS
+
+SQL Injection Protection
+
+=================================================
+RESPONSIVENESS
+=================================================
+
+Fully responsive:
+
+Mobile
+
+Tablet
+
+Desktop
+
+=================================================
+FINAL REQUIREMENT
+=================================================
+
+Generate a complete production-ready LMS.
+
+Every dashboard card, chart, table, metric, and report must fetch live data from NeonDB using node-postgres queries.
+
+Do not generate demo content.
+
+Do not generate placeholder records.
+
+Do not generate fake statistics.
+
+Everything must be connected to actual database tables and API endpoints.

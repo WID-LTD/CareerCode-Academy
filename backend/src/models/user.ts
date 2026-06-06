@@ -5,7 +5,7 @@ export interface User {
   name: string;
   email: string;
   password: string;
-  role: 'student' | 'instructor' | 'admin';
+  role: 'student' | 'instructor' | 'admin' | 'super_admin';
   avatar: string | null;
   bio: string | null;
   is_verified: boolean;
@@ -33,7 +33,7 @@ export interface UpdateUserInput {
   reset_token?: string | null;
   reset_token_expiry?: Date | null;
   password?: string;
-  role?: 'student' | 'instructor' | 'admin';
+  role?: 'student' | 'instructor' | 'admin' | 'super_admin';
 }
 
 export async function createUser(input: CreateUserInput): Promise<User> {

@@ -4,7 +4,7 @@ import { sendMail } from '../config/mailer';
 
 export interface TokenPayload {
   userId: string;
-  role: 'student' | 'instructor' | 'admin';
+  role: 'student' | 'instructor' | 'admin' | 'super_admin';
 }
 
 export function generateToken(payload: TokenPayload): string {

@@ -25,16 +25,20 @@ export async function sendMail(options: {
     return;
   }
 
-  const { error } = await resend.emails.send({
-    from: `CareerCode Academy <${process.env.RESEND_FROM || 'noreply@careercode.academy'}>`,
-    to: options.to,
-    subject: options.subject,
-    html: options.html,
-    text: options.text,
-  });
+  try {
+    const { error } = await resend.emails.send({
+      from: `CareerCode Academy <${process.env.RESEND_FROM || 'noreply@careercode.academy'}>`,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    });
 
-  if (error) {
-    console.error('[Mail] Resend error:', error);
+    if (error) {
+      console.error('[Mail] Resend error:', error);
+    }
+  } catch (err) {
+    console.error('[Mail] Resend exception:', err);
   }
 }
 

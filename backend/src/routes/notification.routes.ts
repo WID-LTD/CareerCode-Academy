@@ -24,10 +24,13 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 
     const unreadCount = await NotificationModel.countUnread(req.user!.userId);
 
+    const total = await NotificationModel.countNotifications(req.user!.userId);
+
     res.json({
       success: true,
       data: notifications,
       unreadCount,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
     next(error);

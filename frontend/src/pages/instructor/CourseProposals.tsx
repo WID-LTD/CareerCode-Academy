@@ -13,7 +13,8 @@ export default function InstructorCourseProposals() {
   const [formData, setFormData] = useState({
     title: '', category: '', level: 'beginner', description: '', learning_outcomes: '', 
     prerequisites: '', duration: '', lesson_count: '', teaching_format: '', 
-    technologies: '', projects: '', recommended_price: '', thumbnail_url: ''
+    technologies: '', projects: '', recommended_price: '', thumbnail_url: '',
+    notes: ''
   });
 
   useEffect(() => {
@@ -38,7 +39,8 @@ export default function InstructorCourseProposals() {
       setFormData({
         title: '', category: '', level: 'beginner', description: '', learning_outcomes: '', 
         prerequisites: '', duration: '', lesson_count: '', teaching_format: '', 
-        technologies: '', projects: '', recommended_price: '', thumbnail_url: ''
+        technologies: '', projects: '', recommended_price: '', thumbnail_url: '',
+        notes: ''
       });
     } catch (error) {
       toast.error('Failed to submit proposal');
@@ -139,6 +141,11 @@ export default function InstructorCourseProposals() {
                 <label className="block text-sm font-medium mb-1">Thumbnail Image URL (Optional)</label>
                 <input type="url" name="thumbnail_url" value={formData.thumbnail_url} onChange={handleChange} className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" placeholder="https://..." />
               </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Pitch Notes (Instructor Pitch / Comments)</label>
+                <textarea rows={3} name="notes" value={formData.notes} onChange={handleChange} placeholder="Add any private comments or pitch details for the administrator..." className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 resize-none"></textarea>
+              </div>
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
               <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
@@ -169,9 +176,15 @@ export default function InstructorCourseProposals() {
                 <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">{proposal.description}</p>
                 
                 {proposal.notes && (
-                  <div className="mt-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 text-sm">
-                    <span className="font-semibold block mb-1">Admin Feedback:</span>
-                    {proposal.notes}
+                  <div className="mt-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700 text-sm">
+                    <span className="font-semibold block mb-1 text-gray-500">My Pitch Notes:</span>
+                    <p className="text-gray-700 dark:text-gray-300">{proposal.notes}</p>
+                  </div>
+                )}
+                {proposal.review_notes && (
+                  <div className="mt-4 p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 text-sm">
+                    <span className="font-semibold block mb-1 text-indigo-600 dark:text-indigo-400">Admin Feedback:</span>
+                    <p className="text-gray-700 dark:text-gray-200">{proposal.review_notes}</p>
                   </div>
                 )}
               </div>

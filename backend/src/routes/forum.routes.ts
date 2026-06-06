@@ -121,7 +121,7 @@ router.put(
 router.delete(
   '/threads/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const thread = await ForumModel.getThreadById(req.params.id);

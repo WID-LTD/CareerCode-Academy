@@ -8,7 +8,7 @@ const router = Router();
 router.get(
   '/dashboard',
   authenticate,
-  authorize('student', 'admin'),
+  authorize('student', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
@@ -130,7 +130,7 @@ router.get(
 router.get(
   '/assignments',
   authenticate,
-  authorize('student', 'admin'),
+  authorize('student', 'admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;

@@ -19,7 +19,7 @@ const updateUserSchema = z.object({
 router.get(
   '/',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -87,7 +87,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const deleted = await UserModel.deleteUser(req.params.id);

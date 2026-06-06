@@ -51,7 +51,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize('admin'),
+  authorize('admin', 'super_admin'),
   validate(createCertificateSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

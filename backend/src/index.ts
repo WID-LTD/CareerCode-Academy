@@ -25,6 +25,10 @@ import instructorRoutes from './routes/instructor.routes';
 import enrollmentRoutes from './routes/enrollment.routes';
 import studentRoutes from './routes/student.routes';
 import applicationRoutes from './routes/application.routes';
+import moduleRoutes from './routes/module.routes';
+import resourceRoutes from './routes/resource.routes';
+import searchRoutes from './routes/search.routes';
+import quizRoutes from './routes/quiz.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -62,6 +66,15 @@ app.get('/health', (_req, res) => {
   res.json({ success: true, message: 'CareerCode Academy API is running', timestamp: new Date().toISOString() });
 });
 
+app.get('/db-health', async (_req, res) => {
+  try {
+    const dbRes = await query('SELECT NOW()');
+    res.json({ success: true, message: 'Database is connected', timestamp: dbRes.rows[0].now });
+  } catch (error) {
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/courses', courseRoutes);
@@ -79,6 +92,10 @@ app.use('/api/v1/instructor', instructorRoutes);
 app.use('/api/v1/enrollments', enrollmentRoutes);
 app.use('/api/v1/student', studentRoutes);
 app.use('/api/v1/applications', applicationRoutes);
+app.use('/api/v1/modules', moduleRoutes);
+app.use('/api/v1/resources', resourceRoutes);
+app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/quizzes', quizRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -91,15 +108,7 @@ app.use(errorHandler);
 // Database initialization
 async function initDatabase() {
   try {
-    const exists = await query(
-      `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')`
-    );
-    if (exists.rows[0].exists) {
-      console.log('Database tables already exist, skipping migration');
-      return;
-    }
-
-    console.log('Initializing database...');
+    console.log('Initializing database schemas and migrations...');
 
     await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
 
@@ -109,7 +118,7 @@ async function initDatabase() {
         name VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'instructor', 'admin')),
+        role VARCHAR(20) NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'instructor', 'admin', 'super_admin')),
         avatar TEXT,
         bio TEXT,
         is_verified BOOLEAN DEFAULT false,
@@ -149,10 +158,23 @@ async function initDatabase() {
       )
     `);
 
+    // New modules table
+    await query(`
+      CREATE TABLE IF NOT EXISTS modules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     await query(`
       CREATE TABLE IF NOT EXISTS lessons (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        module_id UUID REFERENCES modules(id) ON DELETE SET NULL,
         title VARCHAR(200) NOT NULL,
         description TEXT NOT NULL,
         video_url TEXT,
@@ -307,6 +329,7 @@ async function initDatabase() {
         state VARCHAR(100),
         professional_title VARCHAR(200),
         years_experience VARCHAR(50),
+        experience_years VARCHAR(50),
         specialization VARCHAR(100),
         github_url TEXT,
         linkedin_url TEXT,
@@ -320,6 +343,9 @@ async function initDatabase() {
         motivation TEXT,
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
         notes TEXT,
+        review_notes TEXT,
+        reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
@@ -344,6 +370,9 @@ async function initDatabase() {
         thumbnail_url TEXT,
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
         notes TEXT,
+        review_notes TEXT,
+        reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
@@ -370,7 +399,7 @@ async function initDatabase() {
         description TEXT,
         meeting_url TEXT NOT NULL,
         start_time TIMESTAMPTZ NOT NULL,
-        duration INTEGER NOT NULL, -- in minutes
+        duration INTEGER NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
@@ -387,6 +416,94 @@ async function initDatabase() {
       )
     `);
 
+    // New attendance table
+    await query(`
+      CREATE TABLE IF NOT EXISTS attendance (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        live_class_id UUID NOT NULL REFERENCES live_classes(id) ON DELETE CASCADE,
+        student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        attended_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(live_class_id, student_id)
+      )
+    `);
+
+    // New resources table
+    await query(`
+      CREATE TABLE IF NOT EXISTS resources (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+        title VARCHAR(200) NOT NULL,
+        file_url TEXT NOT NULL,
+        file_type VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // New quizzes table
+    await query(`
+      CREATE TABLE IF NOT EXISTS quizzes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        time_limit INTEGER NOT NULL DEFAULT 0,
+        passing_score INTEGER NOT NULL DEFAULT 70,
+        max_attempts INTEGER NOT NULL DEFAULT 1,
+        published BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // New quiz_questions table
+    await query(`
+      CREATE TABLE IF NOT EXISTS quiz_questions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+        question TEXT NOT NULL,
+        options JSONB NOT NULL DEFAULT '[]',
+        correct_answer VARCHAR(500) NOT NULL,
+        points INTEGER NOT NULL DEFAULT 1,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // New quiz_attempts table
+    await query(`
+      CREATE TABLE IF NOT EXISTS quiz_attempts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        answers JSONB NOT NULL DEFAULT '[]',
+        score INTEGER NOT NULL DEFAULT 0,
+        passed BOOLEAN DEFAULT false,
+        attempted_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(quiz_id, user_id)
+      )
+    `);
+
+    await query('CREATE INDEX IF NOT EXISTS idx_quizzes_course ON quizzes(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quizzes_lesson ON quizzes(lesson_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz ON quiz_questions(quiz_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id)');
+
+    // Apply schema alterations dynamically for existing installations
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS review_notes TEXT');
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL');
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ');
+    await query('ALTER TABLE instructor_applications ADD COLUMN IF NOT EXISTS experience_years VARCHAR(50)');
+
+    await query('ALTER TABLE course_proposals ADD COLUMN IF NOT EXISTS review_notes TEXT');
+    await query('ALTER TABLE course_proposals ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL');
+    await query('ALTER TABLE course_proposals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ');
+
+    await query('ALTER TABLE lessons ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id) ON DELETE SET NULL');
+
     // Create indexes
     await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token)');
@@ -394,6 +511,7 @@ async function initDatabase() {
     await query('CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(published)');
     await query('CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_lessons_module ON lessons(module_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_enrollments_user ON enrollments(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id)');
@@ -411,6 +529,8 @@ async function initDatabase() {
     await query('CREATE INDEX IF NOT EXISTS idx_announcements_course ON announcements(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_live_classes_course ON live_classes(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_resources_course ON resources(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_modules_course ON modules(course_id)');
 
     console.log('Database tables initialized successfully');
   } catch (error) {
@@ -444,12 +564,13 @@ io.on('connection', (socket: Socket) => {
 
 // Start server
 async function start() {
-  try {
-    await initDatabase();
-    console.log('Database connected and tables initialized');
-  } catch (error) {
-    console.warn('Database connection failed — server will start without DB:', (error as Error).message);
-  }
+  initDatabase()
+    .then(() => {
+      console.log('Database connected and tables initialized');
+    })
+    .catch((error) => {
+      console.warn('Database connection failed — server will start without DB:', (error as Error).message);
+    });
 
   server.listen(PORT, () => {
     console.log(`CareerCode Academy API running on port ${PORT}`);
