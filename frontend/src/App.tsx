@@ -16,6 +16,9 @@ import Pricing from '@/pages/Pricing';
 import Community from '@/pages/Community';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
+import VerifyEmail from '@/pages/VerifyEmail';
 import BecomeInstructor from '@/pages/BecomeInstructor';
 import Apply from '@/pages/Apply';
 import NotFound from '@/pages/NotFound';
@@ -76,6 +79,9 @@ function App() {
           <Route path="/community" element={<Community />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/verify-email/:token" element={<VerifyEmail />} />
           <Route path="/become-instructor" element={<BecomeInstructor />} />
           <Route path="/apply" element={<Apply />} />
           <Route path="/verify-payment" element={<VerifyPayment />} />

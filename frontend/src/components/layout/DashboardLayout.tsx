@@ -6,8 +6,10 @@ import { Sidebar } from './Sidebar';
 import { Menu } from 'lucide-react';
 
 interface DashboardLayoutProps {
-  requiredRole?: 'student' | 'instructor' | 'admin';
+  requiredRole?: 'student' | 'instructor' | 'admin' | 'super_admin';
 }
+
+const adminRoles = ['admin', 'super_admin'];
 
 export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -17,13 +19,21 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
-    const redirectMap = {
+  const role = user?.role || 'student';
+
+  // Allow super_admin to access admin routes
+  const hasAccess = !requiredRole ||
+    role === requiredRole ||
+    (requiredRole === 'admin' && adminRoles.includes(role));
+
+  if (!hasAccess) {
+    const redirectMap: Record<string, string> = {
       student: '/student/dashboard',
       instructor: '/instructor/dashboard',
       admin: '/admin/dashboard',
+      super_admin: '/admin/dashboard',
     };
-    return <Navigate to={redirectMap[user?.role || 'student']} replace />;
+    return <Navigate to={redirectMap[role] || '/student/dashboard'} replace />;
   }
 
   return (
@@ -40,7 +50,7 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
             <Menu className="w-5 h-5" />
           </button>
           <span className="text-sm font-medium capitalize">
-            {user?.role} Dashboard
+            {user?.role === 'super_admin' ? 'Admin' : user?.role} Dashboard
           </span>
         </div>
 

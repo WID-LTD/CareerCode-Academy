@@ -41,11 +41,25 @@ export function Navbar() {
     if (!user) return '/login';
     switch (user.role) {
       case 'admin':
+      case 'super_admin':
         return '/admin/dashboard';
       case 'instructor':
         return '/instructor/dashboard';
       default:
         return '/student/dashboard';
+    }
+  };
+
+  const getProfileLink = () => {
+    if (!user) return '/login';
+    switch (user.role) {
+      case 'admin':
+      case 'super_admin':
+        return '/admin/settings';
+      case 'instructor':
+        return '/instructor/profile';
+      default:
+        return '/student/profile';
     }
   };
 
@@ -85,7 +99,7 @@ export function Navbar() {
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
-            {isAuthenticated && user?.role === 'student' && (
+            {isAuthenticated && (
               <NotificationsBell />
             )}
 
@@ -120,7 +134,7 @@ export function Navbar() {
                         Dashboard
                       </Link>
                       <Link
-                        to="/student/profile"
+                        to={getProfileLink()}
                         onClick={() => setShowDropdown(false)}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >

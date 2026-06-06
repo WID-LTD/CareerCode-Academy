@@ -68,8 +68,9 @@ api.interceptors.response.use(
           const { data } = await axios.post(refreshUrl, {
             refreshToken,
           });
-          useAuthStore.getState().setToken(data.token);
-          originalRequest.headers.Authorization = `Bearer ${data.token}`;
+          const newToken = data.data?.token || data.token;
+          useAuthStore.getState().setToken(newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         }
       } catch {

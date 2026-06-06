@@ -6,7 +6,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'student' | 'instructor' | 'admin';
+  role: 'student' | 'instructor' | 'admin' | 'super_admin';
   avatar?: string | null;
   bio?: string | null;
   isVerified?: boolean;

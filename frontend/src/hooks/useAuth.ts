@@ -21,7 +21,7 @@ export function useAuth() {
       await storeLogin(email, password);
       toast.success('Welcome back!');
       const role = useAuthStore.getState().user?.role;
-      if (role === 'admin') navigate('/admin/dashboard');
+      if (role === 'admin' || role === 'super_admin') navigate('/admin/dashboard');
       else if (role === 'instructor') navigate('/instructor/dashboard');
       else navigate('/student/dashboard');
     } catch {

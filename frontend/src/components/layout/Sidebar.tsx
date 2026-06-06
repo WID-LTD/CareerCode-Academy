@@ -28,7 +28,7 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-const roleSidebarLinks = {
+const roleSidebarLinks: Record<string, { label: string; path: string; icon: any }[]> = {
   student: [
     { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
     { label: 'My Courses', path: '/student/courses', icon: BookOpen },
@@ -51,6 +51,16 @@ const roleSidebarLinks = {
     { label: 'Profile', path: '/instructor/profile', icon: UserCircle },
   ],
   admin: [
+    { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Users', path: '/admin/users', icon: Users },
+    { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
+    { label: 'Course Proposals', path: '/admin/course-proposals', icon: FileText },
+    { label: 'Applications', path: '/admin/applications', icon: FileText },
+    { label: 'Payments', path: '/admin/payments', icon: CreditCard },
+    { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
+    { label: 'Settings', path: '/admin/settings', icon: Settings },
+  ],
+  super_admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
