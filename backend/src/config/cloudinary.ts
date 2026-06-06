@@ -1,1 +1,1 @@
-export { uploadSingle, uploadMultiple } from '../middleware/upload';
+export { uploadSingle, uploadMultiple, uploadToCloud } from '../middleware/upload';

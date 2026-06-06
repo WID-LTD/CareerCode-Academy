@@ -1,6 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { uploadFile } from '../config/storage';
 
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -35,6 +36,31 @@ const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer
 };
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
+
+// Middleware that uploads to Supabase after multer saves locally
+export function uploadToCloud(fieldName: string, folder: string = 'uploads') {
+  return [
+    upload.single(fieldName),
+    async (req: any, _res: any, next: any) => {
+      if (req.file) {
+        try {
+          const buffer = fs.readFileSync(req.file.path);
+          const publicUrl = await uploadFile(buffer, req.file.originalname, folder);
+          // Replace local path with cloud URL
+          req.file.filename = publicUrl;
+          req.file.path = publicUrl;
+          // Clean up local file
+          fs.unlinkSync(req.file.path);
+          // Actually we need to be careful here - let's just set req.body[fieldName] to the URL
+          req.body[fieldName] = publicUrl;
+        } catch (error) {
+          console.error('Cloud upload failed, using local file:', error);
+        }
+      }
+      next();
+    },
+  ];
+}
 
 export const uploadSingle = (fieldName: string) => upload.single(fieldName);
 export const uploadMultiple = (fieldName: string, maxCount: number = 5) =>

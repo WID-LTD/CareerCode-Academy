@@ -161,7 +161,7 @@ export default function AdminApplications() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
                           {app.profile_image_url ? (
-                            <img src={`http://localhost:3000${app.profile_image_url}`} alt="avatar" className="w-full h-full object-cover" />
+                            <img src={app.profile_image_url} alt="avatar" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-600 font-bold">
                               {app.full_name.charAt(0)}
@@ -236,7 +236,7 @@ export default function AdminApplications() {
                 <div className="md:col-span-2 space-y-6">
                   <div className="flex items-center gap-4">
                     {selectedApp.profile_image_url ? (
-                      <img src={`http://localhost:3000${selectedApp.profile_image_url}`} alt="avatar" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />
+                      <img src={selectedApp.profile_image_url} alt="avatar" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />
                     ) : (
                       <div className="w-20 h-20 rounded-xl bg-gray-200 flex items-center justify-center text-3xl font-bold text-gray-400">
                         {selectedApp.full_name.charAt(0)}
@@ -306,7 +306,7 @@ export default function AdminApplications() {
                     <div className="space-y-3">
                       {selectedApp.resume_url && (
                         <a 
-                          href={`http://localhost:3000${selectedApp.resume_url}`} 
+                          href={selectedApp.resume_url} 
                           target="_blank" rel="noreferrer"
                           className="flex items-center gap-3 w-full p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-primary-500 transition-colors"
                         >
