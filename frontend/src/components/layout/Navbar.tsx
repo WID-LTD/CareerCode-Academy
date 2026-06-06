@@ -16,12 +16,14 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { Button } from '@/components/ui/Button';
+import { NotificationsBell } from './NotificationsBell';
 
 const navLinks = [
   { label: 'Home', path: '/' },
   { label: 'Courses', path: '/courses' },
   { label: 'Pricing', path: '/pricing' },
   { label: 'Community', path: '/community' },
+  { label: 'Teach', path: '/become-instructor' },
   { label: 'Blog', path: '/blog' },
   { label: 'About', path: '/about' },
   { label: 'Contact', path: '/contact' },
@@ -82,6 +84,10 @@ export function Navbar() {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
+
+            {isAuthenticated && user?.role === 'student' && (
+              <NotificationsBell />
+            )}
 
             {isAuthenticated ? (
               <div className="relative">

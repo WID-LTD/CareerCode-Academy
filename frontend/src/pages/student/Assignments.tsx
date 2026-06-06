@@ -1,24 +1,42 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FileText, Clock, CheckCircle, AlertCircle, Upload, Calendar, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FileText, Clock, CheckCircle, AlertCircle, Upload, Calendar, X, Loader2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
-
-const assignments = [
-  { title: 'Build a Personal Portfolio Page', course: 'Full-Stack Web Development', due: '2025-06-10', status: 'pending', grade: null, description: 'Create a responsive personal portfolio website using HTML5, CSS3, and JavaScript. Include sections for about, projects, skills, and contact.' },
-  { title: 'CSS Grid Layout Challenge', course: 'Full-Stack Web Development', due: '2025-06-05', status: 'submitted', grade: 'A', description: 'Recreate a complex magazine-style layout using CSS Grid.' },
-  { title: 'Data Analysis Report', course: 'Data Science & ML', due: '2025-06-15', status: 'in-progress', grade: null, description: 'Analyze the provided dataset and create a comprehensive report with visualizations.' },
-  { title: 'JavaScript Calculator App', course: 'Full-Stack Web Development', due: '2025-05-28', status: 'graded', grade: 'A+', description: 'Build a fully functional calculator with basic arithmetic operations.' },
-  { title: 'UI Component Library', course: 'UI/UX Design', due: '2025-06-20', status: 'not-started', grade: null, description: 'Design and document a reusable component library in Figma.' },
-  { title: 'REST API Design', course: 'Backend Development', due: '2025-06-01', status: 'graded', grade: 'B+', description: 'Design and implement a RESTful API for a blog platform.' },
-];
+import { useStudentStore } from '@/store/studentStore';
 
 export default function Assignments() {
+  const { assignments, fetchAssignments, submitAssignment, isLoading } = useStudentStore();
   const [filter, setFilter] = useState('all');
+  const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
+  const [fileUrl, setFileUrl] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
 
   const filtered = filter === 'all' ? assignments : assignments.filter(a => a.status === filter);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAssignment || !fileUrl) return;
+    
+    setIsSubmitting(true);
+    try {
+      await submitAssignment(selectedAssignment, fileUrl);
+      setSelectedAssignment(null);
+      setFileUrl('');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -45,6 +63,11 @@ export default function Assignments() {
         ))}
       </div>
 
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+        </div>
+      ) : (
       <div className="space-y-4">
         {filtered.map((assignment, i) => (
           <motion.div
@@ -89,14 +112,20 @@ export default function Assignments() {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 line-clamp-1">{assignment.description}</p>
                   <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
                     <div className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Due: {assignment.due}</div>
-                    {assignment.status !== 'not-started' && assignment.status !== 'graded' && (
-                      <Button variant="ghost" size="sm">View Details</Button>
+                    {assignment.feedback && (
+                      <div className="ml-4 text-xs text-primary-500 max-w-xs truncate" title={assignment.feedback}>
+                        Feedback: {assignment.feedback}
+                      </div>
+                    )}
+                    <div className="flex-1" />
+                    {assignment.status !== 'not-started' && assignment.status !== 'graded' && assignment.status !== 'submitted' && (
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedAssignment(assignment.id)}>Submit Now</Button>
                     )}
                     {assignment.status === 'not-started' && (
-                      <Button variant="primary" size="sm">Start Assignment</Button>
+                      <Button variant="primary" size="sm" onClick={() => setSelectedAssignment(assignment.id)}>Start Assignment</Button>
                     )}
                     {assignment.status === 'pending' && (
-                      <Button variant="primary" size="sm">Submit Now</Button>
+                      <Button variant="primary" size="sm" onClick={() => setSelectedAssignment(assignment.id)}>Submit Now</Button>
                     )}
                   </div>
                 </div>
@@ -104,7 +133,52 @@ export default function Assignments() {
             </GlassCard>
           </motion.div>
         ))}
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            No assignments found.
+          </div>
+        )}
       </div>
+      )}
+
+      {/* Submission Modal */}
+      <AnimatePresence>
+        {selectedAssignment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <h2 className="text-xl font-bold">Submit Assignment</h2>
+                <button onClick={() => setSelectedAssignment(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Project URL / File Link</label>
+                  <Input 
+                    placeholder="https://github.com/..." 
+                    value={fileUrl}
+                    onChange={(e) => setFileUrl(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-2">Please provide a link to your repository, live project, or Google Doc.</p>
+                </div>
+                <div className="pt-4 flex gap-3">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setSelectedAssignment(null)}>Cancel</Button>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting || !fileUrl}>
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Submit'}
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -5,6 +5,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import http from 'http';
+import { Server, Socket } from 'socket.io';
 
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
@@ -20,6 +22,9 @@ import reviewRoutes from './routes/review.routes';
 import notificationRoutes from './routes/notification.routes';
 import forumRoutes from './routes/forum.routes';
 import instructorRoutes from './routes/instructor.routes';
+import enrollmentRoutes from './routes/enrollment.routes';
+import studentRoutes from './routes/student.routes';
+import applicationRoutes from './routes/application.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -71,6 +76,9 @@ app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/forum', forumRoutes);
 app.use('/api/v1/instructor', instructorRoutes);
+app.use('/api/v1/enrollments', enrollmentRoutes);
+app.use('/api/v1/student', studentRoutes);
+app.use('/api/v1/applications', applicationRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -110,6 +118,16 @@ async function initDatabase() {
         reset_token_expiry TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(500) UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
 
@@ -279,7 +297,99 @@ async function initDatabase() {
       )
     `);
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS instructor_applications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        full_name VARCHAR(200) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        country VARCHAR(100),
+        state VARCHAR(100),
+        professional_title VARCHAR(200),
+        years_experience VARCHAR(50),
+        specialization VARCHAR(100),
+        github_url TEXT,
+        linkedin_url TEXT,
+        portfolio_url TEXT,
+        resume_url TEXT,
+        profile_image_url TEXT,
+        bio TEXT,
+        teaching_experience TEXT,
+        interested_courses TEXT,
+        availability VARCHAR(100),
+        motivation TEXT,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS course_proposals (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        level VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        learning_outcomes TEXT,
+        prerequisites TEXT,
+        duration INTEGER NOT NULL DEFAULT 0,
+        lesson_count INTEGER NOT NULL DEFAULT 0,
+        teaching_format VARCHAR(100),
+        technologies TEXT,
+        projects TEXT,
+        recommended_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        thumbnail_url TEXT,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS live_classes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        meeting_url TEXT NOT NULL,
+        start_time TIMESTAMPTZ NOT NULL,
+        duration INTEGER NOT NULL, -- in minutes
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS direct_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     // Create indexes
+    await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_instructor ON courses(instructor_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category)');
     await query('CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(published)');
@@ -298,6 +408,9 @@ async function initDatabase() {
     await query('CREATE INDEX IF NOT EXISTS idx_reviews_course ON reviews(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON submissions(assignment_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_announcements_course ON announcements(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_live_classes_course ON live_classes(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)');
 
     console.log('Database tables initialized successfully');
   } catch (error) {
@@ -305,6 +418,29 @@ async function initDatabase() {
     throw error;
   }
 }
+
+// Setup HTTP server and Socket.IO
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  }
+});
+
+io.on('connection', (socket: Socket) => {
+  console.log('A user connected via socket:', socket.id);
+  
+  socket.on('join_room', (userId: string) => {
+    socket.join(userId);
+    console.log(`User ${userId} joined their personal room`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 
 // Start server
 async function start() {
@@ -315,7 +451,7 @@ async function start() {
     console.warn('Database connection failed — server will start without DB:', (error as Error).message);
   }
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`CareerCode Academy API running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
   });
@@ -323,4 +459,4 @@ async function start() {
 
 start();
 
-export default app;
+export { app, io };

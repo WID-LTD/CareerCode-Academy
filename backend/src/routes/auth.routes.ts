@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import * as UserModel from '../models/user';
 import * as NotificationModel from '../models/notification';
+import * as TokenModel from '../models/token';
 import {
   generateToken,
   generateRefreshToken,
@@ -79,6 +80,8 @@ router.post(
       const tokenPayload = { userId: user.id, role: user.role };
       const token = generateToken(tokenPayload);
       const refreshToken = generateRefreshToken(tokenPayload);
+      const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
 
       res.status(201).json({
         success: true,
@@ -119,6 +122,8 @@ router.post(
       const tokenPayload = { userId: user.id, role: user.role };
       const token = generateToken(tokenPayload);
       const refreshToken = generateRefreshToken(tokenPayload);
+      const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
 
       res.json({
         success: true,
@@ -238,6 +243,12 @@ router.post(
       const { refreshToken } = req.body;
       const decoded = verifyRefreshToken(refreshToken);
 
+      // Verify token exists in database (whitelist)
+      const dbToken = await TokenModel.findRefreshToken(refreshToken);
+      if (!dbToken) {
+        throw new UnauthorizedError('Invalid or revoked refresh token');
+      }
+
       const user = await UserModel.getUserById(decoded.userId);
       if (!user) {
         throw new UnauthorizedError('User not found');
@@ -246,6 +257,11 @@ router.post(
       const tokenPayload = { userId: user.id, role: user.role };
       const newToken = generateToken(tokenPayload);
       const newRefreshToken = generateRefreshToken(tokenPayload);
+
+      // Token Rotation: Delete old token, insert new token
+      await TokenModel.deleteRefreshToken(refreshToken);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await TokenModel.createRefreshToken(user.id, newRefreshToken, expiresAt);
 
       res.json({
         success: true,
@@ -260,6 +276,27 @@ router.post(
       } else {
         next(error);
       }
+    }
+  }
+);
+
+// POST /logout
+router.post(
+  '/logout',
+  validate(refreshTokenSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { refreshToken } = req.body;
+      
+      // Delete token from database
+      await TokenModel.deleteRefreshToken(refreshToken);
+      
+      res.json({
+        success: true,
+        message: 'Logged out successfully',
+      });
+    } catch (error) {
+      next(error);
     }
   }
 );

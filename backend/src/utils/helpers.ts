@@ -96,3 +96,36 @@ export function calculateProgress(totalLessons: number, completedLessons: number
   if (totalLessons === 0) return 0;
   return Math.round((completedLessons / totalLessons) * 100);
 }
+
+export async function sendInstructorApprovalEmail(email: string, name: string, tempPassword: string): Promise<void> {
+  const loginUrl = `${process.env.FRONTEND_URL}/login`;
+  await sendMail({
+    to: email,
+    subject: 'Welcome to CareerCode Academy - Instructor Application Approved!',
+    html: `
+      <h1>Congratulations, ${name}!</h1>
+      <p>Your application to become an instructor has been approved.</p>
+      <p>We've created an account for you. You can log in using the following temporary credentials:</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Password:</strong> ${tempPassword}</p>
+      <br />
+      <a href="${loginUrl}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;">Log in to Instructor Dashboard</a>
+      <p>Please log in and change your password immediately from your profile settings.</p>
+    `,
+  });
+}
+
+export async function sendInstructorUpgradeEmail(email: string, name: string): Promise<void> {
+  const loginUrl = `${process.env.FRONTEND_URL}/login`;
+  await sendMail({
+    to: email,
+    subject: 'CareerCode Academy - Instructor Application Approved!',
+    html: `
+      <h1>Congratulations, ${name}!</h1>
+      <p>Your application to become an instructor has been approved.</p>
+      <p>Your existing student account has been upgraded to an Instructor account. Your password remains the same.</p>
+      <br />
+      <a href="${loginUrl}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;">Log in to Instructor Dashboard</a>
+    `,
+  });
+}

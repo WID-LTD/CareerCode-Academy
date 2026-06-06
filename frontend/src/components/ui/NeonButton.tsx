@@ -47,9 +47,7 @@ export function NeonButton({
 }: NeonButtonProps) {
   const c = colorMap[color];
   return (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+    <button
       className={cn(
         'relative inline-flex items-center justify-center gap-2 font-semibold rounded-xl border-2 transition-all duration-300 cursor-pointer',
         c.base,
@@ -61,6 +59,6 @@ export function NeonButton({
       {...props}
     >
       <span className="relative z-10">{children}</span>
-    </motion.button>
+    </button>
   );
 }

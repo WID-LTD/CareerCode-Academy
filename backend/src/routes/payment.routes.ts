@@ -170,7 +170,11 @@ router.post(
   '/webhook',
   async (req: Request, res: Response) => {
     try {
-      const { reference, status } = req.body;
+      // Paystack sends data nested under req.body.data
+      // Generic providers send at top level
+      const payload = req.body.data || req.body;
+      const reference = payload.reference || payload.txRef;
+      const status = payload.status || payload.data?.status;
 
       if (!reference || !status) {
         return res.status(400).json({ success: false, message: 'Missing reference or status' });
@@ -181,7 +185,7 @@ router.post(
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
 
-      const paymentStatus = status === 'success' || status === 'completed' ? 'completed' : 'failed';
+      const paymentStatus = status === 'success' || status === 'completed' || status === 'successful' ? 'completed' : 'failed';
       await PaymentModel.updatePaymentStatus(reference, paymentStatus as any, req.body);
 
       if (paymentStatus === 'completed') {

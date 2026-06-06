@@ -19,11 +19,17 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const { register, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await register(name, email, password, role);
+    setErrorMsg('');
+    try {
+      await register(name, email, password, role);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || 'An error occurred during registration.');
+    }
   };
 
   return (
@@ -85,6 +91,12 @@ export default function Signup() {
                   ))}
                 </div>
               </div>
+
+              {errorMsg && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl border border-red-100 dark:border-red-900/50 text-sm text-center">
+                  {errorMsg}
+                </div>
+              )}
 
               <Button type="submit" className="w-full" loading={isLoading}>Create Account</Button>
             </form>

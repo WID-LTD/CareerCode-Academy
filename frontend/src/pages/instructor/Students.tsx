@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Mail, Star, BookOpen, MoreHorizontal, TrendingUp } from 'lucide-react';
+import { Search, Mail, Star, BookOpen, MoreHorizontal, TrendingUp, Users } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';

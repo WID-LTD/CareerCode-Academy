@@ -15,6 +15,10 @@ import {
   ChevronLeft,
   UserCircle,
   FileText,
+  Megaphone,
+  Calendar,
+  MessageSquare,
+  CheckSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -34,15 +38,24 @@ const roleSidebarLinks = {
   ],
   instructor: [
     { label: 'Dashboard', path: '/instructor/dashboard', icon: LayoutDashboard },
+    { label: 'Analytics', path: '/instructor/analytics', icon: BarChart3 },
     { label: 'Courses', path: '/instructor/courses', icon: BookOpen },
+    { label: 'Course Proposals', path: '/instructor/course-proposals', icon: FileText },
     { label: 'Students', path: '/instructor/students', icon: Users },
     { label: 'Assignments', path: '/instructor/assignments', icon: ClipboardList },
+    { label: 'Submissions', path: '/instructor/submissions', icon: CheckSquare },
+    { label: 'Announcements', path: '/instructor/announcements', icon: Megaphone },
+    { label: 'Live Classes', path: '/instructor/live-classes', icon: Video },
+    { label: 'Messages', path: '/instructor/messages', icon: MessageSquare },
+    { label: 'Schedule', path: '/instructor/schedule', icon: Calendar },
     { label: 'Profile', path: '/instructor/profile', icon: UserCircle },
   ],
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
+    { label: 'Course Proposals', path: '/admin/course-proposals', icon: FileText },
+    { label: 'Applications', path: '/admin/applications', icon: FileText },
     { label: 'Payments', path: '/admin/payments', icon: CreditCard },
     { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
     { label: 'Settings', path: '/admin/settings', icon: Settings },

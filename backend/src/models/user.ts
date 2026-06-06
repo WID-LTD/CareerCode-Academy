@@ -33,6 +33,7 @@ export interface UpdateUserInput {
   reset_token?: string | null;
   reset_token_expiry?: Date | null;
   password?: string;
+  role?: 'student' | 'instructor' | 'admin';
 }
 
 export async function createUser(input: CreateUserInput): Promise<User> {

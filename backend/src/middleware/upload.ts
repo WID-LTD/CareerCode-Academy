@@ -39,3 +39,4 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 10
 export const uploadSingle = (fieldName: string) => upload.single(fieldName);
 export const uploadMultiple = (fieldName: string, maxCount: number = 5) =>
   upload.array(fieldName, maxCount);
+export const uploadFields = (fields: multer.Field[]) => upload.fields(fields);

@@ -22,6 +22,7 @@ const footerLinks = {
   ],
   Company: [
     { label: 'About', path: '/about' },
+    { label: 'Teach on CareerCode', path: '/become-instructor' },
     { label: 'Careers', path: '/careers' },
     { label: 'Contact', path: '/contact' },
     { label: 'Partners', path: '/partners' },

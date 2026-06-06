@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/axios';
+import { Course } from './courseStore';
 
 export interface DashboardStats {
   activeCourses: number;
@@ -26,16 +27,20 @@ interface InstructorState {
   stats: DashboardStats | null;
   topCourses: TopCourse[];
   recentActivity: RecentActivity[];
+  myCourses: Course[];
   isLoading: boolean;
   error: string | null;
   
   fetchDashboardStats: () => Promise<void>;
+  fetchMyCourses: () => Promise<void>;
+  deleteCourse: (id: string) => Promise<void>;
 }
 
-export const useInstructorStore = create<InstructorState>((set) => ({
+export const useInstructorStore = create<InstructorState>((set, get) => ({
   stats: null,
   topCourses: [],
   recentActivity: [],
+  myCourses: [],
   isLoading: false,
   error: null,
 
@@ -54,6 +59,36 @@ export const useInstructorStore = create<InstructorState>((set) => ({
         isLoading: false, 
         error: error.response?.data?.message || 'Failed to fetch dashboard stats' 
       });
+    }
+  },
+
+  fetchMyCourses: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.get('/courses/instructor');
+      set({ myCourses: data.data || [], isLoading: false });
+    } catch (error: any) {
+      set({ 
+        isLoading: false, 
+        error: error.response?.data?.message || 'Failed to fetch your courses' 
+      });
+    }
+  },
+
+  deleteCourse: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await api.delete(`/courses/${id}`);
+      set({ 
+        myCourses: get().myCourses.filter(course => course.id !== id),
+        isLoading: false 
+      });
+    } catch (error: any) {
+      set({ 
+        isLoading: false, 
+        error: error.response?.data?.message || 'Failed to delete course' 
+      });
+      throw error;
     }
   }
 }));
