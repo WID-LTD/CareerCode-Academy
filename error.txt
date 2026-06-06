@@ -1,8 +1,9 @@
-authStore.ts:73 
- POST http://localhost:3000/api/v1/auth/register 500 (Internal Server Error)
+studentStore.ts:105 
+ GET http://localhost:3000/api/v1/student/dashboard 500 (Internal Server Error)
+Promise.then		
+(anonymous)	@	studentStore.ts:105
+(anonymous)	@	Dashboard.tsx:20
 Promise.then		
 (anonymous)	@	authStore.ts:73
 (anonymous)	@	useAuth.ts:39
 (anonymous)	@	Signup.tsx:29
-
-﻿

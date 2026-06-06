@@ -67,11 +67,28 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/db-health', async (_req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    return res.status(503).json({
+      success: false,
+      message: 'DATABASE_URL is not configured in .env',
+      hint: 'Copy backend/.env.example to backend/.env and set your DATABASE_URL',
+    });
+  }
   try {
     const dbRes = await query('SELECT NOW()');
     res.json({ success: true, message: 'Database is connected', timestamp: dbRes.rows[0].now });
   } catch (error) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    const msg = (error as Error).message;
+    res.status(503).json({
+      success: false,
+      message: 'Database connection failed',
+      detail: msg.includes('ETIMEDOUT')
+        ? 'Connection timed out — check your network or wake up NeonDB'
+        : msg.includes('ECONNREFUSED')
+          ? 'Connection refused — database server may be down'
+          : msg,
+    });
   }
 });
 
@@ -562,15 +579,51 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
+// Retry database initialization with backoff
+async function initDatabaseWithRetry(retries: number = 3, delay: number = 3000): Promise<boolean> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await initDatabase();
+      console.log('Database connected and tables initialized');
+      return true;
+    } catch (error) {
+      const msg = (error as Error).message;
+      if (i < retries - 1) {
+        console.warn(`Database init attempt ${i + 1} failed (${msg}), retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+      } else {
+        console.warn('══════════════════════════════════════════════════════════');
+        console.warn('  DATABASE CONNECTION FAILED');
+        console.warn('══════════════════════════════════════════════════════════');
+        console.warn(`  ${msg}`);
+        console.warn('');
+        if (msg.includes('ETIMEDOUT')) {
+          console.warn('  Cause: Connection to NeonDB timed out.');
+          console.warn('  This usually means your network blocks port 5432');
+          console.warn('  or the NeonDB instance needs to be woken up.');
+          console.warn('');
+          console.warn('  Fixes to try:');
+          console.warn('  1. Visit https://console.neon.tech and open your project');
+          console.warn('  2. Check if your IP is allowed in NeonDB settings');
+          console.warn('  3. Use a VPN or different network');
+          console.warn('  4. Run the database locally by installing PostgreSQL');
+          console.warn('     and updating DATABASE_URL in backend/.env');
+        } else if (msg.includes('ECONNREFUSED')) {
+          console.warn('  Cause: Connection refused.');
+          console.warn('  Check DATABASE_URL in backend/.env:');
+          console.warn('  ' + (process.env.DATABASE_URL?.substring(0, 50) + '...' || 'NOT SET'));
+        }
+        console.warn('══════════════════════════════════════════════════════════');
+      }
+    }
+  }
+  return false;
+}
+
 // Start server
 async function start() {
-  initDatabase()
-    .then(() => {
-      console.log('Database connected and tables initialized');
-    })
-    .catch((error) => {
-      console.warn('Database connection failed — server will start without DB:', (error as Error).message);
-    });
+  await initDatabaseWithRetry(3, 3000);
 
   server.listen(PORT, () => {
     console.log(`CareerCode Academy API running on port ${PORT}`);

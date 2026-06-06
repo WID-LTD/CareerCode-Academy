@@ -24,8 +24,13 @@ export function useAuth() {
       if (role === 'admin' || role === 'super_admin') navigate('/admin/dashboard');
       else if (role === 'instructor') navigate('/instructor/dashboard');
       else navigate('/student/dashboard');
-    } catch {
-      toast.error('Invalid email or password');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || '';
+      if (message.includes('unavailable')) {
+        toast.error('Service unavailable — database connection issue');
+      } else {
+        toast.error('Invalid email or password');
+      }
     }
   };
 
@@ -40,8 +45,13 @@ export function useAuth() {
       toast.success('Account created successfully!');
       if (role === 'instructor') navigate('/instructor/dashboard');
       else navigate('/student/dashboard');
-    } catch {
-      toast.error('Registration failed. Please try again.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || '';
+      if (message.includes('unavailable')) {
+        toast.error('Service unavailable — database connection issue');
+      } else {
+        toast.error('Registration failed. Please try again.');
+      }
     }
   };
 
