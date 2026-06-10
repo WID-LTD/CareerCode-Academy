@@ -621,6 +621,15 @@ async function initDatabaseWithRetry(retries: number = 3, delay: number = 3000):
   return false;
 }
 
+// Keep database alive (NeonDB free tier sleeps after 5 minutes of inactivity)
+function startKeepAlive() {
+  setInterval(async () => {
+    try {
+      await query('SELECT 1');
+    } catch { /* ignore */ }
+  }, 60000); // every 60 seconds
+}
+
 // Start server
 async function start() {
   await initDatabaseWithRetry(3, 3000);
@@ -629,6 +638,8 @@ async function start() {
     console.log(`CareerCode Academy API running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
   });
+
+  startKeepAlive();
 }
 
 start();

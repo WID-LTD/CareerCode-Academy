@@ -13,19 +13,33 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   }
 
   // Handle database connection errors
-  const errMessage = (err.message || '').toLowerCase();
-  if (
-    errMessage.includes('econnrefused') ||
-    errMessage.includes('etimedout') ||
-    errMessage.includes('database') ||
-    errMessage.includes('connect')
-  ) {
+  function isDbError(e: any): boolean {
+    const msg = (e?.message || '').toLowerCase();
+    return msg.includes('econnrefused') || msg.includes('etimedout') ||
+           msg.includes('connect') || msg.includes('database') ||
+           msg.includes('timeout') || msg.includes('closed');
+  }
+
+  if (isDbError(err)) {
     console.error('Database error:', err.message);
     res.status(503).json({
       success: false,
-      message: 'Service temporarily unavailable. Database connection issue.',
+      message: 'Service temporarily unavailable — database connection issue.',
     });
     return;
+  }
+
+  // Handle AggregateError (e.g. pool connection failures)
+  if (typeof AggregateError !== 'undefined' && err instanceof AggregateError) {
+    const aggMsg = err.errors?.some((e: any) => isDbError(e));
+    if (aggMsg) {
+      console.error('Database connection error (aggregate):', err.message);
+      res.status(503).json({
+        success: false,
+        message: 'Service temporarily unavailable — database connection issue.',
+      });
+      return;
+    }
   }
 
   console.error('Unhandled error:', err);

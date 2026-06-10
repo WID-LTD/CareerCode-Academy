@@ -1,0 +1,130 @@
+You are a senior full-stack engineer auditing the CareerCode Academy codebase.
+
+OBJECTIVE:
+Users are successfully registering and their records are being saved in NeonDB, but the dashboard is not updating correctly and does not reflect the latest database data.
+
+TASKS:
+
+1. Inspect the entire authentication flow:
+
+   * Registration
+   * Login
+   * JWT/session handling
+   * Protected routes
+   * User roles (student, instructor, admin)
+
+2. Verify that newly registered users are actually persisted in NeonDB.
+
+   * Check database queries.
+   * Check ORM configuration (Prisma, Drizzle, or SQL).
+   * Confirm data is committed successfully.
+
+3. Inspect all dashboard pages.
+
+   * Admin dashboard
+   * Instructor dashboard
+   * Student dashboard
+
+4. Determine where dashboard data originates.
+
+   * Database
+   * API endpoints
+   * Mock data
+   * Static JSON
+   * Hardcoded values
+
+5. Identify any places where mock data is still being used instead of live database queries.
+
+6. Trace the complete data flow:
+   NeonDB → Backend API → Service Layer → Frontend State → Dashboard UI
+
+7. Verify dashboard statistics:
+
+   * Total users
+   * Total students
+   * Total instructors
+   * Total courses
+   * Recent registrations
+   * Enrollments
+   * Revenue metrics
+
+8. Check whether dashboard data is:
+
+   * Cached incorrectly
+   * Not revalidated
+   * Not refetched after registration
+   * Stored in stale React state
+   * Using incorrect query keys
+
+9. Review:
+
+   * React Query / TanStack Query
+   * SWR
+   * Redux
+   * Zustand
+   * Context API
+   * Local component state
+
+10. Determine why new users are not appearing immediately after registration.
+
+11. Implement the best solution:
+
+* Live database queries
+* Proper API endpoints
+* Refetch after mutations
+* Query invalidation
+* Polling if necessary
+* Realtime updates if architecture supports it
+
+12. Search for:
+
+* TODO comments
+* Placeholder code
+* Mock datasets
+* Fake dashboard statistics
+
+13. Produce a detailed report containing:
+
+* Root cause
+* Files affected
+* Code changes required
+* Security concerns
+* Performance concerns
+
+14. Apply the fixes directly.
+
+15. After fixes, verify:
+
+* Register a new user
+* Confirm the record exists in NeonDB
+* Confirm dashboard statistics update
+* Confirm recent users list updates
+* Confirm role counts update
+* Confirm no mock data remains
+
+OUTPUT FORMAT:
+
+=== AUTH AUDIT ===
+Authentication status:
+Issues found:
+Files affected:
+
+=== DASHBOARD AUDIT ===
+Data source:
+Issues found:
+Files affected:
+
+=== DATABASE AUDIT ===
+NeonDB status:
+Queries verified:
+Issues found:
+
+=== FIXES APPLIED ===
+List every file modified and explain why.
+
+=== FINAL VERIFICATION ===
+Registration works: YES/NO
+Dashboard uses live data: YES/NO
+Realtime updates working: YES/NO
+Mock data removed: YES/NO
+Remaining issues:
