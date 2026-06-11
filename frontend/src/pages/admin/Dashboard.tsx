@@ -1,15 +1,16 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, DollarSign, Award, ArrowUp, Calendar, ArrowDown } from 'lucide-react';
+import { Users, BookOpen, DollarSign, Award, RefreshCw, AlertCircle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { useAdminStore } from '@/store/adminStore';
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
 
 export default function AdminDashboard() {
-  const { stats, recentUsers, recentPayments, monthlyRevenue, isLoading, fetchDashboardData } = useAdminStore();
+  const { stats, recentUsers, recentPayments, monthlyRevenue, isLoading, error, fetchDashboardData } = useAdminStore();
 
   useEffect(() => {
     fetchDashboardData();
@@ -19,6 +20,21 @@ export default function AdminDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  if (!isLoading && error && !stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Failed to load dashboard</h2>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <Button onClick={fetchDashboardData}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
+        </div>
       </div>
     );
   }

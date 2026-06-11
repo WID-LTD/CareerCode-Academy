@@ -28,7 +28,13 @@ export default function Signup() {
     try {
       await register(name, email, password, role);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'An error occurred during registration.');
+      const data = err.response?.data;
+      if (data?.errors) {
+        const firstError = Object.values(data.errors)[0] as string[];
+        setErrorMsg(firstError[0]);
+      } else {
+        setErrorMsg(data?.message || 'An error occurred during registration.');
+      }
     }
   };
 

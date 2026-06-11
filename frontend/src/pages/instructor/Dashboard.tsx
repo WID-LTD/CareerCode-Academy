@@ -1,20 +1,21 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, DollarSign, TrendingUp, Star, Activity } from 'lucide-react';
+import { BookOpen, Users, DollarSign, TrendingUp, Star, Activity, RefreshCw, AlertCircle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { useInstructorStore } from '@/store/instructorStore';
 import { useAuthStore } from '@/store/authStore';
 
 export default function InstructorDashboard() {
   const { user } = useAuthStore();
-  const { stats, topCourses, recentActivity, isLoading, fetchDashboardStats } = useInstructorStore();
+  const { stats, topCourses, recentActivity, isLoading, error, fetchDashboardStats } = useInstructorStore();
 
   useEffect(() => {
     fetchDashboardStats();
-  }, []);
+  }, [fetchDashboardStats]);
 
-  if (isLoading || !stats) {
+  if (isLoading && !stats) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
@@ -22,11 +23,26 @@ export default function InstructorDashboard() {
     );
   }
 
+  if (!isLoading && error && !stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Failed to load dashboard</h2>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <Button onClick={fetchDashboardStats}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const statCards = [
-    { icon: BookOpen, label: 'Active Courses', value: stats.activeCourses.toString(), color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { icon: Users, label: 'Total Students', value: stats.totalStudents.toString(), color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { icon: DollarSign, label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { icon: TrendingUp, label: 'Avg Rating', value: stats.averageRating, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+    { icon: BookOpen, label: 'Active Courses', value: stats?.activeCourses?.toString() || '0', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { icon: Users, label: 'Total Students', value: stats?.totalStudents?.toString() || '0', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { icon: DollarSign, label: 'Revenue', value: `$${(stats?.totalRevenue || 0).toLocaleString()}`, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { icon: TrendingUp, label: 'Avg Rating', value: stats?.averageRating || 0, color: 'text-orange-500', bg: 'bg-orange-500/10' },
   ];
 
   return (

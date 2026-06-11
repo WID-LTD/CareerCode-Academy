@@ -102,12 +102,17 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   fetchDashboard: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.get('/student/dashboard');
+      const [dashboardRes, notificationsRes] = await Promise.all([
+        api.get('/student/dashboard'),
+        api.get('/notifications').catch(() => ({ data: { data: [] } })),
+      ]);
+      const data = dashboardRes.data;
       set({
         stats: data.data.stats,
         recentCourses: data.data.recentCourses,
         recentActivity: data.data.recentActivity,
         upcomingAssignments: data.data.upcomingAssignments,
+        notifications: notificationsRes.data.data || [],
         isLoading: false,
       });
     } catch (error: any) {

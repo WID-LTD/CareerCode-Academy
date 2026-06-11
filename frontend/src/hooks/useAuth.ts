@@ -49,9 +49,8 @@ export function useAuth() {
       const message = err?.response?.data?.message || '';
       if (message.includes('unavailable')) {
         toast.error('Service unavailable — database connection issue');
-      } else {
-        toast.error('Registration failed. Please try again.');
       }
+      throw err;
     }
   };
 
