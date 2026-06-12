@@ -281,6 +281,12 @@ router.post(
         }
       }
 
+      // Check for existing enrollment one more time
+      const recheck = await EnrollmentModel.getEnrollment(userId, courseId);
+      if (recheck) {
+        throw new ConflictError('Already enrolled in this course');
+      }
+
       const enrollment = await EnrollmentModel.createEnrollment({ user_id: userId, course_id: courseId });
       res.status(201).json({ success: true, data: enrollment });
     } catch (error) {
