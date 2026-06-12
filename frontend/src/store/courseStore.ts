@@ -37,6 +37,8 @@ export interface Course {
   created_at: string;
   updated_at: string;
   
+  learningOutcomes?: string[];
+  
   // Detail fields
   lessons?: Lesson[];
   reviews?: Review[];

@@ -12,6 +12,7 @@ export interface Course {
   duration: number;
   published: boolean;
   slug: string;
+  learning_outcomes: string[];
   created_at: Date;
   updated_at: Date;
 }
@@ -42,12 +43,25 @@ export interface UpdateCourseInput {
 
 export async function createCourse(input: CreateCourseInput): Promise<Course> {
   const { rows } = await query<Course>(
-    `INSERT INTO courses (title, description, thumbnail, price, category, instructor_id, level, duration, slug)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO courses (title, description, thumbnail, price, category, instructor_id, level, duration, slug, learning_outcomes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
-    [input.title, input.description, input.thumbnail || null, input.price, input.category, input.instructor_id, input.level, input.duration, input.slug]
+    [input.title, input.description, input.thumbnail || null, input.price, input.category, input.instructor_id, input.level, input.duration, input.slug, input.learning_outcomes || []]
   );
   return rows[0];
+}
+
+export interface CreateCourseInput {
+  title: string;
+  description: string;
+  thumbnail?: string;
+  price: number;
+  category: string;
+  instructor_id: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+  duration: number;
+  slug: string;
+  learning_outcomes?: string[];
 }
 
 export async function getAllCourses(limit: number = 50, offset: number = 0, filters?: { published?: boolean; category?: string; level?: string; instructor_id?: string }): Promise<Course[]> {

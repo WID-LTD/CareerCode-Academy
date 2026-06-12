@@ -8,7 +8,8 @@ import { useThemeStore } from '@/store/themeStore';
 import Home from '@/pages/Home';
 import About from '@/pages/About';
 import Courses from '@/pages/Courses';
-import CourseDetails from '@/pages/CourseDetails';
+import CourseDetails from '@/pages/public/CourseDetails';
+import Checkout from '@/pages/public/Checkout';
 import Blog from '@/pages/Blog';
 import BlogPost from '@/pages/BlogPost';
 import Contact from '@/pages/Contact';
@@ -23,6 +24,7 @@ import BecomeInstructor from '@/pages/BecomeInstructor';
 import Apply from '@/pages/Apply';
 import NotFound from '@/pages/NotFound';
 import VerifyPayment from '@/pages/VerifyPayment';
+import VerifyCertificate from '@/pages/public/VerifyCertificate';
 
 import StudentDashboard from '@/pages/student/Dashboard';
 import StudentMyCourses from '@/pages/student/MyCourses';
@@ -85,6 +87,8 @@ function App() {
           <Route path="/become-instructor" element={<BecomeInstructor />} />
           <Route path="/apply" element={<Apply />} />
           <Route path="/verify-payment" element={<VerifyPayment />} />
+          <Route path="/verify-certificate" element={<VerifyCertificate />} />
+          <Route path="/checkout" element={<Checkout />} />
         </Route>
 
         <Route path="/student" element={<DashboardLayout requiredRole="student" />}>

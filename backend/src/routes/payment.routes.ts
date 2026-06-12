@@ -66,7 +66,9 @@ router.post(
       };
 
       const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
+      const flutterwaveKey = process.env.FLUTTERWAVE_SECRET_KEY || '';
       const isPaystackConfigured = paystackKey.length > 20 && !paystackKey.includes('xxxx');
+      const isFlutterwaveConfigured = flutterwaveKey.length > 20 && !flutterwaveKey.includes('xxxx');
 
       if (provider === 'paystack' && isPaystackConfigured) {
         const response = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -81,10 +83,7 @@ router.post(
             reference: payment.reference,
             currency: payment.currency,
             callback_url: `${process.env.FRONTEND_URL}/verify-payment`,
-            metadata: {
-              userId,
-              courseId,
-            }
+            metadata: { userId, courseId }
           })
         });
 
@@ -95,6 +94,32 @@ router.post(
         
         paymentData.authorizationUrl = paystackData.data.authorization_url;
         paymentData.publicKey = process.env.PAYSTACK_PUBLIC_KEY;
+      } else if (provider === 'flutterwave' && isFlutterwaveConfigured) {
+        const response = await fetch('https://api.flutterwave.com/v3/payments', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${flutterwaveKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tx_ref: payment.reference,
+            amount: payment.amount,
+            currency: payment.currency,
+            redirect_url: `${process.env.FRONTEND_URL}/verify-payment?reference=${payment.reference}`,
+            customer: { email: user.email, name: user.name },
+            meta: { userId, courseId },
+            customizations: { title: 'CareerCode Academy', description: course.title },
+          })
+        });
+
+        const flwData: any = await response.json();
+        if (flwData.status === 'success' || flwData.status === '1') {
+          paymentData.authorizationUrl = flwData.data?.link;
+          paymentData.publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY;
+          paymentData.provider = 'flutterwave';
+        } else {
+          throw new Error(flwData.message || 'Flutterwave initialization failed');
+        }
       } else {
         // Dev mode: skip payment gateway and auto-enroll
         paymentData.authorizationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-payment?reference=${payment.reference}&status=success`;
@@ -127,34 +152,55 @@ router.get(
 
       if (payment.status === 'pending') {
         const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
+        const flutterwaveKey = process.env.FLUTTERWAVE_SECRET_KEY || '';
         const isPaystackConfigured = paystackKey.length > 20 && !paystackKey.includes('xxxx');
+        const isFlutterwaveConfigured = flutterwaveKey.length > 20 && !flutterwaveKey.includes('xxxx');
+        let verified = false;
 
         if (payment.provider === 'paystack' && isPaystackConfigured) {
-          const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-            headers: {
-              Authorization: `Bearer ${paystackKey}`,
+          try {
+            const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+              headers: { Authorization: `Bearer ${paystackKey}` }
+            });
+            const paystackData: any = await response.json();
+            if (paystackData.status && paystackData.data?.status === 'success') {
+              verified = true;
             }
-          });
-          const paystackData: any = await response.json();
-          
-          if (paystackData.status && paystackData.data.status === 'success') {
-            await PaymentModel.updatePaymentStatus(reference, 'completed', { verified: true });
-            await EnrollmentModel.createEnrollment({
+          } catch { /* fall through to dev mode */ }
+        } else if (payment.provider === 'flutterwave' && isFlutterwaveConfigured) {
+          try {
+            const response = await fetch(`https://api.flutterwave.com/v3/transactions/${reference}/verify`, {
+              headers: { Authorization: `Bearer ${flutterwaveKey}` }
+            });
+            const flwData: any = await response.json();
+            if (flwData.status === 'success' && flwData.data?.status === 'successful') {
+              verified = true;
+            }
+          } catch { /* fall through to dev mode */ }
+        } else {
+          // Dev mode: auto-complete
+          verified = true;
+        }
+
+        if (verified) {
+          await PaymentModel.updatePaymentStatus(reference, 'completed', { verified: true });
+          const existing = await EnrollmentModel.getEnrollment(payment.user_id, payment.course_id);
+          if (!existing) {
+            const enrollment = await EnrollmentModel.createEnrollment({
               user_id: payment.user_id,
               course_id: payment.course_id,
             });
-          } else {
-             if (paystackData.data?.status === 'failed') {
-               await PaymentModel.updatePaymentStatus(reference, 'failed', { verified: true });
-             }
+            // Notify instructor
+            const course = await CourseModel.getCourseById(payment.course_id);
+            if (course) {
+              const { query } = await import('../config/db');
+              await query(
+                `INSERT INTO notifications (user_id, title, message, type)
+                 VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
+                [course.instructor_id, `A student enrolled in "${course.title}" (paid)`]
+              );
+            }
           }
-        } else {
-          // Dev mode / fallback: auto-complete payment
-          await PaymentModel.updatePaymentStatus(reference, 'completed', { verified: true });
-          await EnrollmentModel.createEnrollment({
-            user_id: payment.user_id,
-            course_id: payment.course_id,
-          });
         }
       }
 

@@ -442,4 +442,80 @@ router.put('/course-proposals/:id', async (req: AuthRequest, res: Response, next
   }
 });
 
+// GET /admin/enrollments - list all enrollments
+router.get('/enrollments', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = (page - 1) * limit;
+    const status = req.query.status as string;
+
+    const enrollments = await EnrollmentModel.getAllEnrollmentsPaginated(limit, offset, status);
+    const total = await EnrollmentModel.countEnrollments();
+
+    res.json({
+      success: true,
+      data: enrollments,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /admin/enrollments/:id - update enrollment (cancel/refund)
+router.patch('/enrollments/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['active', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+
+    const updated = await EnrollmentModel.updateEnrollmentStatus(id, status);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Enrollment not found' });
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /admin/enrollments/export - export enrollment data
+router.post('/enrollments/export', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { status, dateFrom, dateTo } = req.body;
+    let sql = `SELECT e.id, u.name as student_name, u.email as student_email, c.title as course_title,
+                      c.price, e.status, e.progress, e.enrolled_at, e.completed_at
+               FROM enrollments e
+               JOIN users u ON e.user_id = u.id
+               JOIN courses c ON e.course_id = c.id
+               WHERE 1=1`;
+    const params: any[] = [];
+
+    if (status) {
+      params.push(status);
+      sql += ` AND e.status = $${params.length}`;
+    }
+    if (dateFrom) {
+      params.push(dateFrom);
+      sql += ` AND e.enrolled_at >= $${params.length}`;
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      sql += ` AND e.enrolled_at <= $${params.length}`;
+    }
+
+    sql += ' ORDER BY e.enrolled_at DESC';
+    const { rows } = await query(sql, params);
+
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

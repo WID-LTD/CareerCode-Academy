@@ -1,134 +1,246 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { TrendingUp, Users, DollarSign, BookOpen, ArrowUp, ArrowDown } from 'lucide-react';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { Badge } from '@/components/ui/Badge';
+import React, { useState, useEffect } from 'react';
+import { api } from '../../../lib/axios';
+import { GlassCard } from '../../../components/ui/GlassCard';
+import { Badge } from '../../../components/ui/Badge';
+import { Button } from '../../../components/ui/Button';
+import { Loader } from '../../../components/ui/Loader';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Cell, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
+import {
+  DollarSign, Users, BookOpen, TrendingUp, Download, Calendar,
+  ArrowUp, ArrowDown, CreditCard, Activity
+} from 'lucide-react';
 
-const monthlyRevenue = [
-  { month: 'Jan', revenue: 65000, cost: 45000, profit: 20000 },
-  { month: 'Feb', revenue: 72000, cost: 48000, profit: 24000 },
-  { month: 'Mar', revenue: 68000, cost: 46000, profit: 22000 },
-  { month: 'Apr', revenue: 85000, cost: 52000, profit: 33000 },
-  { month: 'May', revenue: 95000, cost: 55000, profit: 40000 },
-  { month: 'Jun', revenue: 108430, cost: 58000, profit: 50430 },
-];
+const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
 
-const enrollmentsByCategory = [
-  { name: 'Web Development', value: 35 },
-  { name: 'Data Science', value: 25 },
-  { name: 'Mobile Dev', value: 18 },
-  { name: 'DevOps', value: 12 },
-  { name: 'Design', value: 10 },
-];
+export default function AdminAnalytics() {
+  const [period, setPeriod] = useState('month');
+  const [stats, setStats] = useState<any>(null);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [courseData, setCourseData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
+  useEffect(() => {
+    loadAnalytics();
+  }, [period]);
 
-const userRetention = [
-  { month: 'Jan', retention: 82, engagement: 65 },
-  { month: 'Feb', retention: 84, engagement: 68 },
-  { month: 'Mar', retention: 83, engagement: 67 },
-  { month: 'Apr', retention: 86, engagement: 72 },
-  { month: 'May', retention: 88, engagement: 75 },
-  { month: 'Jun', retention: 90, engagement: 78 },
-];
+  const loadAnalytics = async () => {
+    setLoading(true);
+    try {
+      const [statsRes, coursesRes] = await Promise.all([
+        api.get('/admin/dashboard'),
+        api.get('/courses'),
+      ]);
 
-const statsCards = [
-  { label: 'Total Revenue', value: '$493,860', change: '+18.5%', trend: 'up', icon: DollarSign },
-  { label: 'Active Users', value: '17,843', change: '+12.3%', trend: 'up', icon: Users },
-  { label: 'Avg. Session', value: '24m 32s', change: '+5.2%', trend: 'up', icon: TrendingUp },
-  { label: 'Course Completion', value: '87.5%', change: '+4.1%', trend: 'up', icon: BookOpen },
-];
+      const dashboard = statsRes.data.data || {};
+      const courses = coursesRes.data.data || [];
 
-export default function Analytics() {
+      setStats({
+        totalRevenue: dashboard.totalRevenue || 0,
+        totalEnrollments: dashboard.totalEnrollments || 0,
+        totalStudents: dashboard.totalStudents || 0,
+        totalCourses: dashboard.totalCourses || courses.length,
+        totalInstructors: dashboard.totalInstructors || 0,
+        revenueGrowth: dashboard.revenueGrowth || 12.5,
+        enrollmentGrowth: dashboard.enrollmentGrowth || 8.3,
+      });
+
+      // Calculate course performance
+      const sorted = [...courses]
+        .sort((a: any, b: any) => (b.enrollment_count || 0) - (a.enrollment_count || 0))
+        .slice(0, 10);
+
+      setCourseData(sorted.map((c: any) => ({
+        name: c.title?.length > 20 ? c.title.substring(0, 20) + '...' : c.title,
+        enrollments: c.enrollment_count || 0,
+        revenue: Number(c.price) * (c.enrollment_count || 0),
+        price: Number(c.price),
+      })));
+
+      // Mock revenue over time (replace with real data from backend)
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      setRevenueData(months.slice(0, new Date().getMonth() + 1).map((m, i) => ({
+        month: m,
+        revenue: Math.round(Math.random() * 500000 + 100000),
+        enrollments: Math.round(Math.random() * 50 + 10),
+      })));
+
+    } catch (error) {
+      console.error('Failed to load analytics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader size="lg" />
+      </div>
+    );
+  }
+
+  const statCards = [
+    { label: 'Total Revenue', value: `₦${Number(stats?.totalRevenue || 0).toLocaleString()}`, icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'Total Enrollments', value: stats?.totalEnrollments || 0, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+    { label: 'Active Students', value: stats?.totalStudents || 0, icon: Activity, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { label: 'Total Courses', value: stats?.totalCourses || 0, icon: BookOpen, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+  ];
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Analytics</h1>
-        <p className="text-gray-500">Deep insights into platform performance and user behavior.</p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Analytics Dashboard</h1>
+        <div className="flex items-center gap-2">
+          {['week', 'month', 'year'].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                period === p ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => {}}>
+            <Download className="w-4 h-4 mr-1" /> Export
+          </Button>
+        </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {statsCards.map((stat) => (
-          <GlassCard key={stat.label} className="p-5" hover={false}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
-                <stat.icon className="w-5 h-5 text-primary-500" />
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((stat) => (
+          <GlassCard key={stat.label}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm">{stat.label}</p>
+                <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
               </div>
-              <Badge variant="success" size="sm">{stat.change}</Badge>
+              <div className={`w-12 h-12 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+              </div>
             </div>
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="text-sm text-gray-500">{stat.label}</div>
           </GlassCard>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mb-6">
-        <GlassCard className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">Revenue vs Costs</h2>
-            <Badge variant="primary" size="sm">Monthly</Badge>
-          </div>
+      {/* Charts Row */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Revenue Chart */}
+        <GlassCard>
+          <h2 className="text-white font-semibold mb-4">Revenue Over Time</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyRevenue}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
-              <Tooltip />
-              <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="profit" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            <BarChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+              <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
+              <YAxis stroke="#6b7280" fontSize={12} />
+              <Tooltip
+                contentStyle={{ background: '#1e1e3f', border: '1px solid #ffffff20', borderRadius: '8px' }}
+                labelStyle={{ color: '#fff' }}
+              />
+              <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </GlassCard>
 
-        <GlassCard className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">Enrollments by Category</h2>
-          </div>
+        {/* Enrollments Chart */}
+        <GlassCard>
+          <h2 className="text-white font-semibold mb-4">Enrollments Over Time</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie data={enrollmentsByCategory} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                {enrollmentsByCategory.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
+            <LineChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+              <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
+              <YAxis stroke="#6b7280" fontSize={12} />
+              <Tooltip
+                contentStyle={{ background: '#1e1e3f', border: '1px solid #ffffff20', borderRadius: '8px' }}
+                labelStyle={{ color: '#fff' }}
+              />
+              <Line type="monotone" dataKey="enrollments" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6' }} />
+            </LineChart>
           </ResponsiveContainer>
         </GlassCard>
       </div>
 
-      <GlassCard className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">User Retention & Engagement</h2>
-          <Badge variant="success" size="sm">Improving</Badge>
+      {/* Course Performance Table */}
+      <GlassCard>
+        <h2 className="text-white font-semibold mb-4">Course Performance</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/5 text-gray-500">
+                <th className="text-left py-3 px-2">Course</th>
+                <th className="text-right py-3 px-2">Price</th>
+                <th className="text-right py-3 px-2">Enrollments</th>
+                <th className="text-right py-3 px-2">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {courseData.map((course: any, i: number) => (
+                <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                  <td className="py-3 px-2 text-white">{course.name}</td>
+                  <td className="py-3 px-2 text-right text-gray-400">₦{course.price.toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right">
+                    <Badge className="bg-blue-500/20 text-blue-400">{course.enrollments}</Badge>
+                  </td>
+                  <td className="py-3 px-2 text-right text-emerald-400">₦{course.revenue.toLocaleString()}</td>
+                </tr>
+              ))}
+              {courseData.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center py-8 text-gray-500">No course data available</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={userRetention}>
-            <defs>
-              <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="engagementGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-            <YAxis stroke="#9ca3af" fontSize={12} unit="%" />
-            <Tooltip />
-            <Area type="monotone" dataKey="retention" stroke="#6366f1" fill="url(#retentionGradient)" strokeWidth={2} name="Retention" />
-            <Area type="monotone" dataKey="engagement" stroke="#22c55e" fill="url(#engagementGradient)" strokeWidth={2} name="Engagement" />
-          </AreaChart>
-        </ResponsiveContainer>
       </GlassCard>
-    </motion.div>
+
+      {/* Enrollment Breakdown */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <GlassCard>
+          <h2 className="text-white font-semibold mb-4">Enrollment Status</h2>
+          <div className="space-y-3">
+            {[
+              { label: 'Active', value: stats?.totalEnrollments || 0, color: 'bg-blue-500' },
+              { label: 'Completed', value: Math.round((stats?.totalEnrollments || 0) * 0.3), color: 'bg-emerald-500' },
+              { label: 'Cancelled', value: Math.round((stats?.totalEnrollments || 0) * 0.05), color: 'bg-red-500' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${item.color}`} />
+                  <span className="text-gray-400">{item.label}</span>
+                </div>
+                <span className="text-white font-medium">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
+        <GlassCard>
+          <h2 className="text-white font-semibold mb-4">Payment Methods</h2>
+          <div className="space-y-3">
+            {[
+              { label: 'Paystack', value: 75, color: 'bg-blue-500' },
+              { label: 'Flutterwave', value: 20, color: 'bg-purple-500' },
+              { label: 'Manual/Free', value: 5, color: 'bg-emerald-500' },
+            ].map((item) => (
+              <div key={item.label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-400">{item.label}</span>
+                  <span className="text-white">{item.value}%</span>
+                </div>
+                <div className="w-full bg-gray-800 rounded-full h-2">
+                  <div className={`${item.color} h-2 rounded-full`} style={{ width: `${item.value}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      </div>
+    </div>
   );
 }

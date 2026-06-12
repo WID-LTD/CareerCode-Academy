@@ -288,6 +288,14 @@ router.post(
       }
 
       const enrollment = await EnrollmentModel.createEnrollment({ user_id: userId, course_id: courseId });
+
+      // Notify instructor
+      await (await import('../config/db')).query(
+        `INSERT INTO notifications (user_id, title, message, type)
+         VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
+        [course.instructor_id, `A new student enrolled in "${course.title}"`]
+      );
+
       res.status(201).json({ success: true, data: enrollment });
     } catch (error) {
       next(error);

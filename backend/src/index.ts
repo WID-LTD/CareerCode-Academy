@@ -29,6 +29,8 @@ import moduleRoutes from './routes/module.routes';
 import resourceRoutes from './routes/resource.routes';
 import searchRoutes from './routes/search.routes';
 import quizRoutes from './routes/quiz.routes';
+import wishlistRoutes from './routes/wishlist.routes';
+import progressRoutes from './routes/progress.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -113,6 +115,8 @@ app.use('/api/v1/modules', moduleRoutes);
 app.use('/api/v1/resources', resourceRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/quizzes', quizRoutes);
+app.use('/api/v1/wishlists', wishlistRoutes);
+app.use('/api/v1/progress', progressRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -548,7 +552,55 @@ async function initDatabase() {
     await query('CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_resources_course ON resources(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_modules_course ON modules(course_id)');
+ 
+    // New wishlists table
+    await query(`
+      CREATE TABLE IF NOT EXISTS wishlists (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, course_id)
+      )
+    `);
 
+    // New lesson_progress table
+    await query(`
+      CREATE TABLE IF NOT EXISTS lesson_progress (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        completed BOOLEAN DEFAULT false,
+        completed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, lesson_id)
+      )
+    `);
+
+    // Add learning_outcomes to courses if not exists
+    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS learning_outcomes JSONB DEFAULT '[]'`);
+
+    // Add status column to enrollments if not exists
+    await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
+    await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+
+    // Update notification types constraint to include all new types
+    await query(`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check`);
+    await query(`ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN ('info', 'success', 'warning', 'error', 'enrollment', 'payment', 'progress', 'certificate', 'system'))`);
+
+    // Add payment provider enum constraint check
+    await query(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_provider_check`);
+    await query(`ALTER TABLE payments ADD CONSTRAINT payments_provider_check CHECK (provider IN ('paystack', 'flutterwave', 'manual'))`);
+
+    // Add indexes for new tables
+    await query('CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_wishlists_course ON wishlists(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON lesson_progress(lesson_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id)');
+ 
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);

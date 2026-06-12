@@ -14,16 +14,42 @@ export interface Enrollment {
 export interface CreateEnrollmentInput {
   user_id: string;
   course_id: string;
+  status?: string;
 }
 
 export async function createEnrollment(input: CreateEnrollmentInput): Promise<Enrollment> {
   const { rows } = await query<Enrollment>(
-    `INSERT INTO enrollments (user_id, course_id)
-     VALUES ($1, $2)
+    `INSERT INTO enrollments (user_id, course_id, status)
+     VALUES ($1, $2, COALESCE($3, 'active'))
      RETURNING *`,
-    [input.user_id, input.course_id]
+    [input.user_id, input.course_id, input.status || 'active']
   );
   return rows[0];
+}
+
+export async function updateEnrollmentStatus(id: string, status: string): Promise<Enrollment | null> {
+  const { rows } = await query<Enrollment>(
+    `UPDATE enrollments SET status = $1, updated_at = NOW()
+     WHERE id = $2 RETURNING *`,
+    [status, id]
+  );
+  return rows[0] || null;
+}
+
+export async function getAllEnrollmentsPaginated(limit: number, offset: number, status?: string) {
+  let sql = `SELECT e.*, u.name as student_name, u.email as student_email, c.title as course_title, c.price
+             FROM enrollments e
+             JOIN users u ON e.user_id = u.id
+             JOIN courses c ON e.course_id = c.id`;
+  const params: any[] = [];
+  if (status) {
+    params.push(status);
+    sql += ` WHERE e.status = $1`;
+  }
+  sql += ` ORDER BY e.enrolled_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  params.push(limit, offset);
+  const { rows } = await query(sql, params);
+  return rows;
 }
 
 export async function getEnrollmentsByUser(userId: string): Promise<Enrollment[]> {

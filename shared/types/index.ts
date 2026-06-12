@@ -72,9 +72,10 @@ export interface IPayment {
   courseId: string;
   amount: number;
   currency: string;
-  provider: 'flutterwave' | 'paystack';
+  provider: 'paystack' | 'flutterwave' | 'manual';
   reference: string;
-  status: 'pending' | 'success' | 'failed';
+  status: 'pending' | 'successful' | 'failed' | 'refunded';
+  metadata?: Record<string, any>;
   createdAt: string;
 }
 
@@ -85,8 +86,12 @@ export interface IEnrollment {
   course?: ICourse;
   progress: number;
   completed: boolean;
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  completedLessons?: string[];
   enrolledAt: string;
   completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ICertificate {
@@ -219,6 +224,25 @@ export interface IQuizQuestion {
   question: string;
   options: string[];
   correctAnswer: number;
+}
+
+export interface IWishlistItem {
+  id: string;
+  userId: string;
+  courseId: string;
+  course?: ICourse;
+  createdAt: string;
+}
+
+export interface ILessonProgress {
+  id: string;
+  userId: string;
+  lessonId: string;
+  courseId: string;
+  completed: boolean;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface INavLink {
