@@ -26,7 +26,7 @@ const courses = [
     rating: 4.8,
     level: 'Intermediate',
     color: 'from-purple-500 to-pink-500',
-    slug: 'data-science-ml',
+    slug: 'machine-learning',
   },
   {
     title: 'Mobile App Development',
@@ -40,15 +40,15 @@ const courses = [
     slug: 'mobile-app-development',
   },
   {
-    title: 'Cloud & DevOps Engineering',
-    description: 'Master AWS, Docker, Kubernetes, and CI/CD pipelines for modern infrastructure.',
+    title: 'Cloud Computing with AWS',
+    description: 'Master AWS, Docker, Kubernetes, and CI/CD pipelines for modern cloud infrastructure.',
     icon: Globe,
     duration: '12 weeks',
     students: 1120,
     rating: 4.9,
     level: 'Advanced',
     color: 'from-orange-500 to-red-500',
-    slug: 'cloud-devops',
+    slug: 'cloud-computing-with-aws',
   },
 ];
 

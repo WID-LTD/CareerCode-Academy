@@ -89,4 +89,5 @@ export const setAuthToken = (token: string | null) => {
   }
 };
 
+export { api };
 export default api;

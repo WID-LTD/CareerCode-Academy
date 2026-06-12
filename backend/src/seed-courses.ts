@@ -198,6 +198,53 @@ const courses = [
     ],
   },
   {
+    title: 'Mobile App Development',
+    description: 'Build cross-platform mobile applications with React Native. Covers components, navigation, state management, native APIs, and deployment to iOS and Android app stores.',
+    category: 'Mobile',
+    level: 'intermediate',
+    duration: 50,
+    price: 9000,
+    thumbnail: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'React Native Fundamentals',
+        lessons: [
+          { title: 'Setting Up React Native Environment', duration: 30, description: 'Expo CLI, Android Studio, Xcode setup.' },
+          { title: 'JSX and Components in React Native', duration: 35, description: 'Core components: View, Text, Image, ScrollView.' },
+          { title: 'Styling and Layout', duration: 40, description: 'Flexbox, StyleSheet, responsive design for mobile.' },
+          { title: 'State and Props', duration: 35, description: 'Managing component state in mobile apps.' },
+        ],
+      },
+      {
+        title: 'Navigation and Screens',
+        lessons: [
+          { title: 'React Navigation Setup', duration: 30, description: 'Stack, tab, and drawer navigators.' },
+          { title: 'Passing Data Between Screens', duration: 25, description: 'Route params and context.' },
+          { title: 'Bottom Tabs and Drawer Navigation', duration: 30, description: 'Multi-screen app architecture.' },
+          { title: 'Deep Linking', duration: 25, description: 'Linking to specific app screens from URLs.' },
+        ],
+      },
+      {
+        title: 'Native Features & APIs',
+        lessons: [
+          { title: 'Camera and Image Picker', duration: 35, description: 'Using expo-camera and expo-image-picker.' },
+          { title: 'Location and Maps', duration: 30, description: 'Geolocation and react-native-maps.' },
+          { title: 'Push Notifications', duration: 30, description: 'Local and remote push notifications.' },
+          { title: 'AsyncStorage and SQLite', duration: 35, description: 'Persistent local data storage.' },
+        ],
+      },
+      {
+        title: 'Deployment & App Store',
+        lessons: [
+          { title: 'Building for Production', duration: 40, description: 'EAS Build, app signing, OTA updates.' },
+          { title: 'Publishing to Google Play Store', duration: 30, description: 'Developer account, store listing, review process.' },
+          { title: 'Publishing to Apple App Store', duration: 30, description: 'Apple Developer program, TestFlight, app review.' },
+          { title: 'Monitoring and Analytics', duration: 25, description: 'Crashlytics, analytics, performance monitoring.' },
+        ],
+      },
+    ],
+  },
+  {
     title: 'Database Systems & SQL',
     description: 'Master relational databases, SQL queries, indexing, normalization, transactions, and NoSQL databases. Design efficient database schemas for real-world applications.',
     category: 'Databases',
@@ -884,6 +931,386 @@ const courses = [
           { title: 'Determinants and Cramer Rule', duration: 25, description: 'Solving systems with matrices.' },
           { title: 'Data Fitting and Regression', duration: 35, description: 'Linear regression with Python.' },
           { title: 'Real-World Algebra Projects', duration: 35, description: 'Applying algebra to real data.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Docker & Kubernetes Mastery',
+    description: 'Master containerization and orchestration with Docker and Kubernetes. Covers container lifecycle, image building, multi-container apps, pod management, service discovery, and production cluster operations.',
+    category: 'DevOps',
+    level: 'intermediate',
+    duration: 45,
+    price: 8500,
+    thumbnail: 'https://images.unsplash.com/photo-1605745341112-85968b19335b?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Docker Fundamentals',
+        lessons: [
+          { title: 'Containers vs Virtual Machines', duration: 25, description: 'Understanding containerization concepts.' },
+          { title: 'Dockerfile and Image Building', duration: 40, description: 'Writing efficient Dockerfiles.' },
+          { title: 'Docker Compose for Multi-Container Apps', duration: 35, description: 'Orchestrating multiple services.' },
+          { title: 'Docker Networking and Volumes', duration: 30, description: 'Persistent storage and container networking.' },
+        ],
+      },
+      {
+        title: 'Kubernetes Basics',
+        lessons: [
+          { title: 'Kubernetes Architecture', duration: 30, description: 'Pods, nodes, clusters, control plane.' },
+          { title: 'Pods, Deployments, and Services', duration: 40, description: 'Running and exposing applications.' },
+          { title: 'ConfigMaps and Secrets', duration: 25, description: 'Managing configuration in Kubernetes.' },
+          { title: 'Ingress and Load Balancing', duration: 30, description: 'External access to cluster services.' },
+        ],
+      },
+      {
+        title: 'Advanced Kubernetes',
+        lessons: [
+          { title: 'Helm Charts and Package Management', duration: 35, description: 'Packaging Kubernetes applications.' },
+          { title: 'StatefulSets and Persistent Volumes', duration: 30, description: 'Stateful applications in K8s.' },
+          { title: 'Monitoring with Prometheus & Grafana', duration: 35, description: 'Cluster observability.' },
+          { title: 'Kubernetes Security (RBAC, PodSecurity)', duration: 30, description: 'Securing cluster resources.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'CI/CD Pipeline Engineering',
+    description: 'Learn to design and implement robust CI/CD pipelines. Covers GitHub Actions, Jenkins, GitLab CI, automated testing, artifact management, and deployment strategies for modern applications.',
+    category: 'DevOps',
+    level: 'advanced',
+    duration: 40,
+    price: 9500,
+    thumbnail: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'CI/CD Fundamentals',
+        lessons: [
+          { title: 'What is CI/CD?', duration: 20, description: 'Continuous integration and deployment concepts.' },
+          { title: 'Version Control Integration', duration: 25, description: 'Triggering pipelines from git events.' },
+          { title: 'Build and Test Automation', duration: 30, description: 'Automating builds and test suites.' },
+          { title: 'Artifact Management', duration: 25, description: 'Storing and versioning build artifacts.' },
+        ],
+      },
+      {
+        title: 'Pipeline Tools',
+        lessons: [
+          { title: 'GitHub Actions Workflows', duration: 40, description: 'Writing YAML workflows with actions.' },
+          { title: 'Jenkins Pipelines', duration: 40, description: 'Declarative and scripted pipelines.' },
+          { title: 'GitLab CI/CD', duration: 35, description: 'GitLab runners and .gitlab-ci.yml.' },
+          { title: 'Infrastructure as Code Pipelines', duration: 30, description: 'Terraform and Pulumi in CI/CD.' },
+        ],
+      },
+      {
+        title: 'Deployment Strategies',
+        lessons: [
+          { title: 'Blue-Green and Canary Deployments', duration: 35, description: 'Zero-downtime deployment patterns.' },
+          { title: 'Rolling Updates and Rollbacks', duration: 25, description: 'Safe deployment with Kubernetes.' },
+          { title: 'Feature Flags and A/B Testing', duration: 30, description: 'Gradual feature rollout.' },
+          { title: 'Pipeline Security and Secrets Management', duration: 30, description: 'Vault, AWS Secrets Manager.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Digital Forensics & Incident Response',
+    description: 'Learn to investigate cyber incidents and recover evidence. Covers forensic acquisition, memory analysis, disk forensics, malware triage, and incident response lifecycle management.',
+    category: 'Security',
+    level: 'intermediate',
+    duration: 45,
+    price: 7500,
+    thumbnail: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Forensic Fundamentals',
+        lessons: [
+          { title: 'Digital Evidence and Chain of Custody', duration: 25, description: 'Maintaining evidence integrity.' },
+          { title: 'Forensic Acquisition Tools', duration: 35, description: 'FTK Imager, dd, Guymager.' },
+          { title: 'File System Analysis', duration: 40, description: 'NTFS, ext4, FAT32 forensics.' },
+          { title: 'Memory Acquisition and Analysis', duration: 35, description: 'Volatility framework for RAM analysis.' },
+        ],
+      },
+      {
+        title: 'Incident Response',
+        lessons: [
+          { title: 'Incident Response Lifecycle', duration: 30, description: 'Preparation, detection, containment, recovery.' },
+          { title: 'Threat Hunting Techniques', duration: 35, description: 'Proactive threat detection.' },
+          { title: 'Log Analysis and SIEM Queries', duration: 40, description: 'ELK, Splunk, and Sigma rules.' },
+          { title: 'Containment and Eradication', duration: 30, description: 'Isolating and removing threats.' },
+        ],
+      },
+      {
+        title: 'Advanced Forensics',
+        lessons: [
+          { title: 'Network Forensics', duration: 35, description: 'PCAP analysis, NetFlow, Wireshark.' },
+          { title: 'Mobile Device Forensics', duration: 30, description: 'iOS and Android forensic extraction.' },
+          { title: 'Cloud Forensics', duration: 30, description: 'AWS, Azure, GCP forensic investigation.' },
+          { title: 'Reporting and Legal Testimony', duration: 25, description: 'Writing forensic reports and court testimony.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Cloud Security & DevSecOps',
+    description: 'Secure cloud infrastructure and integrate security into DevOps pipelines. Covers cloud security architecture, compliance, IaC security, container security, and automated security testing.',
+    category: 'Security',
+    level: 'advanced',
+    duration: 50,
+    price: 8500,
+    thumbnail: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Cloud Security Foundations',
+        lessons: [
+          { title: 'Shared Responsibility Model', duration: 25, description: 'Understanding cloud security boundaries.' },
+          { title: 'IAM and Access Control', duration: 40, description: 'Least privilege, roles, policies.' },
+          { title: 'Data Encryption in Cloud', duration: 35, description: 'KMS, encryption at rest and in transit.' },
+          { title: 'Compliance Frameworks (SOC2, HIPAA, GDPR)', duration: 30, description: 'Meeting regulatory requirements in cloud.' },
+        ],
+      },
+      {
+        title: 'Cloud Provider Security',
+        lessons: [
+          { title: 'AWS Security Services', duration: 45, description: 'GuardDuty, Security Hub, WAF, Shield.' },
+          { title: 'Azure Security Center', duration: 35, description: 'Azure Defender, Sentinel, policies.' },
+          { title: 'GCP Security Tools', duration: 30, description: 'Cloud Armor, Security Command Center.' },
+          { title: 'Multi-Cloud Security Strategy', duration: 30, description: 'Consistent security across providers.' },
+        ],
+      },
+      {
+        title: 'DevSecOps Practices',
+        lessons: [
+          { title: 'SAST and DAST Integration', duration: 35, description: 'SonarQube, Snyk, OWASP ZAP in pipelines.' },
+          { title: 'Container Image Scanning', duration: 25, description: 'Trivy, Clair, Docker Bench.' },
+          { title: 'IaC Security (Terraform, CloudFormation)', duration: 35, description: 'Checkov, tfsec, cfn-nag.' },
+          { title: 'Supply Chain Security', duration: 30, description: 'SBOM, SLSA, Sigstore, Cosign.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Git & Version Control Mastery',
+    description: 'Master Git for collaborative software development. Covers branching strategies, rebasing, merge conflicts, GitHub workflows, open source contributions, and advanced Git internals.',
+    category: 'Software Engineering',
+    level: 'beginner',
+    duration: 25,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1556075798-4825dfaaf498?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Git Basics',
+        lessons: [
+          { title: 'What is Version Control?', duration: 15, description: 'Why Git matters in software development.' },
+          { title: 'Installing and Configuring Git', duration: 20, description: 'Setup, config, SSH keys.' },
+          { title: 'Basic Workflow: add, commit, push, pull', duration: 30, description: 'Core Git operations.' },
+          { title: 'Viewing History with git log', duration: 20, description: 'Reading commit history and diffs.' },
+        ],
+      },
+      {
+        title: 'Branching and Merging',
+        lessons: [
+          { title: 'Creating and Managing Branches', duration: 25, description: 'git branch, checkout, switch.' },
+          { title: 'Merging and Resolving Conflicts', duration: 35, description: 'Merge strategies and conflict resolution.' },
+          { title: 'Rebasing and Cherry-Picking', duration: 30, description: 'Rewriting history safely.' },
+          { title: 'Git Flow and Trunk-Based Development', duration: 25, description: 'Popular branching strategies.' },
+        ],
+      },
+      {
+        title: 'Collaboration & GitHub',
+        lessons: [
+          { title: 'Pull Requests and Code Review', duration: 30, description: 'PR workflow and review best practices.' },
+          { title: 'Forking and Open Source Contributions', duration: 25, description: 'Contributing to open source projects.' },
+          { title: 'GitHub Actions Basics', duration: 30, description: 'Automating workflows with GitHub.' },
+          { title: 'Git Hooks and Automation', duration: 20, description: 'Pre-commit, lint-staged, husky.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Microservices Architecture',
+    description: 'Design and build distributed microservices systems. Covers service decomposition, inter-service communication, API gateways, event-driven architecture, observability, and container orchestration.',
+    category: 'Software Engineering',
+    level: 'advanced',
+    duration: 55,
+    price: 10000,
+    thumbnail: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Microservices Design',
+        lessons: [
+          { title: 'Monolith vs Microservices', duration: 25, description: 'When and why to decompose.' },
+          { title: 'Domain-Driven Design Basics', duration: 40, description: 'Bounded contexts and aggregates.' },
+          { title: 'Service Decomposition Strategies', duration: 35, description: 'Decomposing by business capability.' },
+          { title: 'API Design for Microservices', duration: 30, description: 'REST, gRPC, GraphQL choices.' },
+        ],
+      },
+      {
+        title: 'Communication Patterns',
+        lessons: [
+          { title: 'Synchronous Communication (HTTP/gRPC)', duration: 35, description: 'Service-to-service calls.' },
+          { title: 'Event-Driven Architecture', duration: 40, description: 'Kafka, RabbitMQ, message brokers.' },
+          { title: 'API Gateways and Service Mesh', duration: 35, description: 'Kong, Envoy, Istio.' },
+          { title: 'Circuit Breakers and Resilience', duration: 30, description: 'Hystrix, resilience4j, bulkheads.' },
+        ],
+      },
+      {
+        title: 'Observability & Operations',
+        lessons: [
+          { title: 'Distributed Tracing', duration: 30, description: 'Jaeger, OpenTelemetry, Zipkin.' },
+          { title: 'Centralized Logging', duration: 25, description: 'ELK stack, Loki, structured logging.' },
+          { title: 'Metrics and Monitoring', duration: 30, description: 'Prometheus, Grafana dashboards.' },
+          { title: 'Deploying Microservices on Kubernetes', duration: 40, description: 'Helm, Kustomize, service mesh.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'UI/UX Design Fundamentals',
+    description: 'Learn user interface and user experience design principles. Covers design thinking, wireframing, prototyping, visual hierarchy, color theory, typography, and usability testing for web and mobile.',
+    category: 'Design',
+    level: 'beginner',
+    duration: 35,
+    price: 5000,
+    thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Design Thinking & Research',
+        lessons: [
+          { title: 'What is UX Design?', duration: 20, description: 'UX principles and design thinking process.' },
+          { title: 'User Research Methods', duration: 30, description: 'Interviews, surveys, persona creation.' },
+          { title: 'User Journey Mapping', duration: 25, description: 'Mapping user flows and pain points.' },
+          { title: 'Information Architecture', duration: 25, description: 'Organizing content and navigation.' },
+        ],
+      },
+      {
+        title: 'Visual Design Principles',
+        lessons: [
+          { title: 'Color Theory and Palettes', duration: 30, description: 'Color schemes, contrast, accessibility.' },
+          { title: 'Typography and Readability', duration: 25, description: 'Font selection, hierarchy, spacing.' },
+          { title: 'Layout and Visual Hierarchy', duration: 30, description: 'Grid systems, white space, alignment.' },
+          { title: 'Design Systems and Component Libraries', duration: 35, description: 'Building reusable UI components.' },
+        ],
+      },
+      {
+        title: 'Prototyping & Testing',
+        lessons: [
+          { title: 'Wireframing with Figma', duration: 35, description: 'Low and high-fidelity wireframes.' },
+          { title: 'Interactive Prototypes', duration: 30, description: 'Clickable prototypes and animations.' },
+          { title: 'Usability Testing', duration: 25, description: 'Planning, conducting, and analyzing tests.' },
+          { title: 'Design Handoff to Developers', duration: 20, description: 'Specs, assets, and collaboration tools.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Graphic Design with Figma',
+    description: 'Master digital graphic design using Figma. Covers vector illustration, icon design, typography, color theory, brand identity, social media graphics, and design system management.',
+    category: 'Design',
+    level: 'intermediate',
+    duration: 40,
+    price: 7500,
+    thumbnail: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Figma Fundamentals',
+        lessons: [
+          { title: 'Figma Interface and Tools', duration: 25, description: 'Canvas, layers, properties panel.' },
+          { title: 'Vector Editing and Pen Tool', duration: 35, description: 'Creating and editing vector shapes.' },
+          { title: 'Working with Text and Fonts', duration: 25, description: 'Text styles, Google Fonts, local fonts.' },
+          { title: 'Components and Variants', duration: 30, description: 'Reusable design components.' },
+        ],
+      },
+      {
+        title: 'Visual Design Projects',
+        lessons: [
+          { title: 'Logo and Brand Identity Design', duration: 40, description: 'Designing logos and brand guidelines.' },
+          { title: 'Social Media Graphics', duration: 30, description: 'Posts, stories, and ad creatives.' },
+          { title: 'Presentation and Pitch Deck Design', duration: 25, description: 'Professional slide design.' },
+          { title: 'Icon Set Creation', duration: 30, description: 'Consistent icon families and styles.' },
+        ],
+      },
+      {
+        title: 'Collaboration & Delivery',
+        lessons: [
+          { title: 'Figma Collaboration Features', duration: 20, description: 'Real-time collaboration and comments.' },
+          { title: 'Design Systems in Figma', duration: 35, description: 'Tokens, styles, and library management.' },
+          { title: 'Exporting and Asset Delivery', duration: 25, description: 'SVG, PNG, PDF export and optimization.' },
+          { title: 'Developer Handoff with Figma', duration: 25, description: 'Inspect mode, plugins, and code export.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Network Administration',
+    description: 'Learn to design, configure, and maintain computer networks. Covers routing, switching, VLANs, subnetting, network troubleshooting, and managing enterprise network infrastructure.',
+    category: 'Networking',
+    level: 'beginner',
+    duration: 40,
+    price: 5000,
+    thumbnail: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Network Basics',
+        lessons: [
+          { title: 'Network Topologies and Devices', duration: 25, description: 'Routers, switches, hubs, access points.' },
+          { title: 'IP Addressing and Subnetting', duration: 40, description: 'IPv4, IPv6, CIDR, VLSM.' },
+          { title: 'Ethernet and Switching', duration: 30, description: 'MAC addresses, ARP, VLANs.' },
+          { title: 'Routing Fundamentals', duration: 35, description: 'Static and dynamic routing (OSPF, BGP).' },
+        ],
+      },
+      {
+        title: 'Network Services',
+        lessons: [
+          { title: 'DHCP and DNS Configuration', duration: 30, description: 'Setting up and managing DNS/DHCP.' },
+          { title: 'NAT and Port Forwarding', duration: 25, description: 'Network Address Translation.' },
+          { title: 'VPNs and Remote Access', duration: 30, description: 'Site-to-site and client VPNs.' },
+          { title: 'Wireless Networking', duration: 25, description: 'WiFi standards, security, and optimization.' },
+        ],
+      },
+      {
+        title: 'Network Management',
+        lessons: [
+          { title: 'Network Monitoring Tools', duration: 30, description: 'SNMP, Nagios, Zabbix, PRTG.' },
+          { title: 'Troubleshooting Methodology', duration: 35, description: 'ping, traceroute, Wireshark analysis.' },
+          { title: 'Network Documentation', duration: 20, description: 'Network diagrams, IPAM, documentation.' },
+          { title: 'Disaster Recovery and Redundancy', duration: 25, description: 'Failover, load balancing, backups.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'SDN & Network Automation',
+    description: 'Modernize networks with software-defined networking and automation. Covers SDN architectures, network programmability, Python automation, Ansible, NETCONF, REST APIs, and intent-based networking.',
+    category: 'Networking',
+    level: 'advanced',
+    duration: 45,
+    price: 8500,
+    thumbnail: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'SDN Concepts',
+        lessons: [
+          { title: 'What is SDN?', duration: 25, description: 'Control plane vs data plane separation.' },
+          { title: 'SDN Architectures (OpenFlow, ODL, ONOS)', duration: 35, description: 'Open SDN and overlay models.' },
+          { title: 'Network Virtualization', duration: 30, description: 'VXLAN, NVGRE, network overlays.' },
+          { title: 'Intent-Based Networking', duration: 25, description: 'Cisco DNA, Apstra, Juniper Apstra.' },
+        ],
+      },
+      {
+        title: 'Network Automation',
+        lessons: [
+          { title: 'Python for Network Automation', duration: 40, description: 'Netmiko, NAPALM, Nornir.' },
+          { title: 'Ansible for Network Configuration', duration: 35, description: 'Playbooks, modules, inventory.' },
+          { title: 'NETCONF and YANG Models', duration: 30, description: 'Programmatic network configuration.' },
+          { title: 'REST APIs and Postman for Network Devices', duration: 25, description: 'Cisco, Juniper, Arista APIs.' },
+        ],
+      },
+      {
+        title: 'CI/CD for Networks',
+        lessons: [
+          { title: 'Git-Driven Network Automation', duration: 25, description: 'Version control for network configs.' },
+          { title: 'Network Testing and Validation', duration: 30, description: 'batfish, pyATS, automated testing.' },
+          { title: 'Monitoring with Telegraf and Grafana', duration: 30, description: 'Network telemetry and dashboards.' },
+          { title: 'Network as Code Best Practices', duration: 25, description: 'Pipeline patterns for network changes.' },
         ],
       },
     ],

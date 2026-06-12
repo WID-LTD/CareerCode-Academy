@@ -14,6 +14,16 @@ const priceMap: Record<string, number> = {
   'artificial-intelligence': 12500,
   'software-engineering-design-patterns': 8500,
   'cybersecurity': 10000,
+  'mobile-app-development': 9000,
+  'docker-kubernetes-mastery': 8500,
+  'cicd-pipeline-engineering': 9500,
+  'digital-forensics-incident-response': 7500,
+  'cloud-security-devsecops': 8500,
+  'microservices-architecture': 10000,
+  'ui-ux-design-fundamentals': 5000,
+  'graphic-design-with-figma': 7500,
+  'network-administration': 5000,
+  'sdn-network-automation': 8500,
 };
 
 async function updatePrices() {

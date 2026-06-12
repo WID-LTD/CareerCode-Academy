@@ -3,6 +3,9 @@ import { Pool, QueryResult, QueryResultRow } from 'pg';
 let pool: Pool | null = null;
 
 function isConnectionError(err: any): boolean {
+  if (typeof AggregateError !== 'undefined' && err instanceof AggregateError) {
+    return err.errors?.some((e: any) => isConnectionError(e)) || false;
+  }
   const msg = (err?.message || '').toLowerCase();
   return msg.includes('econnrefused') || msg.includes('etimedout') ||
          msg.includes('database') || msg.includes('connect') ||

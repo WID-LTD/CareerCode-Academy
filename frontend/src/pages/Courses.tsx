@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { useCourseStore } from '@/store/courseStore';
 
-const categories = ['All', 'Web Development', 'Data Science', 'Mobile', 'DevOps', 'Security', 'Design', 'AI'];
+const categories = ['All', 'Web Development', 'Data Science', 'Mobile', 'DevOps', 'Security', 'Design', 'AI', 'Programming', 'Computer Science', 'Databases', 'Networking', 'Cloud Computing', 'Software Engineering'];
 const levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
 
 // Helper to map category to icon and color

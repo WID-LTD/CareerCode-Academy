@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../../lib/axios';
-import { GlassCard } from '../../../components/ui/GlassCard';
-import { Badge } from '../../../components/ui/Badge';
-import { Button } from '../../../components/ui/Button';
-import { Loader } from '../../../components/ui/Loader';
+import api from '../../lib/axios';
+import { GlassCard } from '../../components/ui/GlassCard';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Loader } from '../../components/ui/Loader';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell
