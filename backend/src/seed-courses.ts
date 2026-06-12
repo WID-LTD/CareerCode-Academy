@@ -425,6 +425,469 @@ const courses = [
       },
     ],
   },
+  {
+    title: 'Responsive Web Design',
+    description: 'Learn HTML5, CSS3, Flexbox, CSS Grid, and responsive design principles. Build real projects including a survey form, tribute page, technical documentation page, product landing page, and personal portfolio.',
+    category: 'Web Development',
+    level: 'beginner',
+    duration: 40,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1621839673705-6617adf9e890?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'HTML5 Fundamentals',
+        lessons: [
+          { title: 'Basic HTML Structure', duration: 20, description: 'DOCTYPE, html, head, body tags and document outline.' },
+          { title: 'Text Elements and Links', duration: 25, description: 'Headings, paragraphs, anchors, and navigation.' },
+          { title: 'Images and Media', duration: 20, description: 'Embedding images, video, and audio.' },
+          { title: 'Forms and Inputs', duration: 30, description: 'Form elements, validation, and accessibility.' },
+        ],
+      },
+      {
+        title: 'CSS3 Styling',
+        lessons: [
+          { title: 'Selectors and Specificity', duration: 25, description: 'Element, class, ID, attribute selectors and cascade.' },
+          { title: 'Box Model and Layout', duration: 30, description: 'Margin, padding, border, width, height.' },
+          { title: 'Colors, Typography, Backgrounds', duration: 25, description: 'Color systems, fonts, gradients, background images.' },
+          { title: 'Responsive Design Principles', duration: 30, description: 'Media queries, mobile-first approach, breakpoints.' },
+        ],
+      },
+      {
+        title: 'Flexbox and CSS Grid',
+        lessons: [
+          { title: 'Flexbox Basics', duration: 35, description: 'Flex container, items, alignment, and wrapping.' },
+          { title: 'Advanced Flexbox Patterns', duration: 30, description: 'Navigation bars, card layouts, centering.' },
+          { title: 'CSS Grid Fundamentals', duration: 35, description: 'Grid container, tracks, areas, and gaps.' },
+          { title: 'Combining Flexbox and Grid', duration: 25, description: 'When to use each layout method.' },
+        ],
+      },
+      {
+        title: 'Projects',
+        lessons: [
+          { title: 'Survey Form Project', duration: 45, description: 'Build a styled survey form with validation.' },
+          { title: 'Product Landing Page', duration: 45, description: 'Build a responsive product landing page.' },
+          { title: 'Technical Documentation Page', duration: 40, description: 'Build a documentation page with navigation.' },
+          { title: 'Personal Portfolio Website', duration: 60, description: 'Build your own portfolio to showcase projects.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'JavaScript Algorithms & Data Structures',
+    description: 'Master JavaScript fundamentals, ES6, regular expressions, debugging, data structures, algorithm scripting, and object-oriented programming. Prepares you for technical interviews.',
+    category: 'Programming',
+    level: 'intermediate',
+    duration: 50,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'JavaScript Basics',
+        lessons: [
+          { title: 'Variables and Data Types', duration: 25, description: 'var, let, const, strings, numbers, booleans, null, undefined.' },
+          { title: 'Functions and Scope', duration: 30, description: 'Function declarations, expressions, arrow functions, closures.' },
+          { title: 'Arrays and Objects', duration: 30, description: 'Array methods, object destructuring, spread operator.' },
+          { title: 'Loops and Iteration', duration: 25, description: 'for, while, forEach, map, filter, reduce.' },
+        ],
+      },
+      {
+        title: 'ES6 and Modern JavaScript',
+        lessons: [
+          { title: 'Template Literals and Destructuring', duration: 20, description: 'String interpolation, array and object destructuring.' },
+          { title: 'Promises and Async/Await', duration: 35, description: 'Asynchronous programming patterns.' },
+          { title: 'Modules and Import/Export', duration: 20, description: 'ES modules, named and default exports.' },
+          { title: 'Classes and OOP', duration: 30, description: 'Class syntax, inheritance, getters, setters.' },
+        ],
+      },
+      {
+        title: 'Data Structures',
+        lessons: [
+          { title: 'Stacks and Queues', duration: 30, description: 'LIFO and FIFO implementations in JavaScript.' },
+          { title: 'Linked Lists', duration: 35, description: 'Singly and doubly linked lists.' },
+          { title: 'Trees and Binary Search Trees', duration: 40, description: 'Tree traversal, BST operations.' },
+          { title: 'Hash Tables and Sets', duration: 25, description: 'Implementing hash tables in JavaScript.' },
+        ],
+      },
+      {
+        title: 'Algorithm Scripting',
+        lessons: [
+          { title: 'Basic Algorithm Challenges', duration: 40, description: 'FizzBuzz, palindrome checker, caesar cipher.' },
+          { title: 'Sorting Algorithms', duration: 35, description: 'Bubble, selection, insertion, merge, quick sort.' },
+          { title: 'Search Algorithms', duration: 30, description: 'Linear search, binary search, BFS, DFS.' },
+          { title: 'Dynamic Programming Intro', duration: 40, description: 'Memoization, tabulation, classic DP problems.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Front End Development Libraries',
+    description: 'Learn popular front-end libraries and frameworks including React, Redux, jQuery, Bootstrap, and Sass. Build projects like a markdown previewer, drum machine, calculator, and pomodoro clock.',
+    category: 'Web Development',
+    level: 'intermediate',
+    duration: 45,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Bootstrap and Sass',
+        lessons: [
+          { title: 'Bootstrap Grid and Components', duration: 30, description: 'Layout system, cards, navbars, modals.' },
+          { title: 'Sass Variables and Mixins', duration: 25, description: 'SCSS syntax, nesting, partials, inheritance.' },
+          { title: 'Bootstrap Themes', duration: 20, description: 'Customizing Bootstrap with Sass.' },
+          { title: 'Responsive Utilities', duration: 20, description: 'Display, flex, spacing utilities.' },
+        ],
+      },
+      {
+        title: 'jQuery',
+        lessons: [
+          { title: 'DOM Manipulation with jQuery', duration: 25, description: 'Selectors, events, effects.' },
+          { title: 'AJAX with jQuery', duration: 25, description: 'GET and POST requests, JSON parsing.' },
+          { title: 'jQuery Plugins', duration: 20, description: 'Using and creating jQuery plugins.' },
+          { title: 'When to Use Vanilla JS vs jQuery', duration: 15, description: 'Modern alternatives.' },
+        ],
+      },
+      {
+        title: 'React Fundamentals',
+        lessons: [
+          { title: 'JSX and Components', duration: 30, description: 'Creating components with JSX syntax.' },
+          { title: 'State and Props', duration: 35, description: 'Managing data flow in React.' },
+          { title: 'Lifecycle Methods and Hooks', duration: 35, description: 'useState, useEffect, useContext.' },
+          { title: 'Handling Events and Forms', duration: 30, description: 'Event handlers, controlled components.' },
+        ],
+      },
+      {
+        title: 'Redux',
+        lessons: [
+          { title: 'Redux Store and Reducers', duration: 30, description: 'Actions, reducers, and the store.' },
+          { title: 'React-Redux Integration', duration: 30, description: 'Provider, connect, useSelector, useDispatch.' },
+          { title: 'Redux Middleware (Thunk)', duration: 25, description: 'Async actions with Redux Thunk.' },
+          { title: 'Redux Toolkit', duration: 30, description: 'Modern Redux with createSlice.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Back End Development & APIs',
+    description: 'Build web applications using Node.js, Express.js, MongoDB, Mongoose, and manage package dependencies with npm. Create RESTful APIs, handle authentication, and deploy applications.',
+    category: 'Web Development',
+    level: 'intermediate',
+    duration: 45,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Node.js and npm',
+        lessons: [
+          { title: 'Node.js Runtime', duration: 25, description: 'Event loop, modules, global objects.' },
+          { title: 'npm Package Manager', duration: 20, description: 'Installing, updating, and publishing packages.' },
+          { title: 'File System and Streams', duration: 30, description: 'Reading/writing files, streaming data.' },
+          { title: 'Building CLI Tools', duration: 25, description: 'Creating command-line applications.' },
+        ],
+      },
+      {
+        title: 'Express.js',
+        lessons: [
+          { title: 'Express Web Server', duration: 30, description: 'Routes, middleware, static files.' },
+          { title: 'RESTful API Design', duration: 35, description: 'CRUD operations, status codes, URL structure.' },
+          { title: 'Middleware and Error Handling', duration: 25, description: 'Custom middleware, error handling patterns.' },
+          { title: 'Environment Variables and Configuration', duration: 20, description: 'dotenv, configuration management.' },
+        ],
+      },
+      {
+        title: 'Databases (MongoDB)',
+        lessons: [
+          { title: 'MongoDB and Mongoose', duration: 35, description: 'Schemas, models, CRUD operations.' },
+          { title: 'Data Validation and Relationships', duration: 30, description: 'Schema validation, referencing documents.' },
+          { title: 'REST API with Database', duration: 40, description: 'Connecting Express to MongoDB.' },
+          { title: 'Authentication and Security', duration: 35, description: 'JWT, bcrypt, authorization middleware.' },
+        ],
+      },
+      {
+        title: 'Deployment',
+        lessons: [
+          { title: 'Git and GitHub', duration: 25, description: 'Version control basics.' },
+          { title: 'Deploying to Render/Heroku', duration: 20, description: 'Production deployment.' },
+          { title: 'Environment Variables in Production', duration: 15, description: 'Securing secrets.' },
+          { title: 'API Documentation with Swagger', duration: 25, description: 'Documenting your API.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Quality Assurance',
+    description: 'Learn testing methodologies including unit testing, integration testing, functional testing. Use Chai, Mocha, and assert libraries. Write tests for Node.js and Express applications.',
+    category: 'Software Engineering',
+    level: 'intermediate',
+    duration: 35,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Testing Fundamentals',
+        lessons: [
+          { title: 'What is Testing?', duration: 20, description: 'Types of tests, testing pyramid.' },
+          { title: 'Assertion Libraries', duration: 25, description: 'Node assert, Chai expect, should, assert.' },
+          { title: 'Mocha Test Framework', duration: 30, description: 'describe, it, hooks, reporters.' },
+          { title: 'Writing Your First Tests', duration: 25, description: 'Practical test examples.' },
+        ],
+      },
+      {
+        title: 'Unit and Integration Tests',
+        lessons: [
+          { title: 'Testing Functions and Modules', duration: 30, description: 'Unit testing Node.js modules.' },
+          { title: 'Testing Express Routes', duration: 35, description: 'Supertest for HTTP integration tests.' },
+          { title: 'Mocking and Stubbing', duration: 30, description: 'Sinon.js for mocks, stubs, spies.' },
+          { title: 'Testing Database Operations', duration: 30, description: 'Test databases and fixtures.' },
+        ],
+      },
+      {
+        title: 'Functional and Advanced Testing',
+        lessons: [
+          { title: 'Functional Testing with Puppeteer', duration: 35, description: 'Browser automation and testing.' },
+          { title: 'Continuous Integration', duration: 25, description: 'GitHub Actions for automated testing.' },
+          { title: 'Test Coverage', duration: 20, description: 'Istanbul/nyc for coverage reports.' },
+          { title: 'TDD and BDD Workflows', duration: 25, description: 'Test-driven development practices.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Scientific Computing with Python',
+    description: 'Learn Python fundamentals for scientific computing. Covers variables, loops, conditionals, functions, lists, dictionaries, classes, file I/O, and third-party libraries like NumPy and SciPy.',
+    category: 'Data Science',
+    level: 'beginner',
+    duration: 40,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Python for Science',
+        lessons: [
+          { title: 'Python Refresher', duration: 25, description: 'Data types, control flow, functions.' },
+          { title: 'NumPy Arrays', duration: 35, description: 'Creating and manipulating arrays.' },
+          { title: 'NumPy Math Operations', duration: 30, description: 'Linear algebra, statistics, random numbers.' },
+          { title: 'SciPy Fundamentals', duration: 30, description: 'Optimization, integration, interpolation.' },
+        ],
+      },
+      {
+        title: 'Data Analysis with Python',
+        lessons: [
+          { title: 'Pandas DataFrames', duration: 40, description: 'Series, DataFrames, reading CSV files.' },
+          { title: 'Data Cleaning', duration: 35, description: 'Handling missing data, duplicates, transformations.' },
+          { title: 'Data Visualization with Matplotlib', duration: 35, description: 'Line plots, bar charts, histograms.' },
+          { title: 'Seaborn for Statistical Plots', duration: 30, description: 'Heatmaps, pair plots, box plots.' },
+        ],
+      },
+      {
+        title: 'Projects',
+        lessons: [
+          { title: 'Arithmetic Formatter', duration: 30, description: 'Format arithmetic problems vertically.' },
+          { title: 'Time Calculator', duration: 25, description: 'Add and subtract time durations.' },
+          { title: 'Budget App', duration: 35, description: 'Build a budget tracking class.' },
+          { title: 'Polygon Area Calculator', duration: 30, description: 'Object-oriented geometry calculator.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Data Visualization',
+    description: 'Learn to present data visually using D3.js, JSON, and various charting techniques. Build interactive dashboards, scatter plots, heat maps, choropleth maps, and treemap diagrams.',
+    category: 'Data Science',
+    level: 'intermediate',
+    duration: 35,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'D3.js Fundamentals',
+        lessons: [
+          { title: 'D3 Selections and Data Binding', duration: 30, description: 'Selecting DOM elements, data joins.' },
+          { title: 'Scales and Axes', duration: 35, description: 'Linear, ordinal, time scales.' },
+          { title: 'Shapes and Layouts', duration: 30, description: 'SVG shapes, pie layout, stack layout.' },
+          { title: 'Transitions and Animations', duration: 25, description: 'Animated data visualizations.' },
+        ],
+      },
+      {
+        title: 'Chart Types',
+        lessons: [
+          { title: 'Bar Charts and Line Charts', duration: 30, description: 'Basic chart implementations.' },
+          { title: 'Scatter Plots and Bubble Charts', duration: 25, description: 'Multi-dimensional data visualization.' },
+          { title: 'Heat Maps and Choropleths', duration: 35, description: 'Geographic and matrix visualizations.' },
+          { title: 'Treemaps and Hierarchical Data', duration: 30, description: 'Nested data visualization.' },
+        ],
+      },
+      {
+        title: 'Projects',
+        lessons: [
+          { title: 'Bar Chart: US GDP', duration: 40, description: 'Visualize US GDP data over time.' },
+          { title: 'Scatter Plot: Doping in Cycling', duration: 35, description: 'Interactive scatter plot with tooltips.' },
+          { title: 'Heat Map: Monthly Temperature', duration: 40, description: 'Temperature visualization by month.' },
+          { title: 'Choropleth: Education Levels', duration: 45, description: 'US county education data map.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Information Security',
+    description: 'Learn about ethical hacking, penetration testing, network security, and secure coding practices. Covers HelmetJS, port scanning, hash cracking, SQL injection prevention, and XSS protection.',
+    category: 'Security',
+    level: 'advanced',
+    duration: 40,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Web Security Fundamentals',
+        lessons: [
+          { title: 'HelmetJS and Security Headers', duration: 25, description: 'HTTP security headers middleware.' },
+          { title: 'OWASP Top 10', duration: 35, description: 'Understanding the top web vulnerabilities.' },
+          { title: 'Cross-Site Scripting (XSS)', duration: 30, description: 'Prevention and mitigation.' },
+          { title: 'SQL Injection Prevention', duration: 30, description: 'Parameterized queries and ORM security.' },
+        ],
+      },
+      {
+        title: 'Penetration Testing Tools',
+        lessons: [
+          { title: 'Port Scanning with Nmap', duration: 30, description: 'Network reconnaissance.' },
+          { title: 'Hash Cracking (John the Ripper)', duration: 25, description: 'Password cracking techniques.' },
+          { title: 'Packet Analysis with Wireshark', duration: 30, description: 'Network traffic analysis.' },
+          { title: 'Vulnerability Scanning (Nikto, OpenVAS)', duration: 35, description: 'Automated vulnerability detection.' },
+        ],
+      },
+      {
+        title: 'Secure Coding Practices',
+        lessons: [
+          { title: 'Input Validation and Sanitization', duration: 25, description: 'Preventing injection attacks.' },
+          { title: 'Authentication Best Practices', duration: 30, description: 'Secure password storage, MFA.' },
+          { title: 'API Security (Rate Limiting, CORS)', duration: 25, description: 'Securing REST APIs.' },
+          { title: 'Secure File Upload Handling', duration: 20, description: 'Validation, scanning, storage.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Coding Interview Prep',
+    description: 'Prepare for technical interviews with algorithms, data structures, and problem-solving strategies. Covers recursion, backtracking, graph algorithms, system design, and behavioral questions.',
+    category: 'Computer Science',
+    level: 'advanced',
+    duration: 50,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1489875347897-49f64b51c1f8?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Problem-Solving Strategies',
+        lessons: [
+          { title: 'Brute Force and Optimization', duration: 30, description: 'Naive solutions and how to improve them.' },
+          { title: 'Two Pointers and Sliding Window', duration: 35, description: 'Efficient array and string techniques.' },
+          { title: 'Recursion and Backtracking', duration: 40, description: 'Solving combinatorial problems.' },
+          { title: 'Divide and Conquer', duration: 30, description: 'Merge sort, quick select.' },
+        ],
+      },
+      {
+        title: 'Data Structure Deep Dive',
+        lessons: [
+          { title: 'Arrays, Strings, Hash Tables', duration: 30, description: 'Most common interview topics.' },
+          { title: 'Trees, Tries, and Graphs', duration: 45, description: 'Tree traversals, Trie for strings, graph algorithms.' },
+          { title: 'Heaps and Priority Queues', duration: 30, description: 'Top K problems, median finding.' },
+          { title: 'Union-Find (Disjoint Set)', duration: 25, description: 'Connected components, Kruskal algorithm.' },
+        ],
+      },
+      {
+        title: 'System Design',
+        lessons: [
+          { title: 'Designing Web Applications', duration: 35, description: 'URL shortener, TinyURL design.' },
+          { title: 'Designing Distributed Systems', duration: 40, description: 'Chat systems, news feeds.' },
+          { title: 'Database Design Interviews', duration: 30, description: 'Schema design, normalization trade-offs.' },
+          { title: 'Scalability and Caching', duration: 35, description: 'CDN, caching strategies, load balancing.' },
+        ],
+      },
+      {
+        title: 'Interview Practice',
+        lessons: [
+          { title: 'Mock Technical Interviews', duration: 45, description: 'Simulated coding interviews.' },
+          { title: 'Behavioral Questions', duration: 30, description: 'STAR method, common questions.' },
+          { title: 'Whiteboarding Techniques', duration: 20, description: 'Communicating your thought process.' },
+          { title: 'Negotiation and Job Search', duration: 25, description: 'Salary negotiation, offer evaluation.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Relational Database',
+    description: 'Learn SQL, PostgreSQL, database design, normalization, indexing, and advanced queries. Build projects like a celestial bodies database, world cup database, salon appointment scheduler, and periodic table database.',
+    category: 'Databases',
+    level: 'intermediate',
+    duration: 35,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1544383835-bda2bc66a55d?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'SQL Basics',
+        lessons: [
+          { title: 'Creating Tables and Constraints', duration: 25, description: 'CREATE TABLE, PRIMARY KEY, FOREIGN KEY, UNIQUE.' },
+          { title: 'INSERT, SELECT, UPDATE, DELETE', duration: 30, description: 'Basic CRUD operations.' },
+          { title: 'WHERE, ORDER BY, LIMIT', duration: 20, description: 'Filtering and sorting data.' },
+          { title: 'Aggregate Functions (COUNT, SUM, AVG)', duration: 25, description: 'Data aggregation with GROUP BY.' },
+        ],
+      },
+      {
+        title: 'Advanced SQL',
+        lessons: [
+          { title: 'JOINs (INNER, LEFT, RIGHT, FULL)', duration: 35, description: 'Combining tables.' },
+          { title: 'Subqueries and CTEs', duration: 30, description: 'Nested queries and WITH clauses.' },
+          { title: 'Views and Indexes', duration: 25, description: 'Optimizing queries with indexes.' },
+          { title: 'Transactions and ACID', duration: 25, description: 'BEGIN, COMMIT, ROLLBACK.' },
+        ],
+      },
+      {
+        title: 'Database Projects',
+        lessons: [
+          { title: 'Celestial Bodies Database', duration: 30, description: 'Design a database for astronomical data.' },
+          { title: 'World Cup Database', duration: 35, description: 'Historical World Cup data modeling.' },
+          { title: 'Salon Appointment Scheduler', duration: 40, description: 'Full-stack scheduling application.' },
+          { title: 'Periodic Table Database', duration: 30, description: 'Chemical elements database with queries.' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'College Algebra with Python',
+    description: 'Learn college-level algebra concepts using Python. Covers linear equations, functions, polynomials, quadratic equations, systems of equations, matrices, and practical data applications.',
+    category: 'Data Science',
+    level: 'beginner',
+    duration: 30,
+    price: 0,
+    thumbnail: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&h=250&fit=crop',
+    modules: [
+      {
+        title: 'Algebra Basics with Python',
+        lessons: [
+          { title: 'Numbers and Arithmetic', duration: 20, description: 'Python as a calculator.' },
+          { title: 'Variables and Expressions', duration: 25, description: 'Algebraic expressions in Python.' },
+          { title: 'Linear Equations', duration: 30, description: 'Solving and graphing linear equations.' },
+          { title: 'Functions and Graphs', duration: 30, description: 'Function notation, domain, range.' },
+        ],
+      },
+      {
+        title: 'Polynomials and Quadratics',
+        lessons: [
+          { title: 'Polynomial Operations', duration: 25, description: 'Adding, multiplying, factoring polynomials.' },
+          { title: 'Quadratic Equations', duration: 30, description: 'Quadratic formula, completing the square.' },
+          { title: 'Graphing Quadratics', duration: 25, description: 'Parabolas, vertex, axis of symmetry.' },
+          { title: 'Systems of Equations', duration: 30, description: 'Solving systems with Python.' },
+        ],
+      },
+      {
+        title: 'Matrices and Applications',
+        lessons: [
+          { title: 'Matrix Operations with NumPy', duration: 30, description: 'Addition, multiplication, inverse.' },
+          { title: 'Determinants and Cramer Rule', duration: 25, description: 'Solving systems with matrices.' },
+          { title: 'Data Fitting and Regression', duration: 35, description: 'Linear regression with Python.' },
+          { title: 'Real-World Algebra Projects', duration: 35, description: 'Applying algebra to real data.' },
+        ],
+      },
+    ],
+  },
 ];
 
 async function seedCourses() {
