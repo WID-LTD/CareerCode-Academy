@@ -29,6 +29,7 @@ export const users = pgTable(
     bio: text("bio"),
     isVerified: boolean("is_verified").default(false),
     verificationToken: text("verification_token"),
+    verificationTokenExpires: timestamp("verification_token_expires"),
     resetToken: text("reset_token"),
     resetTokenExpiry: timestamp("reset_token_expiry"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

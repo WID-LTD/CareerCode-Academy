@@ -20,6 +20,9 @@ import Signup from '@/pages/Signup';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import VerifyEmail from '@/pages/VerifyEmail';
+import VerifyPending from '@/pages/VerifyPending';
+import Verified from '@/pages/Verified';
+import VerificationError from '@/pages/VerificationError';
 import BecomeInstructor from '@/pages/BecomeInstructor';
 import Apply from '@/pages/Apply';
 import NotFound from '@/pages/NotFound';
@@ -89,6 +92,9 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
+          <Route path="/auth/verify-pending" element={<VerifyPending />} />
+          <Route path="/auth/verified" element={<Verified />} />
+          <Route path="/auth/verification-error" element={<VerificationError />} />
           <Route path="/become-instructor" element={<BecomeInstructor />} />
           <Route path="/apply" element={<Apply />} />
           <Route path="/verify-payment" element={<VerifyPayment />} />

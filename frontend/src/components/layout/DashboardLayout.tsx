@@ -53,6 +53,10 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
     return <Navigate to="/login" replace />;
   }
 
+  if (user && !user.isVerified) {
+    return <Navigate to={`/auth/verify-pending?email=${encodeURIComponent(user.email)}`} replace />;
+  }
+
   const role = user?.role || 'student';
   const hasAccess = !requiredRole ||
     role === requiredRole ||

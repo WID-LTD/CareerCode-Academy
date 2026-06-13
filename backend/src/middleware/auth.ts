@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, TokenPayload } from '../utils/helpers';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
+import * as UserModel from '../models/user';
 
 export interface AuthRequest extends Request {
   user?: TokenPayload;
@@ -36,6 +37,21 @@ export function authorize(...roles: string[]) {
     }
     next();
   };
+}
+
+export async function requireVerifiedEmail(req: AuthRequest, _res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await UserModel.getUserById(req.user!.userId);
+    if (!user) {
+      return next(new UnauthorizedError('User not found'));
+    }
+    if (!user.is_verified) {
+      return next(new UnauthorizedError('Please verify your email address.'));
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
 export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): void {

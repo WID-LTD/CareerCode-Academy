@@ -1,681 +1,250 @@
-IMPLEMENT A COMPLETE PRODUCTION-READY CAREERCODE ACADEMY PLATFORM.
+# CareerCode Academy - Email Verification System Implementation
 
-IMPORTANT REQUIREMENTS:
+You are working on the CareerCode Academy codebase. Implement a complete email verification system for all newly registered users.
 
-- Use React + TypeScript + Vite ✅
-- Use Tailwind CSS✅
-- Use Node.js + Express + TypeScript✅
-- Use NeonDB PostgreSQL✅
-- Use native PostgreSQL queries using node-postgres (pg)✅
-- DO NOT use Prisma
-- DO NOT use Drizzle ORM
-- DO NOT use MongoDB
-- DO NOT use Mongoose
-- DO NOT use mock data
-- DO NOT use placeholder arrays
-- DO NOT use fake dashboard statistics
-- DO NOT use hardcoded records
+## Objective
 
-Every page, dashboard, table, chart, metric, and report must be powered by live data from NeonDB.
+Users must verify their email address before they can access their dashboard, enroll in courses, create courses, or use any protected features.
 
-=================================================
-DATABASE✅
-=================================================
+---
 
-Use NeonDB PostgreSQL.
+## Requirements
 
-Use:
+### Registration Flow
 
-pg
-dotenv
+When a user registers:
 
-Create a centralized database connection layer.
+1. Validate all input fields.
+2. Create the user account.
+3. Hash the password using bcrypt.
+4. Generate a secure verification token using Node.js crypto.
+5. Store the verification token and expiration date in the database.
+6. Set `emailVerified` to `false`.
+7. Send a verification email to the user's email address.
+8. Redirect the user to a "Check Your Email" page.
 
-Example architecture:
+---
 
-backend/src/
-├── config/
-│   └── database.ts
-├── queries/
-├── controllers/
-├── services/
-├── routes/
-├── middleware/
-└── server.ts
+## Database Updates
 
-=================================================
-USER ROLES✅
-=================================================
+Add the following fields to the User model:
 
-STUDENT
+```typescript
+emailVerified: boolean;
+verificationToken: string | null;
+verificationTokenExpires: Date | null;
+```
 
-INSTRUCTOR
+Default values:
 
-ADMIN
+```typescript
+emailVerified = false
+verificationToken = null
+verificationTokenExpires = null
+```
 
-SUPER_ADMIN
+---
 
-=================================================
-AUTHENTICATION✅
-=================================================
-
-Implement:
-
-- Register
-- Login
-- Logout
-- Forgot Password
-- Reset Password
-- JWT Authentication
-- Refresh Tokens
-- Role-Based Authorization
-- Protected Routes
-
-Store users in PostgreSQL.
-
-Passwords must be hashed using bcrypt.
-
-=================================================
-PUBLIC WEBSITE✅
-=================================================
+## Email Verification Endpoint
 
 Create:
 
-Home Page
-About Page
-Courses Page
-Contact Page
-Become An Instructor Page
-Apply Page
-Login Page
-Register Page
+```typescript
+GET /api/auth/verify-email
+```
 
-=================================================
-STUDENT SYSTEM✅
-=================================================
+Workflow:
 
-Student Dashboard
+1. Receive verification token.
+2. Find matching user.
+3. Check token expiration.
+4. If valid:
 
-Features:
+   * Set `emailVerified = true`
+   * Remove verification token
+   * Remove expiration date
+5. Redirect user to verification success page.
 
-Dashboard Overview
+Invalid or expired tokens should redirect to an error page with an option to resend verification email.
 
-My Courses
+---
 
-My Progress
+## Login Protection
 
-Assignments
+Update login logic.
 
-Submissions
+Before generating JWT:
 
-Announcements
+```typescript
+if (!user.emailVerified) {
+  throw new Error("Please verify your email address.");
+}
+```
 
-Notifications
+Unverified users must not:
 
-Profile Settings
+* Access dashboard
+* Enroll in courses
+* Purchase courses
+* Create courses
+* Access protected routes
 
-=================================================
-INSTRUCTOR APPLICATION SYSTEM✅
-=================================================
+---
+
+## Resend Verification Email
+
+Create endpoint:
+
+```typescript
+POST /api/auth/resend-verification
+```
+
+Requirements:
+
+1. Accept email address.
+2. Find user.
+3. Generate new verification token.
+4. Update expiration date.
+5. Send new verification email.
+6. Return success response.
+
+Add rate limiting to prevent abuse.
+
+---
+
+## Email Templates
+
+Create professional CareerCode Academy branded email templates.
+
+### Verification Email
+
+Subject:
+
+```text
+Verify Your Email - CareerCode Academy
+```
+
+Body should contain:
+
+* Welcome message
+* Verify account button
+* Verification link
+* Expiration notice
+* CareerCode Academy branding
+
+### Verification Success Email
+
+Subject:
+
+```text
+Email Verified Successfully
+```
+
+Body should confirm successful account activation.
+
+---
+
+## Frontend Pages
 
 Create:
 
-/become-an-instructor
+### Verify Email Pending
 
-Application Form Fields:
+Route:
 
-Full Name
+```text
+/auth/verify-pending
+```
 
-Email
+Display:
 
-Phone
+* Check your inbox message
+* User email address
+* Resend verification button
 
-Country
+### Verification Success
 
-State
+Route:
 
-Professional Title
+```text
+/auth/verified
+```
 
-Years Of Experience
+Display:
 
-Specialization
+* Success icon
+* Email verified message
+* Continue to login button
 
-GitHub URL
+### Verification Failed
 
-LinkedIn URL
+Route:
 
-Portfolio URL
+```text
+/auth/verification-error
+```
 
-Resume Upload
+Display:
 
-Profile Image Upload
+* Error message
+* Link expired notice
+* Resend verification button
 
-Bio
+---
 
-Teaching Experience
+## Route Protection
 
-Interested Courses
+Implement middleware that checks:
 
-Availability
+```typescript
+user.emailVerified === true
+```
 
-Motivation
+Only verified users can access:
 
-=================================================
-DATABASE TABLE✅
-=================================================
+```text
+/student/dashboard
+/instructor/dashboard
+/admin/dashboard
+/my-courses
+/profile
+/certificates
+/create-course
+/manage-courses
+```
 
-instructor_applications
+---
 
-Columns:
+## Security Requirements
 
-id
+* Use crypto-generated tokens.
+* Verification links expire after 24 hours.
+* Tokens are single-use.
+* Remove token after successful verification.
+* Prevent login for unverified accounts.
+* Add rate limiting on resend endpoint.
+* Never expose sensitive user information.
 
-full_name
+---
 
-email
+## User Experience
 
-phone
+Registration Flow:
 
-country
+```text
+Register
+   ↓
+Verification Email Sent
+   ↓
+Check Email Page
+   ↓
+Click Verification Link
+   ↓
+Email Verified
+   ↓
+Login
+   ↓
+Dashboard Access
+```
 
-state
-
-professional_title
-
-experience_years
-
-specialization
-
-github_url
-
-linkedin_url
-
-portfolio_url
-
-resume_url
-
-profile_image_url
-
-bio
-
-teaching_experience
-
-interested_courses
-
-availability
-
-motivation
-
-status
-
-review_notes
-
-reviewed_by
-
-reviewed_at
-
-created_at
-
-updated_at
-
-=================================================
-ADMIN REVIEW SYSTEM✅
-=================================================
-
-Admin Dashboard Section:
-
-Instructor Applications
-
-Features:
-
-View Applications
-
-Search Applications
-
-Filter Applications
-
-Approve Application
-
-Reject Application
-
-Add Notes
-
-Download Resume
-
-View Portfolio
-
-View GitHub
-
-=================================================
-APPROVAL WORKFLOW✅
-=================================================
-
-When approved:
-
-Create instructor account
-
-Assign role:
-
-INSTRUCTOR
-
-Generate temporary password
-
-Create notification
-
-Send email
-
-Grant instructor dashboard access
-
-=================================================
-INSTRUCTOR DASHBOARD✅
-=================================================
-
-Features:
-
-Dashboard Overview
-
-My Courses
-
-Course Analytics
-
-Students
-
-Assignments
-
-Submissions
-
-Grading
-
-Announcements
-
-Live Classes
-
-Messages
-
-Schedule
-
-Profile
-
-=================================================
-COURSE PROPOSAL SYSTEM✅👆🏻
-=================================================
-
-Allow instructors to submit courses.
-
-Create:
-
-/instructor/course-proposals
-
-Fields:
-
-Title
-
-Category
-
-Level
-
-Description
-
-Learning Outcomes
-
-Prerequisites
-
-Duration
-
-Lesson Count
-
-Teaching Format
-
-Technologies
-
-Projects
-
-Recommended Price
-
-Thumbnail
-
-Notes
-
-=================================================
-DATABASE TABLE
-=================================================
-
-course_proposals
-
-Columns:
-
-id
-
-instructor_id
-
-title
-
-category
-
-level
-
-description
-
-learning_outcomes
-
-prerequisites
-
-duration
-
-lesson_count
-
-delivery_format
-
-technologies
-
-projects
-
-recommended_price
-
-thumbnail_url
-
-notes
-
-status
-
-review_notes
-
-reviewed_by
-
-reviewed_at
-
-created_at
-
-updated_at
-
-=================================================
-COURSE MANAGEMENT
-=================================================
-
-Admin and Instructors can manage courses.
-
-Features:
-
-Create Course
-
-Edit Course
-
-Archive Course
-
-Publish Course
-
-Manage Modules
-
-Manage Lessons
-
-Manage Resources
-
-Manage Assignments
-
-=================================================
-DATABASE TABLES
-=================================================
-
-users
-
-courses
-
-modules
-
-lessons
-
-enrollments
-
-assignments
-
-submissions
-
-announcements
-
-notifications
-
-payments
-
-course_proposals
-
-instructor_applications
-
-live_classes
-
-attendance
-
-resources
-
-messages
-
-conversations
-
-=================================================
-PAYMENT SYSTEM
-=================================================
-
-Integrate:
-
-Paystack
-
-Implement:
-
-Initialize Payment
-
-Verify Payment
-
-Payment History
-
-Enrollment After Successful Payment
-
-=================================================
-ENROLLMENT SYSTEM
-=================================================
-
-Student clicks Enroll
-
-↓
-
-Paystack Payment
-
-↓
-
-Payment Verified
-
-↓
-
-Create Enrollment
-
-↓
-
-Grant Course Access
-
-=================================================
-ADMIN DASHBOARD
-=================================================
-
-Real-Time Analytics
-
-Show:
-
-Total Students
-
-Total Instructors
-
-Total Courses
-
-Total Enrollments
-
-Total Revenue
-
-Assignment Statistics
-
-Recent Activity
-
-Pending Instructor Applications
-
-Pending Course Proposals
-
-All statistics must come from PostgreSQL queries.
-
-Example:
-
-SELECT COUNT(*) FROM users WHERE role='STUDENT';
-
-SELECT COUNT(*) FROM courses;
-
-SELECT COUNT(*) FROM enrollments;
-
-Never use hardcoded values.
-
-=================================================
-REPORTING
-=================================================
-
-Generate reports from real database data.
-
-Reports:
-
-Enrollment Report
-
-Revenue Report
-
-Instructor Performance
-
-Student Progress
-
-Course Performance
-
-=================================================
-FILE UPLOADS
-=================================================
-
-Use:
-
-Supabase Storage
-
-or
-
-AWS S3
-
-DO NOT use Cloudinary.
-
-Support:
-
-Profile Images
-
-Resumes
-
-Assignments
-
-Resources
-
-Course Thumbnails
-
-Certificates
-
-=================================================
-EMAIL SYSTEM
-=================================================
-
-Use:
-
-Resend
-
-DO NOT use Nodemailer.
-
-Support:
-
-Welcome Email
-
-Password Reset
-
-Instructor Approval
-
-Course Enrollment
-
-Announcements
-
-=================================================
-API ARCHITECTURE
-=================================================
-
-Create REST APIs:
-
-/api/auth
-
-/api/users
-
-/api/courses
-
-/api/modules
-
-/api/lessons
-
-/api/enrollments
-
-/api/assignments
-
-/api/submissions
-
-/api/payments
-
-/api/instructor-applications
-
-/api/course-proposals
-
-/api/announcements
-
-/api/notifications
-
-/api/messages
-
-=================================================
-SECURITY
-=================================================
-
-Implement:
-
-JWT
-
-bcrypt
-
-Helmet
-
-Rate Limiting
-
-Input Validation
-
-Role Permissions
-
-CORS
-
-SQL Injection Protection
-
-=================================================
-RESPONSIVENESS
-=================================================
-
-Fully responsive:
-
-Mobile
-
-Tablet
-
-Desktop
-
-=================================================
-FINAL REQUIREMENT
-=================================================
-
-Generate a complete production-ready LMS.
-
-Every dashboard card, chart, table, metric, and report must fetch live data from NeonDB using node-postgres queries.
-
-Do not generate demo content.
-
-Do not generate placeholder records.
-
-Do not generate fake statistics.
-
-Everything must be connected to actual database tables and API endpoints.
+Ensure the implementation is production-ready, fully integrated with the existing authentication system, role-based access control, Neon PostgreSQL database, and React + TypeScript frontend used by CareerCode Academy.

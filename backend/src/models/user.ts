@@ -10,6 +10,7 @@ export interface User {
   bio: string | null;
   is_verified: boolean;
   verification_token: string | null;
+  verification_token_expires: Date | null;
   reset_token: string | null;
   reset_token_expiry: Date | null;
   created_at: Date;
@@ -22,6 +23,7 @@ export interface CreateUserInput {
   password: string;
   role?: 'student' | 'instructor' | 'admin';
   verification_token?: string;
+  verification_token_expires?: Date;
 }
 
 export interface UpdateUserInput {
@@ -30,6 +32,7 @@ export interface UpdateUserInput {
   bio?: string;
   is_verified?: boolean;
   verification_token?: string | null;
+  verification_token_expires?: Date | null;
   reset_token?: string | null;
   reset_token_expiry?: Date | null;
   password?: string;
@@ -38,10 +41,10 @@ export interface UpdateUserInput {
 
 export async function createUser(input: CreateUserInput): Promise<User> {
   const { rows } = await query<User>(
-    `INSERT INTO users (name, email, password, role, verification_token)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users (name, email, password, role, verification_token, verification_token_expires)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [input.name, input.email, input.password, input.role || 'student', input.verification_token || null]
+    [input.name, input.email, input.password, input.role || 'student', input.verification_token || null, input.verification_token_expires || null]
   );
   return rows[0];
 }
@@ -71,6 +74,14 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function getUserByVerificationToken(token: string): Promise<User | null> {
+  const { rows } = await query<User>(
+    'SELECT * FROM users WHERE verification_token = $1 AND (verification_token_expires IS NULL OR verification_token_expires > NOW())',
+    [token]
+  );
+  return rows[0] || null;
+}
+
+export async function getUserByVerificationTokenIgnoreExpiry(token: string): Promise<User | null> {
   const { rows } = await query<User>(
     'SELECT * FROM users WHERE verification_token = $1',
     [token]

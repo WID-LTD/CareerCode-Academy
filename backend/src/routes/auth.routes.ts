@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import * as UserModel from '../models/user';
@@ -66,6 +67,7 @@ router.post(
 
       const hashedPassword = await bcrypt.hash(password, 12);
       const verificationToken = generateVerificationCode();
+      const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       const user = await UserModel.createUser({
         name,
@@ -73,6 +75,7 @@ router.post(
         password: hashedPassword,
         role,
         verification_token: verificationToken,
+        verification_token_expires: verificationTokenExpires,
       });
 
       await sendVerificationEmail(email, verificationToken);
@@ -117,6 +120,10 @@ router.post(
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
         throw new UnauthorizedError('Invalid email or password');
+      }
+
+      if (!user.is_verified) {
+        throw new UnauthorizedError('Please verify your email address.');
       }
 
       const tokenPayload = { userId: user.id, role: user.role };
@@ -220,6 +227,7 @@ router.get(
       await UserModel.updateUser(user.id, {
         is_verified: true,
         verification_token: null,
+        verification_token_expires: null,
       });
 
       await sendWelcomeEmail(user.email, user.name);
@@ -227,6 +235,59 @@ router.get(
       res.json({
         success: true,
         message: 'Email verified successfully.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /resend-verification
+const resendVerificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many verification email requests. Please try again later.' },
+});
+
+const resendVerificationSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+router.post(
+  '/resend-verification',
+  resendVerificationLimiter,
+  validate(resendVerificationSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+
+      const user = await UserModel.getUserByEmail(email);
+      if (!user) {
+        throw new NotFoundError('User');
+      }
+
+      if (user.is_verified) {
+        return res.json({
+          success: true,
+          message: 'Your email is already verified. You can log in.',
+        });
+      }
+
+      const verificationToken = generateVerificationCode();
+      const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await UserModel.updateUser(user.id, {
+        verification_token: verificationToken,
+        verification_token_expires: verificationTokenExpires,
+      });
+
+      await sendVerificationEmail(email, verificationToken);
+
+      res.json({
+        success: true,
+        message: 'Verification email has been resent. Please check your inbox.',
       });
     } catch (error) {
       next(error);

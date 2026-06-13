@@ -28,6 +28,9 @@ export function useAuth() {
       const message = err?.response?.data?.message || '';
       if (message.includes('unavailable')) {
         toast.error('Service unavailable — database connection issue');
+      } else if (message.includes('verify your email')) {
+        navigate(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
+        toast.error('Please verify your email address.');
       } else {
         toast.error('Invalid email or password');
       }
@@ -42,9 +45,10 @@ export function useAuth() {
   ) => {
     try {
       await storeRegister(name, email, password, role);
-      toast.success('Account created successfully!');
-      if (role === 'instructor') navigate('/instructor/dashboard');
-      else navigate('/student/dashboard');
+      const state = useAuthStore.getState();
+      const userEmail = state.user?.email || email;
+      toast.success('Account created! Please verify your email.');
+      navigate(`/auth/verify-pending?email=${encodeURIComponent(userEmail)}`);
     } catch (err: any) {
       const message = err?.response?.data?.message || '';
       if (message.includes('unavailable')) {

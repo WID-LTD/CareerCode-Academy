@@ -43,13 +43,50 @@ export async function sendVerificationEmail(email: string, token: string): Promi
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
   await sendMail({
     to: email,
-    subject: 'Verify your CareerCode Academy email',
+    subject: 'Verify Your Email - CareerCode Academy',
     html: `
-      <h1>Email Verification</h1>
-      <p>Click the link below to verify your email address:</p>
-      <a href="${verificationUrl}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;">Verify Email</a>
-      <p>Or copy this URL: ${verificationUrl}</p>
-      <p>This link expires in 24 hours.</p>
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="margin:0;padding:0;background:#f4f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 20px;">
+          <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+              <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px 40px;text-align:center;">
+                <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;">CareerCode Academy</h1>
+                <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Build Your Career, One Code at a Time</p>
+              </td></tr>
+              <tr><td style="padding:40px;">
+                <h2 style="color:#1e293b;font-size:20px;margin:0 0 8px;">Welcome to CareerCode Academy!</h2>
+                <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 24px;">
+                  Thanks for creating an account. Please verify your email address to get started on your learning journey.
+                </p>
+                <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+                  <tr><td align="center">
+                    <a href="${verificationUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">Verify Account</a>
+                  </td></tr>
+                </table>
+                <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 8px;">
+                  Or copy this link into your browser:
+                </p>
+                <p style="color:#6366f1;font-size:13px;word-break:break-all;margin:0 0 24px;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+                  ${verificationUrl}
+                </p>
+                <p style="color:#94a3b8;font-size:13px;margin:0;">
+                  This verification link expires in <strong>24 hours</strong>.
+                </p>
+              </td></tr>
+              <tr><td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+                <p style="color:#94a3b8;font-size:12px;margin:0;">
+                  &copy; 2024 CareerCode Academy. All rights reserved.<br>
+                  If you did not create this account, please ignore this email.
+                </p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
     `,
   });
 }
@@ -71,13 +108,49 @@ export async function sendPasswordResetEmail(email: string, token: string): Prom
 }
 
 export async function sendWelcomeEmail(email: string, name: string): Promise<void> {
+  const loginUrl = `${process.env.FRONTEND_URL}/login`;
   await sendMail({
     to: email,
-    subject: 'Welcome to CareerCode Academy!',
+    subject: 'Email Verified Successfully',
     html: `
-      <h1>Welcome, ${name}!</h1>
-      <p>Your account has been created successfully.</p>
-      <p>Start learning and building your career today.</p>
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="margin:0;padding:0;background:#f4f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 20px;">
+          <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+              <tr><td style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:32px 40px;text-align:center;">
+                <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;">Email Verified Successfully</h1>
+              </td></tr>
+              <tr><td style="padding:40px;">
+                <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+                  <tr><td align="center" style="width:64px;height:64px;background:#dcfce7;border-radius:50%;text-align:center;vertical-align:middle;font-size:32px;line-height:64px;">&#10003;</td></tr>
+                </table>
+                <h2 style="color:#1e293b;font-size:20px;margin:0 0 8px;text-align:center;">Welcome, ${name}!</h2>
+                <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 24px;text-align:center;">
+                  Your email has been verified and your account is now active.
+                  You can log in and start learning right away.
+                </p>
+                <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+                  <tr><td align="center">
+                    <a href="${loginUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">Log In to Your Dashboard</a>
+                  </td></tr>
+                </table>
+                <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0;text-align:center;">
+                  Start exploring courses, track your progress, and build your career.
+                </p>
+              </td></tr>
+              <tr><td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+                <p style="color:#94a3b8;font-size:12px;margin:0;">
+                  &copy; 2024 CareerCode Academy. All rights reserved.
+                </p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
     `,
   });
 }
