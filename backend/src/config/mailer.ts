@@ -20,8 +20,8 @@ export async function sendMail(options: {
 }): Promise<void> {
   const resend = getResend();
 
-  if (!resend || process.env.NODE_ENV === 'development') {
-    console.log('[Mail] Dev mode - skipped:', options.to, options.subject);
+  if (!resend) {
+    console.log('[Mail] No API key - skipped:', options.to, options.subject);
     return;
   }
 

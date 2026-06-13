@@ -1,2 +1,6 @@
 PUBLIC_KEY=pk_test_1e7dfb9ee157a0da6f9d4866146ab497584a9991
 SECRET_KEY=sk_test_edb58823826ec534ccbb974d0434fcaeec25cdd6
+
+# ── Mail (Resend) ──
+RESEND_API_KEY= re_fbWyshvF_8H2Rp7Giaq7FZSiAJ8WhLAiy
+RESEND_FROM=noreply@careercode.academy
