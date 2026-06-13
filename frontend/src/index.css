@@ -31,23 +31,23 @@
   }
 
   .neon-glow {
-    @apply shadow-[0_0_5px_rgba(99,102,241,0.5),0_0_10px_rgba(99,102,241,0.3)];
+    @apply shadow-[0_0_5px_rgba(79,70,229,0.5),0_0_10px_rgba(79,70,229,0.3)];
   }
 
   .neon-glow-strong {
-    @apply shadow-[0_0_10px_rgba(99,102,241,0.8),0_0_20px_rgba(99,102,241,0.5),0_0_40px_rgba(99,102,241,0.3)];
+    @apply shadow-[0_0_10px_rgba(79,70,229,0.8),0_0_20px_rgba(79,70,229,0.5),0_0_40px_rgba(79,70,229,0.3)];
   }
 
   .neon-border {
-    @apply border border-primary-500/50 shadow-[0_0_5px_rgba(99,102,241,0.3),inset_0_0_5px_rgba(99,102,241,0.1)];
+    @apply border border-primary-500/50 shadow-[0_0_5px_rgba(79,70,229,0.3),inset_0_0_5px_rgba(79,70,229,0.1)];
   }
 
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-primary-500 to-accent-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 via-secondary-500 to-accent-500;
   }
 
   .gradient-bg {
-    @apply bg-gradient-to-br from-primary-500 via-primary-600 to-accent-600;
+    @apply bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600;
   }
 
   .gradient-bg-subtle {

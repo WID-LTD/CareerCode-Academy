@@ -181,7 +181,7 @@ export default function CourseView() {
 
           <div className="flex items-center gap-2">
             <Button
-              variant={lessonProgress[currentLesson?.id] ? "secondary" : "default"}
+              variant={lessonProgress[currentLesson?.id] ? "secondary" : "primary"}
               onClick={markCompleted}
               disabled={!currentLesson}
               className={lessonProgress[currentLesson?.id] ? "bg-emerald-600 hover:bg-emerald-700" : ""}

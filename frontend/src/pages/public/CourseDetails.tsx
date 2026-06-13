@@ -53,7 +53,7 @@ export default function CourseDetails() {
         toast.success('Enrolled successfully!');
         navigate('/student/dashboard');
       } else {
-        const result = await initializePayment(course.id, 'paystack');
+        const result: any = await initializePayment(course.id, 'paystack');
         if (result?.authorizationUrl) {
           window.location.href = result.authorizationUrl;
         } else {
@@ -133,7 +133,7 @@ export default function CourseDetails() {
                 <Badge className={levelColors[course.level] || ''}>
                   {course.level}
                 </Badge>
-                <Badge variant="outline" className="text-blue-400 border-blue-500/30">
+                <Badge variant="primary" className="border border-blue-500/30">
                   {course.category}
                 </Badge>
                 {isFree && (

@@ -1,16 +1,22 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  BookOpen, Clock, Award, TrendingUp, Play,
-  Calendar, ChevronRight, ChevronLeft, RefreshCw,
-  AlertCircle, Target, Zap, Flame,
+  BookOpen, ChevronRight, ChevronLeft, Play, Calendar,
+  Clock, AlertCircle, RefreshCw, Target,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useStudentStore } from '@/store/studentStore';
 import { useAuthStore } from '@/store/authStore';
+import { HeroSection } from '@/components/student/HeroSection';
+import { StatsCards } from '@/components/student/StatsCards';
+import { LearningAnalytics } from '@/components/student/LearningAnalytics';
+import { RecommendedCourses } from '@/components/student/RecommendedCourses';
+import { AchievementCenter } from '@/components/student/AchievementCenter';
+import { AIStudyAssistant } from '@/components/student/AIStudyAssistant';
+import { HeroSkeleton, StatsSkeleton, CardSkeleton, ChartSkeleton } from '@/components/student/SkeletonLoader';
 
 function ProgressRing({ progress, size = 56, strokeWidth = 4 }: { progress: number; size?: number; strokeWidth?: number }) {
   const radius = (size - strokeWidth) / 2;
@@ -18,7 +24,7 @@ function ProgressRing({ progress, size = 56, strokeWidth = 4 }: { progress: numb
   const offset = circumference - (progress / 100) * circumference;
 
   return (
-    <svg width={size} height={size} className="transform -rotate-90 flex-shrink-0">
+    <svg width={size} height={size} className="transform -rotate-90 flex-shrink-0" aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} className="text-gray-200 dark:text-gray-700" />
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="text-primary-500 transition-all duration-700" />
     </svg>
@@ -27,7 +33,10 @@ function ProgressRing({ progress, size = 56, strokeWidth = 4 }: { progress: numb
 
 export default function StudentDashboard() {
   const { user } = useAuthStore();
-  const { stats, recentCourses, recentActivity, upcomingAssignments, isLoading, error, fetchDashboard } = useStudentStore();
+  const {
+    stats, recentCourses, recentActivity, upcomingAssignments,
+    isLoading, error, fetchDashboard,
+  } = useStudentStore();
   const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,8 +45,19 @@ export default function StudentDashboard() {
 
   if (isLoading && !stats) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-8" role="status" aria-label="Loading dashboard">
+        <HeroSkeleton />
+        <StatsSkeleton />
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <CardSkeleton />
+            <ChartSkeleton />
+          </div>
+          <div className="space-y-6">
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        </div>
       </div>
     );
   }
@@ -46,75 +66,36 @@ export default function StudentDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <AlertCircle className="w-12 h-12 text-danger-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Failed to load dashboard</h2>
           <p className="text-gray-500 mb-4">{error}</p>
-          <Button onClick={fetchDashboard}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          <Button onClick={fetchDashboard} icon={<RefreshCw className="w-4 h-4" />}>
+            Retry
           </Button>
         </div>
       </div>
     );
   }
 
-  const activeCourses = recentCourses.filter(c => c.progress > 0 && c.progress < 100);
+  const coursesInProgress = recentCourses.filter(c => c.progress > 0 && c.progress < 100);
   const newCourses = recentCourses.filter(c => c.progress === 0);
   const completedCount = recentCourses.filter(c => c.progress === 100).length;
 
   const scrollCarousel = (dir: 'left' | 'right') => {
     if (!carouselRef.current) return;
-    const scroll = dir === 'left' ? -320 : 320;
-    carouselRef.current.scrollBy({ left: scroll, behavior: 'smooth' });
+    carouselRef.current.scrollBy({ left: dir === 'left' ? -320 : 320, behavior: 'smooth' });
   };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-      {/* Welcome Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">
-            Welcome back, <span className="gradient-text">{user?.name?.split(' ')[0] || 'Learner'}</span>
-          </h1>
-          <p className="text-gray-500 mt-1">
-            {activeCourses.length > 0
-              ? `Pick up where you left off on ${activeCourses.length} course${activeCourses.length > 1 ? 's' : ''}.`
-              : newCourses.length > 0
-                ? `You have ${newCourses.length} new course${newCourses.length > 1 ? 's' : ''} to start.`
-                : stats && stats.certificates > 0
-                  ? 'Great work! Browse more courses to continue learning.'
-                  : 'Start your learning journey by enrolling in a course.'}
-          </p>
-        </div>
-        {activeCourses.length > 0 && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-100 dark:bg-gray-800/50 px-4 py-2 rounded-full">
-            <Flame className="w-4 h-4 text-orange-500" />
-            <span><strong className="text-gray-900 dark:text-white">{stats?.averageProgress || 0}%</strong> average progress</span>
-          </div>
-        )}
-      </div>
+      {/* Hero Welcome Section */}
+      <HeroSection />
 
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { icon: BookOpen, label: 'Enrolled', value: stats?.enrolledCourses?.toString() || '0', color: 'text-blue-500', bg: 'bg-blue-500/10' },
-          { icon: Target, label: 'Completed', value: completedCount.toString() || '0', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-          { icon: Zap, label: 'Lessons Done', value: stats?.completedLessons?.toString() || '0', color: 'text-purple-500', bg: 'bg-purple-500/10' },
-          { icon: Award, label: 'Certificates', value: stats?.certificates?.toString() || '0', color: 'text-amber-500', bg: 'bg-amber-500/10' },
-        ].map((stat) => (
-          <GlassCard key={stat.label} className="p-4 flex items-center gap-3" hover={false}>
-            <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>
-              <stat.icon className={`w-5 h-5 ${stat.color}`} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xl font-bold">{stat.value}</div>
-              <div className="text-xs text-gray-500 truncate">{stat.label}</div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
+      {/* Stats Cards */}
+      <StatsCards stats={stats} />
 
       {/* Continue Learning */}
-      {activeCourses.length > 0 && (
+      {coursesInProgress.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Continue Learning</h2>
@@ -122,12 +103,14 @@ export default function StudentDashboard() {
               <button
                 onClick={() => scrollCarousel('left')}
                 className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Scroll left"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={() => scrollCarousel('right')}
                 className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Scroll right"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -136,16 +119,19 @@ export default function StudentDashboard() {
           <div
             ref={carouselRef}
             className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1 snap-x snap-mandatory"
+            role="list"
+            aria-label="Active courses"
           >
-            {activeCourses.map((course) => (
+            {coursesInProgress.map((course) => (
               <motion.div
                 key={course.id}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="flex-shrink-0 w-[280px] snap-start"
+                role="listitem"
               >
                 <Link to={`/student/courses/${course.slug}`} className="block group">
-                  <GlassCard className="p-5 h-full" hover={true}>
+                  <GlassCard className="p-5 h-full" hover>
                     <div className="flex items-start gap-4">
                       <div className="relative flex-shrink-0">
                         <ProgressRing progress={course.progress} size={64} strokeWidth={5} />
@@ -158,7 +144,7 @@ export default function StudentDashboard() {
                           {course.title}
                         </h3>
                         <p className="text-xs text-gray-500 mt-1 truncate">{course.instructor_name}</p>
-                        <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
+                        <div className="mt-2 flex items-center gap-1 text-xs text-gray-400">
                           <Play className="w-3 h-3" />
                           <span>{course.progress}% complete</span>
                         </div>
@@ -178,11 +164,21 @@ export default function StudentDashboard() {
         </section>
       )}
 
+      {/* Learning Analytics */}
+      <LearningAnalytics />
+
+      {/* Recommended Courses */}
+      <RecommendedCourses />
+
+      {/* Achievement Center */}
+      <AchievementCenter />
+
       {/* Main Grid: My Learning + Sidebar */}
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* My Learning */}
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
-          <GlassCard className="p-6">
+          {/* My Learning */}
+          <GlassCard className="p-6" hover={false}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold">
                 {newCourses.length > 0 ? 'All Courses' : 'My Learning'}
@@ -240,7 +236,7 @@ export default function StudentDashboard() {
           </GlassCard>
 
           {/* Recent Activity */}
-          <GlassCard className="p-6">
+          <GlassCard className="p-6" hover={false}>
             <h2 className="text-lg font-semibold mb-5">Recent Activity</h2>
             <div className="space-y-4">
               {recentActivity.length === 0 ? (
@@ -256,15 +252,19 @@ export default function StudentDashboard() {
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                       activity.type === 'enrollment'
                         ? 'bg-blue-500/10 text-blue-500'
-                        : 'bg-emerald-500/10 text-emerald-500'
+                        : activity.type === 'lesson'
+                        ? 'bg-purple-500/10 text-purple-500'
+                        : 'bg-success-500/10 text-success-500'
                     }`}>
                       {activity.type === 'enrollment'
                         ? <BookOpen className="w-4 h-4" />
-                        : <Award className="w-4 h-4" />}
+                        : <Target className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="text-gray-900 dark:text-gray-100">
-                        {activity.type === 'enrollment' ? 'Enrolled in' : 'Earned certificate for'}
+                        {activity.type === 'enrollment' ? 'Enrolled in' :
+                         activity.type === 'lesson' ? 'Completed lesson in' :
+                         'Earned certificate for'}
                       </span>
                       <span className="text-gray-500"> {activity.course_title}</span>
                     </div>
@@ -278,9 +278,10 @@ export default function StudentDashboard() {
           </GlassCard>
         </div>
 
-        {/* Sidebar */}
+        {/* Right Sidebar */}
         <div className="space-y-6">
-          <GlassCard className="p-6">
+          {/* Upcoming Deadlines */}
+          <GlassCard className="p-6" hover={false}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">
                 <Calendar className="w-4 h-4 inline mr-2 -mt-0.5 text-gray-400" />
@@ -294,29 +295,39 @@ export default function StudentDashboard() {
               {upcomingAssignments.length === 0 ? (
                 <p className="text-sm text-gray-400 py-2">No upcoming deadlines.</p>
               ) : (
-                upcomingAssignments.slice(0, 4).map((assignment) => (
-                  <div key={assignment.id} className="p-3 rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-medium text-sm text-amber-900 dark:text-amber-100 truncate">
-                          {assignment.title}
-                        </h3>
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 truncate">
-                          {assignment.course_title}
-                        </p>
+                upcomingAssignments.slice(0, 4).map((assignment) => {
+                  const dueDate = new Date(assignment.due_date);
+                  const now = new Date();
+                  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const urgencyColor = diffDays <= 1 ? 'danger' : diffDays <= 3 ? 'warning' : 'primary';
+                  const urgencyBg = diffDays <= 1 ? 'bg-danger-50/50 dark:bg-danger-900/10 border-danger-100 dark:border-danger-900/30' :
+                    diffDays <= 3 ? 'bg-warning-50/50 dark:bg-warning-900/10 border-warning-100 dark:border-warning-900/30' :
+                    'bg-gray-50/50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-800';
+
+                  return (
+                    <div key={assignment.id} className={`p-3 rounded-xl ${urgencyBg} border`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-medium text-sm truncate">{assignment.title}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">{assignment.course_title}</p>
+                        </div>
+                        <Badge variant={urgencyColor as any} size="sm">
+                          {diffDays <= 0 ? 'Due today' : `${diffDays}d left`}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 mt-2 text-[11px] text-gray-500">
+                        <Calendar className="w-3 h-3" />
+                        Due {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 mt-2 text-[11px] text-amber-500">
-                      <Calendar className="w-3 h-3" />
-                      Due {new Date(assignment.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </GlassCard>
 
-          <GlassCard className="p-6">
+          {/* Learning Stats */}
+          <GlassCard className="p-6" hover={false}>
             <h2 className="text-lg font-semibold mb-4">
               <Target className="w-4 h-4 inline mr-2 -mt-0.5 text-gray-400" />
               Learning Stats
@@ -340,7 +351,7 @@ export default function StudentDashboard() {
                   <div className="text-xs text-gray-500">Enrolled</div>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                  <div className="text-lg font-bold text-emerald-500">{completedCount}</div>
+                  <div className="text-lg font-bold text-success-500">{completedCount}</div>
                   <div className="text-xs text-gray-500">Completed</div>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
@@ -356,6 +367,9 @@ export default function StudentDashboard() {
           </GlassCard>
         </div>
       </div>
+
+      {/* AI Study Assistant (Floating) */}
+      <AIStudyAssistant />
     </motion.div>
   );
 }

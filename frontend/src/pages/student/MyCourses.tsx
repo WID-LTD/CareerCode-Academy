@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../../lib/axios';
+import { api } from '@/lib/axios';
 import { motion } from 'framer-motion';
-import { GlassCard } from '../../components/ui/GlassCard';
-import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
-import { Loader } from '../../components/ui/Loader';
-import { BookOpen, ArrowRight, Clock, ChevronRight, PlayCircle } from 'lucide-react';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { BookOpen, ArrowRight, Clock, PlayCircle } from 'lucide-react';
+import { PageSkeleton, CardSkeleton } from '@/components/student/SkeletonLoader';
 
 const statusColors: Record<string, string> = {
-  active: 'bg-emerald-500/20 text-emerald-400',
+  active: 'bg-success-500/20 text-success-400',
   completed: 'bg-blue-500/20 text-blue-400',
-  cancelled: 'bg-red-500/20 text-red-400',
-  pending: 'bg-yellow-500/20 text-yellow-400',
+  cancelled: 'bg-danger-500/20 text-danger-400',
+  pending: 'bg-warning-500/20 text-warning-400',
 };
 
 const categoryGradients: Record<string, string> = {
   'Computer Science': 'from-blue-600 to-purple-600',
   'Web Development': 'from-emerald-600 to-teal-600',
   'Data Science': 'from-orange-600 to-pink-600',
-  'Cybersecurity': 'from-red-600 to-rose-600',
+  'Cybersecurity': 'from-danger-600 to-rose-600',
   'Cloud Computing': 'from-sky-600 to-indigo-600',
 };
 
@@ -46,18 +46,14 @@ export default function MyCourses() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader size="lg" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <GlassCard className="text-center p-8">
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-danger-400 mb-4">{error}</p>
           <Button onClick={fetchEnrollments}>Retry</Button>
         </GlassCard>
       </div>
@@ -78,14 +74,12 @@ export default function MyCourses() {
       </div>
 
       {enrollments.length === 0 ? (
-        <GlassCard className="text-center py-16">
-          <BookOpen className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">You are not enrolled in any courses yet</h2>
+        <GlassCard className="text-center py-16" hover={false}>
+          <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">You are not enrolled in any courses yet</h2>
           <p className="text-gray-500 mb-6">Browse our catalog and start your learning journey.</p>
           <Link to="/courses">
-            <Button>
-              Browse Courses <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            <Button icon={<ArrowRight className="w-4 h-4" />}>Browse Courses</Button>
           </Link>
         </GlassCard>
       ) : (
@@ -105,12 +99,11 @@ export default function MyCourses() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <Link to={`/student/courses/${course.slug}`}>
-                  <GlassCard className="h-full hover:border-blue-500/30 transition-all group">
-                    {/* Thumbnail */}
-                    <div className={`aspect-video rounded-lg bg-gradient-to-br ${categoryGradients[course.category] || 'from-blue-600 to-purple-600'} flex items-center justify-center relative overflow-hidden mb-4`}>
+                <Link to={`/student/courses/${course.slug}`} className="block group">
+                  <GlassCard className="h-full p-0 overflow-hidden" hover>
+                    <div className={`aspect-video bg-gradient-to-br ${categoryGradients[course.category] || 'from-primary-600 to-secondary-600'} flex items-center justify-center relative overflow-hidden`}>
                       {course.thumbnail ? (
-                        <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                        <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" loading="lazy" />
                       ) : (
                         <BookOpen className="w-10 h-10 text-white/50" />
                       )}
@@ -118,34 +111,30 @@ export default function MyCourses() {
                         <PlayCircle className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
-
-                    {/* Info */}
-                    <h3 className="text-white font-semibold mb-2 line-clamp-2">{course.title}</h3>
-                    <p className="text-gray-500 text-sm mb-3">{course.instructor_name || course.category}</p>
-
-                    {/* Progress */}
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-400">Progress</span>
-                        <span className="text-white font-medium">{progress}%</span>
+                    <div className="p-4">
+                      <h3 className="font-semibold mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">{course.title}</h3>
+                      <p className="text-gray-500 text-sm mb-3">{course.instructor_name || course.category}</p>
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-gray-500">Progress</span>
+                          <span className="font-medium">{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-800 rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${progress}%` }}
-                        />
+                      <div className="flex items-center justify-between">
+                        <Badge className={statusColors[status] || 'bg-gray-500/20 text-gray-400'}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </Badge>
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {completedLessons}/{totalLessons} lessons
+                        </span>
                       </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between">
-                      <Badge className={statusColors[status] || 'bg-gray-500/20 text-gray-400'}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </Badge>
-                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {completedLessons}/{totalLessons} lessons
-                      </span>
                     </div>
                   </GlassCard>
                 </Link>

@@ -1,24 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   BookOpen,
-  Video,
+  GitBranch,
   ClipboardList,
   Award,
   Users,
-  GraduationCap,
-  CreditCard,
-  BarChart3,
+  Trophy,
+  Calendar,
+  Bell,
   Settings,
   ChevronLeft,
+  ChevronRight,
   UserCircle,
-  FileText,
-  Megaphone,
-  Calendar,
-  MessageSquare,
-  CheckSquare
+  GraduationCap,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -32,21 +30,26 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   student: [
     { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
     { label: 'My Courses', path: '/student/courses', icon: BookOpen },
+    { label: 'Learning Paths', path: '/student/learning-paths', icon: GitBranch },
     { label: 'Assignments', path: '/student/assignments', icon: ClipboardList },
     { label: 'Certificates', path: '/student/certificates', icon: Award },
-    { label: 'Profile', path: '/student/profile', icon: UserCircle },
+    { label: 'Community', path: '/student/community', icon: Users },
+    { label: 'Leaderboard', path: '/student/leaderboard', icon: Trophy },
+    { label: 'Calendar', path: '/student/calendar', icon: Calendar },
+    { label: 'Notifications', path: '/student/notifications', icon: Bell },
+    { label: 'Settings', path: '/student/settings', icon: Settings },
   ],
   instructor: [
     { label: 'Dashboard', path: '/instructor/dashboard', icon: LayoutDashboard },
-    { label: 'Analytics', path: '/instructor/analytics', icon: BarChart3 },
+    { label: 'Analytics', path: '/instructor/analytics', icon: LayoutDashboard },
     { label: 'Courses', path: '/instructor/courses', icon: BookOpen },
-    { label: 'Course Proposals', path: '/instructor/course-proposals', icon: FileText },
+    { label: 'Course Proposals', path: '/instructor/course-proposals', icon: GitBranch },
     { label: 'Students', path: '/instructor/students', icon: Users },
     { label: 'Assignments', path: '/instructor/assignments', icon: ClipboardList },
-    { label: 'Submissions', path: '/instructor/submissions', icon: CheckSquare },
-    { label: 'Announcements', path: '/instructor/announcements', icon: Megaphone },
-    { label: 'Live Classes', path: '/instructor/live-classes', icon: Video },
-    { label: 'Messages', path: '/instructor/messages', icon: MessageSquare },
+    { label: 'Submissions', path: '/instructor/submissions', icon: ClipboardList },
+    { label: 'Announcements', path: '/instructor/announcements', icon: Bell },
+    { label: 'Live Classes', path: '/instructor/live-classes', icon: Calendar },
+    { label: 'Messages', path: '/instructor/messages', icon: Users },
     { label: 'Schedule', path: '/instructor/schedule', icon: Calendar },
     { label: 'Profile', path: '/instructor/profile', icon: UserCircle },
   ],
@@ -54,27 +57,28 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
-    { label: 'Course Proposals', path: '/admin/course-proposals', icon: FileText },
-    { label: 'Applications', path: '/admin/applications', icon: FileText },
-    { label: 'Payments', path: '/admin/payments', icon: CreditCard },
-    { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
+    { label: 'Course Proposals', path: '/admin/course-proposals', icon: GitBranch },
+    { label: 'Applications', path: '/admin/applications', icon: ClipboardList },
+    { label: 'Payments', path: '/admin/payments', icon: LayoutDashboard },
+    { label: 'Analytics', path: '/admin/analytics', icon: Trophy },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
   ],
   super_admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
-    { label: 'Course Proposals', path: '/admin/course-proposals', icon: FileText },
-    { label: 'Applications', path: '/admin/applications', icon: FileText },
-    { label: 'Payments', path: '/admin/payments', icon: CreditCard },
-    { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
+    { label: 'Course Proposals', path: '/admin/course-proposals', icon: GitBranch },
+    { label: 'Applications', path: '/admin/applications', icon: ClipboardList },
+    { label: 'Payments', path: '/admin/payments', icon: LayoutDashboard },
+    { label: 'Analytics', path: '/admin/analytics', icon: Trophy },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
   ],
 };
 
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const location = useLocation();
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const [collapsed, setCollapsed] = useState(false);
   const role = user?.role || 'student';
   const links = roleSidebarLinks[role] || roleSidebarLinks.student;
 
@@ -84,51 +88,108 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
           onClick={onToggle}
+          aria-hidden="true"
         />
       )}
 
       <motion.aside
         initial={{ x: -280 }}
-        animate={{ x: isOpen ? 0 : -280 }}
+        animate={{ x: isOpen ? 0 : collapsed ? -200 : 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="fixed top-16 left-0 bottom-0 w-64 z-40 glass border-r border-white/20 dark:border-gray-800/50 overflow-y-auto scrollbar-thin"
+        className={cn(
+          'fixed top-16 left-0 bottom-0 z-40 glass border-r border-white/20 dark:border-gray-800/50 overflow-y-auto scrollbar-thin transition-all duration-300',
+          collapsed ? 'w-16' : 'w-64'
+        )}
+        aria-label="Sidebar navigation"
       >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-6 px-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-4 h-4 text-white" />
+        <div className="flex flex-col h-full">
+          <div className="p-4 flex-1">
+            <div className="flex items-center justify-between mb-6 px-2">
+              {!collapsed && (
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
+                    <GraduationCap className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="font-semibold text-sm capitalize">{role} Panel</span>
+                </div>
+              )}
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    setCollapsed(!collapsed);
+                    if (!collapsed) onToggle();
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors hidden lg:block"
+                  aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                  {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={onToggle}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden"
+                  aria-label="Close sidebar"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
               </div>
-              <span className="font-semibold text-sm capitalize">{role} Panel</span>
             </div>
-            <button
-              onClick={onToggle}
-              className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+
+            <nav className="space-y-1" role="navigation">
+              {links.map((link) => {
+                const isActive = location.pathname === link.path;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={() => {
+                      if (window.innerWidth < 1024) onToggle();
+                    }}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group',
+                      isActive
+                        ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
+                    )}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <link.icon className={cn('w-4 h-4 flex-shrink-0', isActive && 'text-primary-500')} />
+                    {!collapsed && (
+                      <span className="truncate">{link.label}</span>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
 
-          <nav className="space-y-1">
-            {links.map((link) => {
-              const isActive = location.pathname === link.path;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-                    isActive
-                      ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
-                  )}
+          {/* User Profile at Bottom */}
+          {!collapsed && (
+            <div className="p-4 border-t border-white/20 dark:border-gray-800/50">
+              <Link
+                to={`/${role}/profile`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-all group"
+              >
+                <div className="w-9 h-9 gradient-bg rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.name || 'User'}</p>
+                  <p className="text-xs text-gray-500 truncate capitalize">{role}</p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logout();
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors"
+                  aria-label="Log out"
                 >
-                  <link.icon className="w-4 h-4 flex-shrink-0" />
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </Link>
+            </div>
+          )}
         </div>
       </motion.aside>
     </>

@@ -32,6 +32,11 @@ import StudentCourseView from '@/pages/student/CourseView';
 import StudentAssignments from '@/pages/student/Assignments';
 import StudentCertificate from '@/pages/student/Certificate';
 import StudentProfile from '@/pages/student/Profile';
+import StudentLearningPaths from '@/pages/student/LearningPaths';
+import StudentLeaderboard from '@/pages/student/Leaderboard';
+import StudentCalendar from '@/pages/student/Calendar';
+import StudentNotifications from '@/pages/student/Notifications';
+import StudentSettings from '@/pages/student/Settings';
 
 import InstructorDashboard from '@/pages/instructor/Dashboard';
 import InstructorManageCourses from '@/pages/instructor/ManageCourses';
@@ -95,9 +100,14 @@ function App() {
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="courses" element={<StudentMyCourses />} />
           <Route path="courses/:slug" element={<StudentCourseView />} />
+          <Route path="learning-paths" element={<StudentLearningPaths />} />
           <Route path="assignments" element={<StudentAssignments />} />
           <Route path="certificates" element={<StudentCertificate />} />
+          <Route path="leaderboard" element={<StudentLeaderboard />} />
+          <Route path="calendar" element={<StudentCalendar />} />
+          <Route path="notifications" element={<StudentNotifications />} />
           <Route path="profile" element={<StudentProfile />} />
+          <Route path="settings" element={<StudentSettings />} />
         </Route>
 
         <Route path="/instructor" element={<DashboardLayout requiredRole="instructor" />}>

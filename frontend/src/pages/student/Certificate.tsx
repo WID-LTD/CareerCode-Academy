@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/axios';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '@/lib/axios';
 import { motion } from 'framer-motion';
-import { Award, Download, Share2, Calendar, ExternalLink, Search } from 'lucide-react';
-import { GlassCard } from '../../components/ui/GlassCard';
-import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
-import { Loader } from '../../components/ui/Loader';
-import { formatDate } from '../../lib/utils';
+import { Award, Share2, Calendar, Search, ExternalLink } from 'lucide-react';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { Button } from '@/components/ui/Button';
+import { formatDate } from '@/lib/utils';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import toast from 'react-hot-toast';
 
 export default function Certificate() {
@@ -50,13 +50,7 @@ export default function Certificate() {
     navigator.clipboard.writeText(url).then(() => toast.success('Verification link copied!'));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader size="lg" />
-      </div>
-    );
-  }
+  if (loading) return <PageSkeleton />;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -70,9 +64,9 @@ export default function Certificate() {
       </div>
 
       {/* Certificate Verification */}
-      <GlassCard className="mb-8">
-        <h2 className="text-white font-semibold mb-3 flex items-center gap-2">
-          <Search className="w-4 h-4 text-blue-400" />
+      <GlassCard className="mb-8 p-5" hover={false}>
+        <h2 className="font-semibold mb-3 flex items-center gap-2">
+          <Search className="w-4 h-4 text-primary-500" />
           Verify a Certificate
         </h2>
         <div className="flex gap-2">
@@ -81,21 +75,20 @@ export default function Certificate() {
             placeholder="Enter certificate verification code"
             value={verifyCode}
             onChange={(e) => setVerifyCode(e.target.value)}
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50"
+            className="flex-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/30 transition-all"
             onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+            aria-label="Verification code"
           />
-          <Button onClick={handleVerify} disabled={verifying}>
-            {verifying ? <Loader size="sm" /> : 'Verify'}
-          </Button>
+          <Button onClick={handleVerify} loading={verifying}>Verify</Button>
         </div>
         {verifyResult && (
-          <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-            <div className="flex items-center gap-2 text-emerald-400 font-medium">
+          <div className="mt-4 p-4 bg-success-500/10 border border-success-500/30 rounded-xl">
+            <div className="flex items-center gap-2 text-success-600 dark:text-success-400 font-medium">
               <Award className="w-5 h-5" />
               Valid Certificate
             </div>
-            <p className="text-gray-300 text-sm mt-1">
-              {verifyResult.user?.name} completed "{verifyResult.course?.title}" on {formatDate(verifyResult.issued_at)}
+            <p className="text-gray-500 text-sm mt-1">
+              {verifyResult.user?.name} completed &ldquo;{verifyResult.course?.title}&rdquo; on {formatDate(verifyResult.issued_at)}
             </p>
           </div>
         )}
@@ -103,13 +96,13 @@ export default function Certificate() {
 
       {/* Certificate List */}
       {certificates.length === 0 ? (
-        <GlassCard className="text-center py-12">
-          <Award className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No Certificates Yet</h3>
+        <GlassCard className="text-center py-12" hover={false}>
+          <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No Certificates Yet</h3>
           <p className="text-gray-500 mb-6">Complete a course to earn your first certificate.</p>
-          <Button onClick={() => window.location.href = '/student/courses'}>
-            View My Courses
-          </Button>
+          <Link to="/student/courses" className="inline-block">
+            <Button>View My Courses</Button>
+          </Link>
         </GlassCard>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
@@ -124,29 +117,28 @@ export default function Certificate() {
                 transition={{ delay: i * 0.1 }}
               >
                 <GlassCard className="p-8 text-center relative overflow-hidden" glow>
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
-                  <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/5 rounded-full blur-3xl" />
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-primary-500/5 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 left-0 w-40 h-40 bg-secondary-500/5 rounded-full blur-3xl" />
 
                   <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-4">
                       <Award className="w-8 h-8 text-white" />
                     </div>
-
                     <h3 className="text-xl font-bold mb-1">Certificate of Completion</h3>
                     <p className="text-gray-500 text-sm mb-4">This certifies that</p>
-                    <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 mb-2">
+                    <p className="text-2xl font-bold gradient-text mb-2">
                       {item.user?.name || 'Student'}
                     </p>
                     <p className="text-gray-500 text-sm mb-4">has successfully completed</p>
-                    <p className="text-xl font-semibold mb-6 text-white">{course.title || 'Course'}</p>
+                    <p className="text-xl font-semibold mb-6">{course.title || 'Course'}</p>
 
                     <div className="flex items-center justify-center gap-1 text-sm text-gray-500 mb-6">
                       <Calendar className="w-4 h-4" />
                       Issued: {formatDate(cert.issued_at)}
                     </div>
 
-                    <div className="text-xs text-gray-400 mb-6">
-                      Certificate ID: {cert.verification_code}
+                    <div className="text-xs text-gray-400 mb-6 font-mono">
+                      ID: {cert.verification_code}
                     </div>
 
                     <div className="flex items-center justify-center gap-3">
