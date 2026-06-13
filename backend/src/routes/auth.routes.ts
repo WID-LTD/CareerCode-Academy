@@ -264,14 +264,11 @@ router.post(
       const { email } = req.body;
 
       const user = await UserModel.getUserByEmail(email);
-      if (!user) {
-        throw new NotFoundError('User');
-      }
 
-      if (user.is_verified) {
+      if (!user || user.is_verified) {
         return res.json({
           success: true,
-          message: 'Your email is already verified. You can log in.',
+          message: 'If the account exists and is unverified, a verification email has been sent.',
         });
       }
 
@@ -287,7 +284,7 @@ router.post(
 
       res.json({
         success: true,
-        message: 'Verification email has been resent. Please check your inbox.',
+        message: 'If the account exists and is unverified, a verification email has been sent.',
       });
     } catch (error) {
       next(error);

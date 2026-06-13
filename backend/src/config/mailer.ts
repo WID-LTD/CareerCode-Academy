@@ -1,15 +1,17 @@
-let resendInstance: any = null;
+import { TransactionalEmailsApi, SendSmtpEmail, TransactionalEmailsApiApiKeys } from '@getbrevo/brevo';
 
-function getResend() {
-  if (!resendInstance) {
-    const key = process.env.RESEND_API_KEY;
-    if (!key || key === 're_xxxxxxxxxxxx') {
+let brevoInstance: TransactionalEmailsApi | null = null;
+
+function getBrevo(): TransactionalEmailsApi | null {
+  if (!brevoInstance) {
+    const key = process.env.BREVO_API_KEY;
+    if (!key || key === 'xkeysib-xxxxxxxxxxxx') {
       return null;
     }
-    const { Resend } = require('resend');
-    resendInstance = new Resend(key);
+    brevoInstance = new TransactionalEmailsApi();
+    brevoInstance.setApiKey(TransactionalEmailsApiApiKeys.apiKey, key);
   }
-  return resendInstance;
+  return brevoInstance;
 }
 
 export async function sendMail(options: {
@@ -18,27 +20,31 @@ export async function sendMail(options: {
   html: string;
   text?: string;
 }): Promise<void> {
-  const resend = getResend();
+  const brevo = getBrevo();
 
-  if (!resend || process.env.NODE_ENV === 'development') {
+  if (!brevo || process.env.NODE_ENV === 'development') {
     console.log('[Mail] Dev mode - skipped:', options.to, options.subject);
     return;
   }
 
   try {
-    const { error } = await resend.emails.send({
-      from: `CareerCode Academy <${process.env.RESEND_FROM || 'noreply@careercode.academy'}>`,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-    });
+    const email = new SendSmtpEmail();
+    email.subject = options.subject;
+    email.htmlContent = options.html;
+    email.sender = {
+      name: 'CareerCode Academy',
+      email: process.env.BREVO_FROM || 'noreply@careercode.academy',
+    };
+    email.to = [{ email: options.to }];
 
-    if (error) {
-      console.error('[Mail] Resend error:', error);
+    if (options.text) {
+      email.textContent = options.text;
     }
-  } catch (err) {
-    console.error('[Mail] Resend exception:', err);
+
+    const response = await brevo.sendTransacEmail(email);
+    console.log('[Mail] Sent via Brevo:', response.body?.messageId || 'OK');
+  } catch (err: any) {
+    console.error('[Mail] Brevo exception:', err.response?.body || err.message || err);
   }
 }
 

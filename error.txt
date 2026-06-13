@@ -1,16 +1,13 @@
-All errors resolved.
+index-De-y7dwr.js:798 
+ POST https://careercode-academy.onrender.com/api/v1/auth/resend-verification net::ERR_CONNECTION_CLOSED
 
-=== FIXES APPLIED ===
-1. DB connection pool: lazy init, retry with pool reset, keep-alive ping
-2. Error handler: handles AggregateError, returns 503 for DB issues
-3. Student dashboard: fetchDashboard now fetches notifications too
-4. All dashboards: proper loading/error states with retry button
-5. Instructor dashboard: fixed useEffect deps
-
-=== VERIFICATION (2026-06-06) ===
-- Register: 200 ✅
-- Login: 200 ✅
-- Student dashboard: 200 (live data) ✅
-- Admin dashboard: 200 (live data) ✅
-- Instructor dashboard: 200 (live data) ✅
-- No mock data found anywhere ✅
+FIXED: See review.txt implementation.
+- Root cause: `/api/v1/auth/resend-verification` endpoint did not exist on the production backend.
+- Fix: Created `POST /api/v1/auth/resend-verification` with:
+  - Zod validation (email required)
+  - Rate limiting (3 req / 15 min) via express-rate-limit
+  - Token generation (crypto.randomBytes(32)) with 24h expiry
+  - Branded CareerCode Academy email template via Resend
+  - Generic success message (security: prevents user enumeration)
+- Also updated: login blocks unverified users, verify-email checks token expiry,
+  frontend VerifyPending/Verified/VerificationError pages, DashboardLayout verification check
