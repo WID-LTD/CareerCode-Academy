@@ -1,17 +1,15 @@
-import { TransactionalEmailsApi, SendSmtpEmail, TransactionalEmailsApiApiKeys } from '@getbrevo/brevo';
+let resendInstance: any = null;
 
-let brevoInstance: TransactionalEmailsApi | null = null;
-
-function getBrevo(): TransactionalEmailsApi | null {
-  if (!brevoInstance) {
-    const key = process.env.BREVO_API_KEY;
-    if (!key || key === 'xkeysib-xxxxxxxxxxxx') {
+function getResend() {
+  if (!resendInstance) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key || key === 're_xxxxxxxxxxxx') {
       return null;
     }
-    brevoInstance = new TransactionalEmailsApi();
-    brevoInstance.setApiKey(TransactionalEmailsApiApiKeys.apiKey, key);
+    const { Resend } = require('resend');
+    resendInstance = new Resend(key);
   }
-  return brevoInstance;
+  return resendInstance;
 }
 
 export async function sendMail(options: {
@@ -20,31 +18,27 @@ export async function sendMail(options: {
   html: string;
   text?: string;
 }): Promise<void> {
-  const brevo = getBrevo();
+  const resend = getResend();
 
-  if (!brevo || process.env.NODE_ENV === 'development') {
+  if (!resend || process.env.NODE_ENV === 'development') {
     console.log('[Mail] Dev mode - skipped:', options.to, options.subject);
     return;
   }
 
   try {
-    const email = new SendSmtpEmail();
-    email.subject = options.subject;
-    email.htmlContent = options.html;
-    email.sender = {
-      name: 'CareerCode Academy',
-      email: process.env.BREVO_FROM || 'noreply@careercode.academy',
-    };
-    email.to = [{ email: options.to }];
+    const { error } = await resend.emails.send({
+      from: `CareerCode Academy <${process.env.RESEND_FROM || 'noreply@careercode.academy'}>`,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    });
 
-    if (options.text) {
-      email.textContent = options.text;
+    if (error) {
+      console.error('[Mail] Resend error:', error);
     }
-
-    const response = await brevo.sendTransacEmail(email);
-    console.log('[Mail] Sent via Brevo:', response.body?.messageId || 'OK');
-  } catch (err: any) {
-    console.error('[Mail] Brevo exception:', err.response?.body || err.message || err);
+  } catch (err) {
+    console.error('[Mail] Resend exception:', err);
   }
 }
 
