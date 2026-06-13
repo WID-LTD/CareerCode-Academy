@@ -78,8 +78,7 @@ router.post(
         verification_token_expires: verificationTokenExpires,
       });
 
-      await sendVerificationEmail(email, verificationToken);
-
+      // Email verification disabled — no verification email sent
       const tokenPayload = { userId: user.id, role: user.role };
       const token = generateToken(tokenPayload);
       const refreshToken = generateRefreshToken(tokenPayload);
@@ -230,8 +229,7 @@ router.get(
         verification_token_expires: null,
       });
 
-      await sendWelcomeEmail(user.email, user.name);
-
+      // Welcome email disabled
       res.json({
         success: true,
         message: 'Email verified successfully.',
