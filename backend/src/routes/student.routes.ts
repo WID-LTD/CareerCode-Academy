@@ -86,4 +86,16 @@ router.delete('/messages/:id', async (req: AuthRequest, res: Response, next: Nex
   } catch (error) { next(error); }
 });
 
+// PUT /api/v1/messages/read-all - mark all conversations as read
+router.put('/messages/read-all', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { rowCount } = await query(
+      `UPDATE direct_messages SET is_read = true WHERE receiver_id = $1 AND is_read = false`,
+      [userId]
+    );
+    res.json({ success: true, updated: rowCount });
+  } catch (error) { next(error); }
+});
+
 export default router;

@@ -21,6 +21,14 @@ export interface ConversationUser {
   last_message_at?: string;
 }
 
+export interface ChatUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar: string | null;
+}
+
 interface ChatState {
   socket: Socket | null;
   conversations: ConversationUser[];
@@ -30,6 +38,8 @@ interface ChatState {
   apiPrefix: string;
   onlineUsers: Set<string>;
   typingUsers: Set<string>;
+  searchResults: ChatUser[];
+  isSearching: boolean;
 
   setApiPrefix: (prefix: string) => void;
   initializeSocket: (userId: string) => void;
@@ -40,7 +50,10 @@ interface ChatState {
   addMessage: (message: Message) => void;
   deleteMessage: (messageId: string) => Promise<void>;
   markAsRead: (senderId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
   emitTyping: (receiverId: string, typing: boolean) => void;
+  searchUsers: (query: string) => Promise<void>;
+  clearSearch: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -52,6 +65,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   apiPrefix: '/instructor',
   onlineUsers: new Set(),
   typingUsers: new Set(),
+  searchResults: [],
+  isSearching: false,
 
   setApiPrefix: (prefix: string) => set({ apiPrefix: prefix }),
 
@@ -171,4 +186,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const event = typing ? 'typing' : 'stop_typing';
     socket.emit(event, { receiverId, senderId: '' });
   },
+
+  markAllAsRead: async () => {
+    try {
+      const prefix = get().apiPrefix;
+      await api.put(`${prefix}/messages/read-all`);
+      set((state) => ({
+        conversations: state.conversations.map(c => ({ ...c, unread_count: 0 })),
+      }));
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
+  searchUsers: async (query: string) => {
+    if (!query.trim()) { set({ searchResults: [], isSearching: false }); return; }
+    set({ isSearching: true });
+    try {
+      const { data } = await api.get(`/admin/users?search=${encodeURIComponent(query)}&limit=20`);
+      set({ searchResults: data.data, isSearching: false });
+    } catch (error) {
+      console.error(error);
+      set({ isSearching: false });
+    }
+  },
+
+  clearSearch: () => set({ searchResults: [], isSearching: false }),
 }));

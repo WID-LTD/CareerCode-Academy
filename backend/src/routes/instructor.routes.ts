@@ -499,6 +499,20 @@ router.put('/messages/read', async (req: AuthRequest, res: Response, next: NextF
   }
 });
 
+// PUT /instructor/messages/read-all - mark all conversations as read
+router.put('/messages/read-all', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { rowCount } = await query(
+      `UPDATE direct_messages SET is_read = true WHERE receiver_id = $1 AND is_read = false`,
+      [userId]
+    );
+    res.json({ success: true, updated: rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // DELETE /instructor/messages/:id - delete a message (own messages only)
 router.delete('/messages/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
