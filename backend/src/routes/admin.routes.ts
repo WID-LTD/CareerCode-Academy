@@ -20,8 +20,17 @@ const router = Router();
 router.use(authenticate, authorize('admin', 'super_admin'));
 
 // GET /admin/dashboard
-router.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/dashboard', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const range = (req.query.range as string) || '6m';
+    const intervalMap: Record<string, string> = { '7d': '7 days', '30d': '30 days', '6m': '6 months', '1y': '1 year' };
+    const chartInterval = range === '7d' || range === '30d' ? 'day' : 'month';
+    const dateTrunc = chartInterval === 'day' ? 'DATE' : "DATE_TRUNC('month', created_at)::date";
+    const labelExpr = chartInterval === 'day' ? "to_char(created_at, 'Mon DD')" : "to_char(DATE_TRUNC('month', created_at), 'Mon YYYY')";
+    const enrollLabel = chartInterval === 'day' ? "to_char(enrolled_at, 'Mon DD')" : "to_char(DATE_TRUNC('month', enrolled_at), 'Mon YYYY')";
+    const enrollTrunc = chartInterval === 'day' ? 'DATE(enrolled_at)' : "DATE_TRUNC('month', enrolled_at)::date";
+    const userLabel = "to_char(created_at, 'Mon DD')";
+
     const totalStudents = await UserModel.countUsers('student');
     const totalInstructors = await UserModel.countUsers('instructor');
     const totalCourses = await CourseModel.countCourses();
@@ -36,21 +45,31 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunc
       query(`SELECT COUNT(*) FROM certificates`),
     ]);
 
-    const [enrollTrend, userRegTrend, topC, recentAct] = await Promise.all([
-      query(`SELECT DATE_TRUNC('month', enrolled_at)::date as month, COUNT(*) as enrollments FROM enrollments WHERE enrolled_at > NOW() - INTERVAL '6 months' GROUP BY month ORDER BY month`),
-      query(`SELECT DATE(created_at) as day, COUNT(*) as users FROM users WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY day ORDER BY day`),
-      query(`SELECT c.title, COUNT(e.id) as enrollments FROM courses c LEFT JOIN enrollments e ON c.id = e.course_id GROUP BY c.id, c.title ORDER BY enrollments DESC LIMIT 5`),
+    const intervalStr = intervalMap[range] || '6 months';
+    const [enrollTrend, userRegTrend, topC, recentAct, revenueTrend, refundTrend, prevStats] = await Promise.all([
+      query(`SELECT ${enrollTrunc} as date, ${enrollLabel} as label, COUNT(*) as enrollments FROM enrollments WHERE enrolled_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
+      query(`SELECT DATE(created_at) as date, ${userLabel} as label, COUNT(*) as users FROM users WHERE created_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
+      query(`SELECT c.title, c.slug, COUNT(e.id) as enrollments FROM courses c LEFT JOIN enrollments e ON c.id = e.course_id GROUP BY c.id, c.title, c.slug ORDER BY enrollments DESC LIMIT 5`),
       query(`SELECT al.*, u.name as admin_name FROM audit_logs al JOIN users u ON al.admin_id = u.id ORDER BY al.created_at DESC LIMIT 10`),
+      query(`SELECT ${dateTrunc} as date, ${labelExpr} as label, COALESCE(SUM(amount), 0) as revenue, COUNT(*) as transactions FROM payments WHERE status = 'completed' AND created_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
+      query(`SELECT ${dateTrunc} as date, ${labelExpr} as label, COALESCE(SUM(amount), 0) as refunds FROM payments WHERE status = 'refunded' AND created_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
+      query(`SELECT
+        (SELECT COUNT(*) FROM users WHERE role = 'student' AND created_at < NOW() - INTERVAL '${intervalStr}') as prev_students,
+        (SELECT COUNT(*) FROM users WHERE role = 'instructor' AND created_at < NOW() - INTERVAL '${intervalStr}') as prev_instructors,
+        (SELECT COUNT(*) FROM enrollments WHERE enrolled_at < NOW() - INTERVAL '${intervalStr}') as prev_enrollments,
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at < NOW() - INTERVAL '${intervalStr}') as prev_revenue
+      `),
     ]);
 
     const recentUsers = await UserModel.getAllUsers(10, 0);
     const recentPayments = await PaymentModel.getAllPayments(10, 0);
 
-    const monthlyRevenue = await query(
-      `SELECT DATE_TRUNC('month', created_at)::date as month, COALESCE(SUM(amount), 0) as revenue, COUNT(*) as transactions
-       FROM payments WHERE status = 'completed' AND created_at > NOW() - INTERVAL '6 months'
-       GROUP BY DATE_TRUNC('month', created_at) ORDER BY month DESC`
-    );
+    const prev = prevStats.rows[0];
+
+    const calcTrend = (current: number, previous: number): number => {
+      if (!previous) return 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
 
     res.json({
       success: true,
@@ -68,10 +87,17 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunc
           activeUsers: parseInt(activeUsers.rows[0].count, 10),
           certificatesIssued: parseInt(certsIssued.rows[0].count, 10),
           monthlyRevenue: revenueStats.total_revenue,
+          trends: {
+            totalStudents: calcTrend(totalStudents, parseInt(prev.prev_students || '0')),
+            totalInstructors: calcTrend(totalInstructors, parseInt(prev.prev_instructors || '0')),
+            totalEnrollments: calcTrend(totalEnrollments, parseInt(prev.prev_enrollments || '0')),
+            totalRevenue: calcTrend(revenueStats.total_revenue, parseFloat(prev.prev_revenue || '0')),
+          },
         },
         recentUsers,
         recentPayments,
-        monthlyRevenue: monthlyRevenue.rows,
+        monthlyRevenue: revenueTrend.rows,
+        refundTrend: refundTrend.rows,
         enrollmentTrend: enrollTrend.rows,
         userRegistrationTrend: userRegTrend.rows,
         topCourses: topC.rows,

@@ -34,6 +34,12 @@ export interface AdminStats {
   certificatesIssued: number;
   monthlyRevenue: number;
   totalRevenue: number;
+  trends?: {
+    totalStudents: number;
+    totalInstructors: number;
+    totalEnrollments: number;
+    totalRevenue: number;
+  };
 }
 
 export interface AdminUser {
@@ -202,6 +208,7 @@ interface AdminState {
   recentUsers: AdminUser[];
   recentPayments: AdminPayment[];
   monthlyRevenue: any[];
+  refundTrend: any[];
   enrollmentTrend: any[];
   userRegistrationTrend: any[];
   topCourses: any[];
@@ -252,7 +259,7 @@ interface AdminState {
   error: string | null;
 
   // Dashboard
-  fetchDashboardData: () => Promise<void>;
+  fetchDashboardData: (range?: string) => Promise<void>;
 
   // Users
   fetchUsers: (page?: number, limit?: number) => Promise<void>;
@@ -318,6 +325,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   recentUsers: [],
   recentPayments: [],
   monthlyRevenue: [],
+  refundTrend: [],
   enrollmentTrend: [],
   userRegistrationTrend: [],
   topCourses: [],
@@ -360,16 +368,18 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   // ═══════════════════════════════════════
   // DASHBOARD
   // ═══════════════════════════════════════
-  fetchDashboardData: async () => {
+  fetchDashboardData: async (range?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.get('/admin/dashboard');
+      const params = range ? `?range=${range}` : '';
+      const { data } = await api.get(`/admin/dashboard${params}`);
       const d = data.data;
       set({
         stats: d.stats,
         recentUsers: normalizeList(d.recentUsers),
         recentPayments: normalizeList(d.recentPayments),
         monthlyRevenue: d.monthlyRevenue || [],
+        refundTrend: d.refundTrend || [],
         enrollmentTrend: d.enrollmentTrend || [],
         userRegistrationTrend: d.userRegistrationTrend || [],
         topCourses: d.topCourses || [],
