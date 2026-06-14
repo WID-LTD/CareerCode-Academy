@@ -40,6 +40,8 @@ import StudentLeaderboard from '@/pages/student/Leaderboard';
 import StudentCalendar from '@/pages/student/Calendar';
 import StudentNotifications from '@/pages/student/Notifications';
 import StudentSettings from '@/pages/student/Settings';
+import StudentTickets from '@/pages/student/Tickets';
+import StudentMessages from '@/pages/student/Messages';
 
 import InstructorDashboard from '@/pages/instructor/Dashboard';
 import InstructorManageCourses from '@/pages/instructor/ManageCourses';
@@ -62,6 +64,13 @@ import AdminPayments from '@/pages/admin/Payments';
 import AdminAnalytics from '@/pages/admin/Analytics';
 import AdminCourseProposals from '@/pages/admin/CourseProposals';
 import AdminSettings from '@/pages/admin/Settings';
+import AdminCertificates from '@/pages/admin/Certificates';
+import AdminTickets from '@/pages/admin/Tickets';
+import AdminBroadcasts from '@/pages/admin/Broadcasts';
+import AdminAuditLog from '@/pages/admin/AuditLog';
+import AdminCategories from '@/pages/admin/Categories';
+import AdminReports from '@/pages/admin/Reports';
+import AdminMessages from '@/pages/admin/Messages';
 
 function App() {
   const { darkMode } = useThemeStore();
@@ -112,6 +121,8 @@ function App() {
           <Route path="leaderboard" element={<StudentLeaderboard />} />
           <Route path="calendar" element={<StudentCalendar />} />
           <Route path="notifications" element={<StudentNotifications />} />
+          <Route path="tickets" element={<StudentTickets />} />
+          <Route path="messages" element={<StudentMessages />} />
           <Route path="profile" element={<StudentProfile />} />
           <Route path="settings" element={<StudentSettings />} />
         </Route>
@@ -140,6 +151,13 @@ function App() {
           <Route path="course-proposals" element={<AdminCourseProposals />} />
           <Route path="applications" element={<AdminApplications />} />
           <Route path="payments" element={<AdminPayments />} />
+          <Route path="certificates" element={<AdminCertificates />} />
+          <Route path="tickets" element={<AdminTickets />} />
+          <Route path="broadcasts" element={<AdminBroadcasts />} />
+          <Route path="categories" element={<AdminCategories />} />
+          <Route path="reports" element={<AdminReports />} />
+          <Route path="messages" element={<AdminMessages />} />
+          <Route path="audit-log" element={<AdminAuditLog />} />
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>

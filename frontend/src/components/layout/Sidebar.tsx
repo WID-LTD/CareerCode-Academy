@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   BookOpen,
@@ -17,6 +16,7 @@ import {
   UserCircle,
   GraduationCap,
   LogOut,
+  Hash,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -37,6 +37,8 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Leaderboard', path: '/student/leaderboard', icon: Trophy },
     { label: 'Calendar', path: '/student/calendar', icon: Calendar },
     { label: 'Notifications', path: '/student/notifications', icon: Bell },
+    { label: 'Messages', path: '/student/messages', icon: Users },
+    { label: 'Support', path: '/student/tickets', icon: Users },
     { label: 'Settings', path: '/student/settings', icon: Settings },
   ],
   instructor: [
@@ -57,20 +59,34 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
-    { label: 'Course Proposals', path: '/admin/course-proposals', icon: GitBranch },
+    { label: 'Categories', path: '/admin/categories', icon: Hash },
+    { label: 'Course Proposals', path: '/admin/course-proposals', icon: BookOpen },
     { label: 'Applications', path: '/admin/applications', icon: ClipboardList },
     { label: 'Payments', path: '/admin/payments', icon: LayoutDashboard },
+    { label: 'Certificates', path: '/admin/certificates', icon: Award },
+    { label: 'Support Tickets', path: '/admin/tickets', icon: Users },
+    { label: 'Notifications', path: '/admin/broadcasts', icon: Bell },
+    { label: 'Reports', path: '/admin/reports', icon: LayoutDashboard },
+    { label: 'Messages', path: '/admin/messages', icon: Users },
     { label: 'Analytics', path: '/admin/analytics', icon: Trophy },
+    { label: 'Audit Log', path: '/admin/audit-log', icon: LayoutDashboard },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
   ],
   super_admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
-    { label: 'Course Proposals', path: '/admin/course-proposals', icon: GitBranch },
+    { label: 'Categories', path: '/admin/categories', icon: Hash },
+    { label: 'Course Proposals', path: '/admin/course-proposals', icon: BookOpen },
     { label: 'Applications', path: '/admin/applications', icon: ClipboardList },
     { label: 'Payments', path: '/admin/payments', icon: LayoutDashboard },
+    { label: 'Certificates', path: '/admin/certificates', icon: Award },
+    { label: 'Support Tickets', path: '/admin/tickets', icon: Users },
+    { label: 'Notifications', path: '/admin/broadcasts', icon: Bell },
+    { label: 'Reports', path: '/admin/reports', icon: LayoutDashboard },
+    { label: 'Messages', path: '/admin/messages', icon: Users },
     { label: 'Analytics', path: '/admin/analytics', icon: Trophy },
+    { label: 'Audit Log', path: '/admin/audit-log', icon: LayoutDashboard },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
   ],
 };
@@ -92,13 +108,11 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         />
       )}
 
-      <motion.aside
-        initial={{ x: -280 }}
-        animate={{ x: isOpen ? 0 : collapsed ? -200 : 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      <aside
         className={cn(
-          'fixed top-16 left-0 bottom-0 z-40 glass border-r border-white/20 dark:border-gray-800/50 overflow-y-auto scrollbar-thin transition-all duration-300',
-          collapsed ? 'w-16' : 'w-64'
+          'fixed top-16 left-0 bottom-0 z-40 glass border-r border-white/20 dark:border-gray-800/50 overflow-y-auto scrollbar-thin transition-transform duration-300 lg:translate-x-0',
+          collapsed ? 'w-16' : 'w-64',
+          isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
         aria-label="Sidebar navigation"
       >
@@ -115,10 +129,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               )}
               <div className="flex gap-1">
                 <button
-                  onClick={() => {
-                    setCollapsed(!collapsed);
-                    if (!collapsed) onToggle();
-                  }}
+                  onClick={() => setCollapsed(!collapsed)}
                   className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors hidden lg:block"
                   aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
@@ -191,7 +202,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             </div>
           )}
         </div>
-      </motion.aside>
+        </aside>
     </>
   );
 }

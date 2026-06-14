@@ -4,11 +4,12 @@ import { isDatabaseAvailable } from '../config/db';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      success: false,
-      message: err.message,
-      ...(err.constructor.name === 'ValidationError' && { errors: (err as any).errors }),
-    });
+    const body: any = { success: false, message: err.message };
+    const appErr = err as any;
+    if (appErr.errors) {
+      body.errors = appErr.errors;
+    }
+    res.status(err.statusCode).json(body);
     return;
   }
 

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Globe, Shield, Mail, CreditCard, Bell, Palette, Lock, Smartphone } from 'lucide-react';
+import { Save, Globe, Shield, Mail, CreditCard, Bell, Palette, Lock, Smartphone, Loader2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useAdminStore } from '@/store/adminStore';
 
 const sections = [
   { id: 'general', label: 'General', icon: Globe },
@@ -16,6 +17,41 @@ const sections = [
 
 export default function AdminSettings() {
   const [activeSection, setActiveSection] = useState('general');
+  const { settings, fetchSettings, updateSetting, isLoading } = useAdminStore();
+  const [localSettings, setLocalSettings] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  useEffect(() => {
+    if (settings && settings.length > 0) {
+      const settingsMap: Record<string, string> = {};
+      settings.forEach(s => {
+        settingsMap[s.key] = s.value;
+      });
+      setLocalSettings(settingsMap);
+    }
+  }, [settings]);
+
+  const handleChange = (key: string, value: string) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const promises = Object.keys(localSettings).map(key => updateSetting(key, localSettings[key]));
+      await Promise.all(promises);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getSetting = (key: string, defaultVal: string = '') => {
+    return localSettings[key] !== undefined ? localSettings[key] : defaultVal;
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -24,7 +60,9 @@ export default function AdminSettings() {
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">Platform Settings</h1>
           <p className="text-gray-500">Configure platform-wide settings and preferences.</p>
         </div>
-        <Button icon={<Save className="w-4 h-4" />}>Save Changes</Button>
+        <Button onClick={handleSave} disabled={isSaving || isLoading} icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
@@ -50,16 +88,16 @@ export default function AdminSettings() {
             <GlassCard className="p-6">
               <h2 className="text-lg font-semibold mb-6">General Settings</h2>
               <div className="space-y-4">
-                <Input label="Platform Name" defaultValue="CareerCode Academy" />
+                <Input label="Platform Name" value={getSetting('platform_name', 'CareerCode Academy')} onChange={(e) => handleChange('platform_name', e.target.value)} />
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Platform Description</label>
-                  <textarea rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all" defaultValue="Empowering the next generation of developers with industry-focused, project-based learning." />
+                  <textarea rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all" value={getSetting('platform_description', 'Empowering the next generation of developers...')} onChange={(e) => handleChange('platform_description', e.target.value)} />
                 </div>
-                <Input label="Support Email" type="email" defaultValue="hello@careercode.academy" icon={<Mail className="w-4 h-4" />} />
-                <Input label="Website URL" defaultValue="https://careercode.academy" icon={<Globe className="w-4 h-4" />} />
+                <Input label="Support Email" type="email" value={getSetting('support_email', 'hello@careercode.academy')} onChange={(e) => handleChange('support_email', e.target.value)} icon={<Mail className="w-4 h-4" />} />
+                <Input label="Website URL" value={getSetting('website_url', 'https://careercode.academy')} onChange={(e) => handleChange('website_url', e.target.value)} icon={<Globe className="w-4 h-4" />} />
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Default Language</label>
-                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('default_language', 'English (US)')} onChange={(e) => handleChange('default_language', e.target.value)}>
                     <option>English (US)</option>
                     <option>Spanish</option>
                     <option>French</option>
@@ -68,7 +106,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Timezone</label>
-                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('timezone', 'Pacific Time (PT)')} onChange={(e) => handleChange('timezone', e.target.value)}>
                     <option>Pacific Time (PT)</option>
                     <option>Eastern Time (ET)</option>
                     <option>Central European Time (CET)</option>
@@ -91,7 +129,7 @@ export default function AdminSettings() {
                       <div className="text-xs text-gray-500">Add an extra layer of security to your account</div>
                     </div>
                   </div>
-                  <input type="checkbox" className="rounded text-primary-500 focus:ring-primary-500" />
+                  <input type="checkbox" checked={getSetting('2fa_enabled', 'false') === 'true'} onChange={(e) => handleChange('2fa_enabled', e.target.checked.toString())} className="rounded text-primary-500 focus:ring-primary-500" />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800">
                   <div className="flex items-center gap-3">
@@ -101,7 +139,7 @@ export default function AdminSettings() {
                       <div className="text-xs text-gray-500">Enable SSO with Google, GitHub, or Microsoft</div>
                     </div>
                   </div>
-                  <input type="checkbox" className="rounded text-primary-500 focus:ring-primary-500" />
+                  <input type="checkbox" checked={getSetting('sso_enabled', 'false') === 'true'} onChange={(e) => handleChange('sso_enabled', e.target.checked.toString())} className="rounded text-primary-500 focus:ring-primary-500" />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800">
                   <div className="flex items-center gap-3">
@@ -113,8 +151,8 @@ export default function AdminSettings() {
                   </div>
                   <Button variant="ghost" size="sm">Manage</Button>
                 </div>
-                <Input label="Session Timeout (minutes)" type="number" defaultValue="60" />
-                <Input label="Max Login Attempts" type="number" defaultValue="5" />
+                <Input label="Session Timeout (minutes)" type="number" value={getSetting('session_timeout', '60')} onChange={(e) => handleChange('session_timeout', e.target.value)} />
+                <Input label="Max Login Attempts" type="number" value={getSetting('max_login_attempts', '5')} onChange={(e) => handleChange('max_login_attempts', e.target.value)} />
               </div>
             </GlassCard>
           )}

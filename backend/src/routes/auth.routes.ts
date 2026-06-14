@@ -22,9 +22,9 @@ import { UnauthorizedError, NotFoundError, ConflictError } from '../utils/errors
 const router = Router();
 
 const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  name: z.string().min(1, 'Name is required').max(100),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100),
+  password: z.string().min(4, 'Password must be at least 4 characters').max(100),
   role: z.enum(['student', 'instructor']).optional().default('student'),
 });
 

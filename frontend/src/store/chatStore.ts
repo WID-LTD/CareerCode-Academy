@@ -25,7 +25,9 @@ interface ChatState {
   activeConversation: string | null;
   messages: Message[];
   isLoading: boolean;
-  
+  apiPrefix: string;
+
+  setApiPrefix: (prefix: string) => void;
   initializeSocket: (userId: string) => void;
   disconnectSocket: () => void;
   fetchConversations: () => Promise<void>;
@@ -40,6 +42,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeConversation: null,
   messages: [],
   isLoading: false,
+  apiPrefix: '/instructor',
+
+  setApiPrefix: (prefix: string) => set({ apiPrefix: prefix }),
 
   initializeSocket: (userId: string) => {
     let { socket } = get();
@@ -72,8 +77,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   fetchConversations: async () => {
     set({ isLoading: true });
     try {
-      // Assuming instructor or student endpoint
-      const { data } = await api.get('/instructor/messages/conversations');
+      const prefix = get().apiPrefix;
+      const { data } = await api.get(`${prefix}/messages/conversations`);
       set({ conversations: data.data, isLoading: false });
     } catch (error) {
       console.error(error);
@@ -84,7 +89,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setActiveConversation: async (userId: string) => {
     set({ activeConversation: userId, isLoading: true, messages: [] });
     try {
-      const { data } = await api.get(`/instructor/messages/${userId}`);
+      const prefix = get().apiPrefix;
+      const { data } = await api.get(`${prefix}/messages/${userId}`);
       set({ messages: data.data, isLoading: false });
     } catch (error) {
       console.error(error);
@@ -94,7 +100,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (receiverId: string, content: string) => {
     try {
-      const { data } = await api.post('/instructor/messages', { receiver_id: receiverId, content });
+      const prefix = get().apiPrefix;
+      const { data } = await api.post(`${prefix}/messages`, { receiver_id: receiverId, content });
       get().addMessage(data.data);
     } catch (error) {
       console.error(error);

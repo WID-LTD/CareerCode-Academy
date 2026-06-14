@@ -31,6 +31,7 @@ import searchRoutes from './routes/search.routes';
 import quizRoutes from './routes/quiz.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import progressRoutes from './routes/progress.routes';
+import ticketRoutes from './routes/ticket.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -49,10 +50,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Rate limiting
+// Rate limiting (relaxed for development/testing)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per `window` (here, per 15 minutes)
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
@@ -121,6 +122,7 @@ app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/quizzes', quizRoutes);
 app.use('/api/v1/wishlists', wishlistRoutes);
 app.use('/api/v1/progress', progressRoutes);
+app.use('/api/v1/tickets', ticketRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -569,6 +571,81 @@ async function initDatabase() {
       )
     `);
 
+    // admin_support_tickets table
+    await query(`
+      CREATE TABLE IF NOT EXISTS support_tickets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject VARCHAR(200) NOT NULL,
+        description TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'closed')),
+        priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+        assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS ticket_replies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+        admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Broadcast notifications table (admin-level, distinct from user notifications)
+    await query(`
+      CREATE TABLE IF NOT EXISTS broadcasts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(200) NOT NULL,
+        message TEXT NOT NULL,
+        audience VARCHAR(50) NOT NULL DEFAULT 'all',
+        type VARCHAR(50) NOT NULL DEFAULT 'info',
+        status VARCHAR(20) NOT NULL DEFAULT 'sent' CHECK (status IN ('draft', 'scheduled', 'sent', 'failed')),
+        scheduled_at TIMESTAMPTZ,
+        sent_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Audit logs table
+    await query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        action VARCHAR(100) NOT NULL,
+        resource_type VARCHAR(50) NOT NULL,
+        resource_id VARCHAR(255),
+        details TEXT,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // System settings table
+    await query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL,
+        category VARCHAR(50) NOT NULL DEFAULT 'general',
+        description TEXT
+      )
+    `);
+
+    // Add suspended column to users
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
+
+    // Add revoked column to certificates
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
+
     // New lesson_progress table
     await query(`
       CREATE TABLE IF NOT EXISTS lesson_progress (
@@ -584,12 +661,41 @@ async function initDatabase() {
       )
     `);
 
+    // Add featured and status columns to courses
+    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft'`);
+
+    // Review columns for courses
+    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_notes TEXT`);
+    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ`);
+
     // Add learning_outcomes to courses if not exists
     await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS learning_outcomes JSONB DEFAULT '[]'`);
 
     // Add status column to enrollments if not exists
     await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
     await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+
+    // Add status constraint to courses
+    await query(`ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_status_check`);
+    await query(`ALTER TABLE courses ADD CONSTRAINT courses_status_check CHECK (status IN ('draft', 'pending_review', 'approved', 'published', 'rejected', 'archived'))`);
+
+    // Categories table
+    await query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL UNIQUE,
+        slug VARCHAR(100) NOT NULL UNIQUE,
+        description TEXT,
+        icon VARCHAR(50),
+        color VARCHAR(20),
+        parent_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
 
     // Update notification types constraint to include all new types
     await query(`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check`);
@@ -627,16 +733,33 @@ const io = new Server(server, {
   }
 });
 
+const onlineUsers = new Map<string, { socketId: string; name?: string; role?: string }>();
+
 io.on('connection', (socket: Socket) => {
   console.log('A user connected via socket:', socket.id);
-  
-  socket.on('join_room', (userId: string) => {
+
+  socket.on('join_room', (userId: string, name?: string, role?: string) => {
     socket.join(userId);
     console.log(`User ${userId} joined their personal room`);
+    onlineUsers.set(userId, { socketId: socket.id, name, role });
+    io.emit('online_users', {
+      count: onlineUsers.size,
+      users: Array.from(onlineUsers.entries()).map(([id, data]) => ({ id, name: data.name, role: data.role })),
+    });
   });
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    for (const [userId, data] of onlineUsers.entries()) {
+      if (data.socketId === socket.id) {
+        onlineUsers.delete(userId);
+        break;
+      }
+    }
+    io.emit('online_users', {
+      count: onlineUsers.size,
+      users: Array.from(onlineUsers.entries()).map(([id, data]) => ({ id, name: data.name, role: data.role })),
+    });
   });
 });
 
@@ -701,6 +824,10 @@ async function start() {
   });
 
   startKeepAlive();
+
+  // Start background workers
+  const { startBroadcastWorker } = await import('./workers/broadcastWorker');
+  startBroadcastWorker(io);
 }
 
 start();

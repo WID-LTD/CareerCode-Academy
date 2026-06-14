@@ -13,6 +13,11 @@ export interface Course {
   published: boolean;
   slug: string;
   learning_outcomes: string[];
+  featured: boolean;
+  status: string;
+  review_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -64,11 +69,15 @@ export interface CreateCourseInput {
   learning_outcomes?: string[];
 }
 
-export async function getAllCourses(limit: number = 50, offset: number = 0, filters?: { published?: boolean; category?: string; level?: string; instructor_id?: string }): Promise<Course[]> {
+export async function getAllCourses(limit: number = 50, offset: number = 0, filters?: { published?: boolean; status?: string; category?: string; level?: string; instructor_id?: string }): Promise<Course[]> {
   let sql = 'SELECT c.*, u.name as instructor_name, u.avatar as instructor_avatar FROM courses c JOIN users u ON c.instructor_id = u.id WHERE 1=1';
   const params: any[] = [];
   let paramIndex = 1;
 
+  if (filters?.status) {
+    sql += ` AND c.status = $${paramIndex++}`;
+    params.push(filters.status);
+  }
   if (filters?.published !== undefined) {
     sql += ` AND c.published = $${paramIndex++}`;
     params.push(filters.published);
@@ -91,6 +100,15 @@ export async function getAllCourses(limit: number = 50, offset: number = 0, filt
 
   const { rows } = await query<Course>(sql, params);
   return rows;
+}
+
+export async function updateCourseStatus(id: string, status: string, reviewNotes?: string, reviewedBy?: string): Promise<Course | null> {
+  const published = status === 'published';
+  const { rows } = await query<Course>(
+    `UPDATE courses SET status = $1, published = $2, review_notes = COALESCE($3, review_notes), reviewed_by = COALESCE($4, reviewed_by), reviewed_at = CASE WHEN $4 IS NOT NULL THEN NOW() ELSE reviewed_at END, updated_at = NOW() WHERE id = $5 RETURNING *`,
+    [status, published, reviewNotes || null, reviewedBy || null, id]
+  );
+  return rows[0] || null;
 }
 
 export async function getCourseById(id: string): Promise<Course | null> {

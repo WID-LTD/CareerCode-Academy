@@ -2,13 +2,17 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as UserModel from '../models/user';
 import * as CourseModel from '../models/course';
+import * as CategoryModel from '../models/category';
 import * as EnrollmentModel from '../models/enrollment';
 import * as PaymentModel from '../models/payment';
 import * as NotificationModel from '../models/notification';
+import * as CertificateModel from '../models/certificate';
 import { query } from '../config/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail } from '../utils/helpers';
+import { logAudit } from '../middleware/audit';
+import { io } from '../index';
 
 const router = Router();
 
@@ -25,22 +29,27 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunc
     const totalEnrollments = await EnrollmentModel.countEnrollments();
     const revenueStats = await CourseModel.getRevenueStats();
 
-    // Recent users
-    const recentUsers = await UserModel.getAllUsers(10, 0);
+    const [pendingApps, draftC, activeUsers, certsIssued] = await Promise.all([
+      query(`SELECT COUNT(*) FROM instructor_applications WHERE status = 'pending'`),
+      query(`SELECT COUNT(*) FROM courses WHERE published = false`),
+      query(`SELECT COUNT(*) FROM users WHERE is_suspended = false OR is_suspended IS NULL`),
+      query(`SELECT COUNT(*) FROM certificates`),
+    ]);
 
-    // Recent payments
+    const [enrollTrend, userRegTrend, topC, recentAct] = await Promise.all([
+      query(`SELECT DATE_TRUNC('month', enrolled_at)::date as month, COUNT(*) as enrollments FROM enrollments WHERE enrolled_at > NOW() - INTERVAL '6 months' GROUP BY month ORDER BY month`),
+      query(`SELECT DATE(created_at) as day, COUNT(*) as users FROM users WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY day ORDER BY day`),
+      query(`SELECT c.title, COUNT(e.id) as enrollments FROM courses c LEFT JOIN enrollments e ON c.id = e.course_id GROUP BY c.id, c.title ORDER BY enrollments DESC LIMIT 5`),
+      query(`SELECT al.*, u.name as admin_name FROM audit_logs al JOIN users u ON al.admin_id = u.id ORDER BY al.created_at DESC LIMIT 10`),
+    ]);
+
+    const recentUsers = await UserModel.getAllUsers(10, 0);
     const recentPayments = await PaymentModel.getAllPayments(10, 0);
 
-    // Monthly revenue (last 6 months)
     const monthlyRevenue = await query(
-      `SELECT
-         DATE_TRUNC('month', created_at)::date as month,
-         COALESCE(SUM(amount), 0) as revenue,
-         COUNT(*) as transactions
-       FROM payments
-       WHERE status = 'completed' AND created_at > NOW() - INTERVAL '6 months'
-       GROUP BY DATE_TRUNC('month', created_at)
-       ORDER BY month DESC`
+      `SELECT DATE_TRUNC('month', created_at)::date as month, COALESCE(SUM(amount), 0) as revenue, COUNT(*) as transactions
+       FROM payments WHERE status = 'completed' AND created_at > NOW() - INTERVAL '6 months'
+       GROUP BY DATE_TRUNC('month', created_at) ORDER BY month DESC`
     );
 
     res.json({
@@ -54,10 +63,19 @@ router.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunc
           totalEnrollments,
           totalRevenue: revenueStats.total_revenue,
           averagePrice: revenueStats.average_price,
+          pendingApplications: parseInt(pendingApps.rows[0].count, 10),
+          draftCourses: parseInt(draftC.rows[0].count, 10),
+          activeUsers: parseInt(activeUsers.rows[0].count, 10),
+          certificatesIssued: parseInt(certsIssued.rows[0].count, 10),
+          monthlyRevenue: revenueStats.total_revenue,
         },
         recentUsers,
         recentPayments,
         monthlyRevenue: monthlyRevenue.rows,
+        enrollmentTrend: enrollTrend.rows,
+        userRegistrationTrend: userRegTrend.rows,
+        topCourses: topC.rows,
+        recentActivities: recentAct.rows,
       },
     });
   } catch (error) {
@@ -72,13 +90,29 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = (page - 1) * limit;
     const role = req.query.role as string | undefined;
+    const search = req.query.search as string | undefined;
 
-    const users = await UserModel.getAllUsers(limit, offset);
-    const total = role ? await UserModel.countUsers(role) : await UserModel.countUsers();
+    let sql = 'SELECT id, name, email, role, avatar, bio, is_verified, is_suspended, created_at FROM users WHERE 1=1';
+    const params: any[] = [];
+
+    if (role) {
+      params.push(role);
+      sql += ` AND role = $${params.length}`;
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      sql += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+    }
+    sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const { rows } = await query(sql, params);
+    const { rows: countRows } = await query('SELECT COUNT(*) FROM users', []);
+    const total = parseInt(countRows[0].count, 10);
 
     res.json({
       success: true,
-      data: users,
+      data: rows,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
@@ -108,6 +142,9 @@ router.put('/users/:id/role', async (req: AuthRequest, res: Response, next: Next
       message: `Your role has been updated to ${role}`,
       type: 'info',
     });
+    io.to(id).emit('new_notification', { title: 'Role Updated', message: `Your role has been updated to ${role}`, type: 'info' });
+
+    await logAudit({ adminId: adminId, action: 'update_role', resourceType: 'user', resourceId: id, details: `Role changed to ${role}`, ipAddress: req.ip });
 
     res.json({ success: true, data: user });
   } catch (error) {
@@ -130,6 +167,7 @@ router.delete('/users/:id', async (req: AuthRequest, res: Response, next: NextFu
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    await logAudit({ adminId, action: 'delete', resourceType: 'user', resourceId: id, ipAddress: req.ip });
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     next(error);
@@ -142,14 +180,17 @@ router.get('/courses', async (req: Request, res: Response, next: NextFunction) =
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = (page - 1) * limit;
+    const status = req.query.status as string | undefined;
 
-    const courses = await CourseModel.getAllCourses(limit, offset);
-    const total = await CourseModel.countCourses();
+    const courses = await CourseModel.getAllCourses(limit, offset, status ? { status } : undefined);
+    const total = status
+      ? (await query('SELECT COUNT(*) FROM courses WHERE status = $1', [status])).rows[0].count
+      : (await query('SELECT COUNT(*) FROM courses')).rows[0].count;
 
     res.json({
       success: true,
       data: courses,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      pagination: { page, limit, total: parseInt(total, 10), pages: Math.ceil(parseInt(total, 10) / limit) },
     });
   } catch (error) {
     next(error);
@@ -164,6 +205,7 @@ router.delete('/courses/:id', async (req: AuthRequest, res: Response, next: Next
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
+    await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'course', resourceId: id, ipAddress: req.ip });
     res.json({ success: true, message: 'Course deleted successfully' });
   } catch (error) {
     next(error);
@@ -282,6 +324,73 @@ router.get('/applications', async (req: Request, res: Response, next: NextFuncti
   } catch (error) {
     next(error);
   }
+});
+
+// PUT /admin/applications/:id/approve
+router.put('/applications/:id/approve', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    req.body.status = 'approved';
+    req.body.notes = req.body.notes || req.body.review_notes;
+    next();
+  } catch (error) { next(error); }
+}, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { notes, review_notes } = req.body;
+    const adminId = req.user!.userId;
+
+    const oldAppResult = await query(`SELECT status FROM instructor_applications WHERE id = $1`, [id]);
+    if (oldAppResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+    const oldStatus = oldAppResult.rows[0].status;
+
+    const { rows } = await query(
+      `UPDATE instructor_applications
+       SET status = 'approved', notes = COALESCE($1, notes), review_notes = COALESCE($2, review_notes),
+           reviewed_by = $3, reviewed_at = NOW(), updated_at = NOW()
+       WHERE id = $4 RETURNING *`,
+      [notes, review_notes, adminId, id]
+    );
+
+    const application = rows[0];
+    const email = application.email;
+    const name = application.full_name;
+
+    const existingUser = await UserModel.getUserByEmail(email);
+    if (existingUser) {
+      await UserModel.updateUser(existingUser.id, { role: 'instructor' });
+      await NotificationModel.createNotification({ user_id: existingUser.id, title: 'Application Approved', message: 'Your instructor application has been approved!', type: 'success' });
+      await sendInstructorUpgradeEmail(email, name);
+    } else {
+      const tempPassword = crypto.randomBytes(4).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPassword, 12);
+      const newUser = await UserModel.createUser({ name, email, password: hashedPassword, role: 'instructor' });
+      await UserModel.updateUser(newUser.id, { is_verified: true });
+      await NotificationModel.createNotification({ user_id: newUser.id, title: 'Welcome Instructor', message: 'Your instructor application has been approved!', type: 'success' });
+      await sendInstructorApprovalEmail(email, name, tempPassword);
+    }
+
+    await logAudit({ adminId: req.user!.userId, action: 'approve', resourceType: 'application', resourceId: id, ipAddress: req.ip });
+
+    res.json({ success: true, message: 'Application approved', data: application });
+  } catch (error) { next(error); }
+});
+
+// PUT /admin/applications/:id/reject
+router.put('/applications/:id/reject', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const adminId = req.user!.userId;
+    const { rows } = await query(
+      `UPDATE instructor_applications SET status = 'rejected', notes = COALESCE($1, notes), reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW() WHERE id = $3 RETURNING *`,
+      [notes, adminId, id]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Application not found' });
+    await logAudit({ adminId, action: 'reject', resourceType: 'application', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Application rejected', data: rows[0] });
+  } catch (error) { next(error); }
 });
 
 // PUT /admin/applications/:id
@@ -487,7 +596,7 @@ router.patch('/enrollments/:id', async (req: AuthRequest, res: Response, next: N
 // POST /admin/enrollments/export - export enrollment data
 router.post('/enrollments/export', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { status, dateFrom, dateTo } = req.body;
+    const { status, dateFrom, dateTo, format } = req.body;
     let sql = `SELECT e.id, u.name as student_name, u.email as student_email, c.title as course_title,
                       c.price, e.status, e.progress, e.enrolled_at, e.completed_at
                FROM enrollments e
@@ -512,10 +621,539 @@ router.post('/enrollments/export', async (req: AuthRequest, res: Response, next:
     sql += ' ORDER BY e.enrolled_at DESC';
     const { rows } = await query(sql, params);
 
+    if (format === 'csv') {
+      const header = 'ID,Student Name,Student Email,Course Title,Price,Status,Progress,Enrolled At,Completed At';
+      const csvRows = rows.map(r =>
+        `"${r.id}","${r.student_name}","${r.student_email}","${r.course_title}","${r.price}","${r.status}","${r.progress}","${r.enrolled_at}","${r.completed_at || ''}"`
+      );
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=enrollments.csv');
+      return res.send([header, ...csvRows].join('\n'));
+    }
+
     res.json({ success: true, data: rows });
   } catch (error) {
     next(error);
   }
+});
+
+// ══════════════════════════════════════════════════════════════
+// SUSPEND / REACTIVATE USERS
+// ══════════════════════════════════════════════════════════════
+
+// PUT /admin/users/:id/suspend
+router.put('/users/:id/suspend', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const { rows } = await query(
+      `UPDATE users SET is_suspended = true, suspended_at = NOW(), suspended_reason = $1 WHERE id = $2 RETURNING id, name, email, role, is_suspended`,
+      [reason || null, id]
+    );
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'suspend', resourceType: 'user', resourceId: id, details: reason, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/users/:id/reactivate
+router.put('/users/:id/reactivate', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await query(
+      `UPDATE users SET is_suspended = false, suspended_at = NULL, suspended_reason = NULL WHERE id = $1 RETURNING id, name, email, role, is_suspended`,
+      [id]
+    );
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'reactivate', resourceType: 'user', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// COURSE MODERATION (approve / archive / feature)
+// ══════════════════════════════════════════════════════════════
+
+// PUT /admin/courses/:id/review
+router.put('/courses/:id/review', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status, review_notes } = req.body;
+    const validStatuses = ['pending_review', 'approved', 'published', 'rejected', 'draft', 'archived'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+    const adminId = req.user!.userId;
+    const course = await CourseModel.updateCourseStatus(id, status, review_notes, adminId);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    await logAudit({ adminId, action: 'review', resourceType: 'course', resourceId: id, details: `Status set to ${status}`, ipAddress: req.ip });
+    res.json({ success: true, data: course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:id/approve (convenience wrapper — sets status to published)
+router.put('/courses/:id/approve', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.userId;
+    const course = await CourseModel.updateCourseStatus(id, 'published', req.body.review_notes, adminId);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    await logAudit({ adminId, action: 'approve', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data: course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:id/reject
+router.put('/courses/:id/reject', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.userId;
+    const course = await CourseModel.updateCourseStatus(id, 'rejected', req.body.review_notes || req.body.reason, adminId);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    await logAudit({ adminId, action: 'reject', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data: course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:id/archive
+router.put('/courses/:id/archive', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.userId;
+    const course = await CourseModel.updateCourseStatus(id, 'archived');
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    await logAudit({ adminId, action: 'archive', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data: course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:id/feature
+router.put('/courses/:id/feature', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const cur = await query(`SELECT featured FROM courses WHERE id = $1`, [id]);
+    const isFeatured = cur.rows[0]?.featured;
+    const { rows } = await query(
+      `UPDATE courses SET featured = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [!isFeatured, id]
+    );
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Course not found' });
+    await logAudit({ adminId: req.user!.userId, action: isFeatured ? 'unfeature' : 'feature', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// CERTIFICATES
+// ══════════════════════════════════════════════════════════════
+
+// GET /admin/certificates
+router.get('/certificates', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const data = await CertificateModel.getAllCertificates(limit, offset);
+    const total = await CertificateModel.countCertificates();
+    res.json({
+      success: true,
+      data,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/certificates/:id/revoke
+router.put('/certificates/:id/revoke', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const cert = await CertificateModel.revokeCertificateById(req.params.id);
+    if (!cert) return res.status(404).json({ success: false, message: 'Certificate not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'revoke', resourceType: 'certificate', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: cert });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/certificates/:id/reissue
+router.put('/certificates/:id/reissue', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const cert = await CertificateModel.reissueCertificateById(req.params.id);
+    if (!cert) return res.status(404).json({ success: false, message: 'Certificate not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'reissue', resourceType: 'certificate', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: cert });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// SUPPORT TICKETS
+// ══════════════════════════════════════════════════════════════
+
+// GET /admin/tickets
+router.get('/tickets', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const status = req.query.status as string;
+
+    let sql = `SELECT t.*, u.name as user_name, u.email as user_email, a.name as assigned_name
+               FROM support_tickets t
+               JOIN users u ON t.user_id = u.id
+               LEFT JOIN users a ON t.assigned_to = a.id`;
+    const params: any[] = [];
+
+    if (status) {
+      params.push(status);
+      sql += ` WHERE t.status = $${params.length}`;
+    }
+    sql += ` ORDER BY t.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const { rows } = await query(sql, params);
+    const countRes = await query('SELECT COUNT(*) FROM support_tickets' + (status ? ` WHERE status = $1` : ''), status ? [status] : []);
+    const total = parseInt(countRes.rows[0].count, 10);
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /admin/tickets/:id/reply
+router.post('/tickets/:id/reply', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+    const adminId = req.user!.userId;
+    const { rows } = await query(
+      `INSERT INTO ticket_replies (ticket_id, admin_id, message) VALUES ($1, $2, $3) RETURNING *`,
+      [id, adminId, message]
+    );
+    await query(`UPDATE support_tickets SET status = 'in_progress', updated_at = NOW() WHERE id = $1`, [id]);
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/tickets/:id/close
+router.put('/tickets/:id/close', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { rows } = await query(
+      `UPDATE support_tickets SET status = 'closed', updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'close', resourceType: 'ticket', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/tickets/:id/reopen
+router.put('/tickets/:id/reopen', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { rows } = await query(
+      `UPDATE support_tickets SET status = 'open', updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'reopen', resourceType: 'ticket', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/tickets/:id/assign
+router.put('/tickets/:id/assign', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { adminId } = req.body;
+    const { rows } = await query(
+      `UPDATE support_tickets SET assigned_to = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [adminId, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'assign', resourceType: 'ticket', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// BROADCAST NOTIFICATIONS
+// ══════════════════════════════════════════════════════════════
+
+// GET /admin/broadcasts
+router.get('/broadcasts', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const { rows } = await query(
+      `SELECT * FROM broadcasts ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    const countRes = await query('SELECT COUNT(*) FROM broadcasts');
+    const total = parseInt(countRes.rows[0].count, 10);
+    res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /admin/broadcasts
+router.post('/broadcasts', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { title, message, audience, type, scheduledAt } = req.body;
+    const isScheduled = scheduledAt && new Date(scheduledAt) > new Date();
+    const status = isScheduled ? 'scheduled' : 'sent';
+    const { rows } = await query(
+      `INSERT INTO broadcasts (title, message, audience, type, status, scheduled_at, sent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        title,
+        message,
+        audience || 'all',
+        type || 'info',
+        status,
+        isScheduled ? scheduledAt : null,
+        isScheduled ? null : new Date(),
+      ]
+    );
+
+    // If sending immediately (not scheduled), deliver to users
+    if (status === 'sent') {
+      let userQuery = 'SELECT id FROM users WHERE 1=1';
+      const userParams: any[] = [];
+      if (audience === 'students') userQuery += ' AND role = $1';
+      else if (audience === 'instructors') userQuery += ' AND role = $1';
+      else if (audience === 'admins') userQuery += ' AND role = $1';
+
+      let roleFilter = audience;
+      if (audience === 'students') roleFilter = 'student';
+      else if (audience === 'instructors') roleFilter = 'instructor';
+      else if (audience === 'admins') roleFilter = 'admin';
+
+      if (roleFilter !== 'all') userParams.push(roleFilter);
+
+      const { rows: users } = await query(userQuery, userParams);
+
+      for (const user of users) {
+        await NotificationModel.createNotification({
+          user_id: user.id,
+          title,
+          message,
+          type: type === 'warning' ? 'warning' : type === 'announcement' ? 'info' : type === 'promotion' ? 'info' : 'info',
+        });
+        io.to(user.id).emit('new_notification', { title, message, type });
+      }
+    }
+
+    await logAudit({ adminId: req.user!.userId, action: 'broadcast', resourceType: 'broadcast', resourceId: rows[0].id, details: `Audience: ${audience}, Title: ${title}`, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /admin/broadcasts/:id
+router.delete('/broadcasts/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { rowCount } = await query(`DELETE FROM broadcasts WHERE id = $1`, [id]);
+    if (!rowCount) return res.status(404).json({ success: false, message: 'Broadcast not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'broadcast', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Broadcast deleted' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// AUDIT LOGS
+// ══════════════════════════════════════════════════════════════
+
+// GET /admin/audit-logs
+router.get('/audit-logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const { rows } = await query(
+      `SELECT al.*, u.name as admin_name
+       FROM audit_logs al
+       JOIN users u ON al.admin_id = u.id
+       ORDER BY al.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    const countRes = await query('SELECT COUNT(*) FROM audit_logs');
+    const total = parseInt(countRes.rows[0].count, 10);
+    res.json({
+      success: true,
+      data: rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// SYSTEM SETTINGS
+// ══════════════════════════════════════════════════════════════
+
+// GET /admin/settings
+router.get('/settings', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { rows } = await query('SELECT * FROM system_settings ORDER BY category, key');
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/settings
+router.put('/settings', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { key, value } = req.body;
+    const { rows } = await query(
+      `INSERT INTO system_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = $2
+       RETURNING *`,
+      [key, value]
+    );
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// CATEGORIES
+// ══════════════════════════════════════════════════════════════
+
+// GET /admin/categories
+router.get('/categories', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const data = await CategoryModel.getAllCategories();
+    const total = await CategoryModel.countCategories();
+    res.json({ success: true, data, pagination: { total } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /admin/categories
+router.post('/categories', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { name, slug, description, icon, color, parent_id, sort_order } = req.body;
+    if (!name || !slug) return res.status(400).json({ success: false, message: 'Name and slug are required' });
+    const data = await CategoryModel.createCategory({ name, slug, description, icon, color, parent_id, sort_order });
+    await logAudit({ adminId: req.user!.userId, action: 'create', resourceType: 'category', resourceId: data.id, ipAddress: req.ip });
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/categories/:id
+router.put('/categories/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const data = await CategoryModel.updateCategory(id, req.body);
+    if (!data) return res.status(404).json({ success: false, message: 'Category not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'update', resourceType: 'category', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /admin/categories/:id
+router.delete('/categories/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await CategoryModel.deleteCategory(req.params.id);
+    if (!deleted) return res.status(404).json({ success: false, message: 'Category not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'category', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Category deleted' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// MISSING ROUTES (Sprint 1.2)
+// ══════════════════════════════════════════════════════════════
+
+// POST /admin/users/:id/reset-password
+router.post('/users/:id/reset-password', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const tempPassword = crypto.randomBytes(4).toString('hex');
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+    const user = await UserModel.updateUser(id, { password: hashedPassword });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'reset_password', resourceType: 'user', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Password reset successfully', data: { tempPassword } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/payments/:id/refund
+router.post('/payments/:id/refund', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await query(`UPDATE payments SET status = 'refunded' WHERE id = $1 RETURNING *`, [id]);
+    if (!rows[0]) return res.status(404).json({ success: false, message: 'Payment not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'refund', resourceType: 'payment', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// PUT /admin/applications/:id/request-changes
+router.put('/applications/:id/request-changes', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const adminId = req.user!.userId;
+    const { rows } = await query(
+      `UPDATE instructor_applications SET status = 'pending', notes = COALESCE($1, notes), reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW() WHERE id = $3 RETURNING *`,
+      [notes, adminId, id]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Application not found' });
+    await logAudit({ adminId, action: 'request_changes', resourceType: 'application', resourceId: id, details: notes, ipAddress: req.ip });
+    res.json({ success: true, message: 'Changes requested', data: rows[0] });
+  } catch (error) { next(error); }
 });
 
 export default router;

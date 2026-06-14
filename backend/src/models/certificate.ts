@@ -63,3 +63,37 @@ export async function getCertificateById(id: string): Promise<Certificate | null
   const { rows } = await query<Certificate>('SELECT * FROM certificates WHERE id = $1', [id]);
   return rows[0] || null;
 }
+
+export async function getAllCertificates(limit = 50, offset = 0): Promise<any[]> {
+  const { rows } = await query(
+    `SELECT cert.*, u.name as user_name, u.email as user_email, c.title as course_title
+     FROM certificates cert
+     JOIN users u ON cert.user_id = u.id
+     JOIN courses c ON cert.course_id = c.id
+     ORDER BY cert.issued_at DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+  return rows;
+}
+
+export async function countCertificates(): Promise<number> {
+  const { rows } = await query('SELECT COUNT(*) FROM certificates');
+  return parseInt(rows[0].count, 10);
+}
+
+export async function revokeCertificateById(id: string): Promise<any> {
+  const { rows } = await query(
+    `UPDATE certificates SET revoked = true, revoked_at = NOW() WHERE id = $1 RETURNING *`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+export async function reissueCertificateById(id: string): Promise<any> {
+  const { rows } = await query(
+    `UPDATE certificates SET revoked = false, revoked_at = NULL, issued_at = NOW() WHERE id = $1 RETURNING *`,
+    [id]
+  );
+  return rows[0] || null;
+}
