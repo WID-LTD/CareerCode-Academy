@@ -1,11 +1,11 @@
-import { Router, Request, Response } from 'express';
-import { authenticate, authorize } from '../middleware/auth';
+import { Router, Response } from 'express';
+import { authenticate, AuthRequest } from '../middleware/auth';
 import { query } from '../config/db';
 
 const router = Router();
 
 // GET /wishlists - Get user's wishlist
-router.get('/', authenticate, async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const result = await query(
@@ -27,7 +27,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
 });
 
 // POST /wishlists - Add to wishlist
-router.post('/', authenticate, async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { courseId } = req.body;
@@ -58,7 +58,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
 });
 
 // DELETE /wishlists/:courseId - Remove from wishlist
-router.delete('/:courseId', authenticate, async (req: Request, res: Response) => {
+router.delete('/:courseId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { courseId } = req.params;
