@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/axios';
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from './authStore';
 
 export interface Message {
   id: string;
@@ -17,6 +16,9 @@ export interface ConversationUser {
   name: string;
   avatar: string | null;
   role: string;
+  unread_count?: number;
+  last_message?: string;
+  last_message_at?: string;
 }
 
 interface ChatState {
@@ -26,6 +28,8 @@ interface ChatState {
   messages: Message[];
   isLoading: boolean;
   apiPrefix: string;
+  onlineUsers: Set<string>;
+  typingUsers: Set<string>;
 
   setApiPrefix: (prefix: string) => void;
   initializeSocket: (userId: string) => void;
@@ -34,6 +38,9 @@ interface ChatState {
   setActiveConversation: (userId: string) => Promise<void>;
   sendMessage: (receiverId: string, content: string) => Promise<void>;
   addMessage: (message: Message) => void;
+  deleteMessage: (messageId: string) => Promise<void>;
+  markAsRead: (senderId: string) => Promise<void>;
+  emitTyping: (receiverId: string, typing: boolean) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -43,23 +50,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isLoading: false,
   apiPrefix: '/instructor',
+  onlineUsers: new Set(),
+  typingUsers: new Set(),
 
   setApiPrefix: (prefix: string) => set({ apiPrefix: prefix }),
 
   initializeSocket: (userId: string) => {
     let { socket } = get();
     if (!socket) {
-      const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3000';
-      socket = io(SOCKET_URL, {
-        withCredentials: true
-      });
-      
+      const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:5000';
+      socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+
       socket.on('connect', () => {
         socket!.emit('join_room', userId);
       });
 
       socket.on('receive_message', (message: Message) => {
         get().addMessage(message);
+        get().fetchConversations();
+      });
+
+      socket.on('online_users', (data: { count: number; users: { id: string }[] }) => {
+        set({ onlineUsers: new Set(data.users.map(u => u.id)) });
+      });
+
+      socket.on('user_typing', (data: { senderId: string; typing: boolean }) => {
+        set((state) => {
+          const next = new Set(state.typingUsers);
+          if (data.typing) next.add(data.senderId);
+          else next.delete(data.senderId);
+          return { typingUsers: next };
+        });
       });
 
       set({ socket });
@@ -70,7 +91,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { socket } = get();
     if (socket) {
       socket.disconnect();
-      set({ socket: null });
+      set({ socket: null, onlineUsers: new Set(), typingUsers: new Set() });
     }
   },
 
@@ -92,6 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const prefix = get().apiPrefix;
       const { data } = await api.get(`${prefix}/messages/${userId}`);
       set({ messages: data.data, isLoading: false });
+      get().markAsRead(userId);
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
@@ -103,6 +125,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const prefix = get().apiPrefix;
       const { data } = await api.post(`${prefix}/messages`, { receiver_id: receiverId, content });
       get().addMessage(data.data);
+      get().emitTyping(receiverId, false);
     } catch (error) {
       console.error(error);
     }
@@ -110,12 +133,42 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   addMessage: (message: Message) => {
     const { messages, activeConversation } = get();
-    // Only add to current view if it belongs to the active conversation
     if (
-      (message.sender_id === activeConversation) || 
+      (message.sender_id === activeConversation) ||
       (message.receiver_id === activeConversation)
     ) {
       set({ messages: [...messages, message] });
     }
-  }
+  },
+
+  deleteMessage: async (messageId: string) => {
+    try {
+      const prefix = get().apiPrefix;
+      await api.delete(`${prefix}/messages/${messageId}`);
+      set({ messages: get().messages.filter(m => m.id !== messageId) });
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
+  markAsRead: async (senderId: string) => {
+    try {
+      const prefix = get().apiPrefix;
+      await api.put(`${prefix}/messages/read`, { senderId });
+      set((state) => ({
+        conversations: state.conversations.map(c =>
+          c.id === senderId ? { ...c, unread_count: 0 } : c
+        ),
+      }));
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
+  emitTyping: (receiverId: string, typing: boolean) => {
+    const { socket } = get();
+    if (!socket) return;
+    const event = typing ? 'typing' : 'stop_typing';
+    socket.emit(event, { receiverId, senderId: '' });
+  },
 }));

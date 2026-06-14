@@ -748,6 +748,14 @@ io.on('connection', (socket: Socket) => {
     });
   });
 
+  socket.on('typing', (data: { receiverId: string; senderId: string }) => {
+    io.to(data.receiverId).emit('user_typing', { senderId: data.senderId, typing: true });
+  });
+
+  socket.on('stop_typing', (data: { receiverId: string; senderId: string }) => {
+    io.to(data.receiverId).emit('user_typing', { senderId: data.senderId, typing: false });
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     for (const [userId, data] of onlineUsers.entries()) {

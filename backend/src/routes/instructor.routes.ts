@@ -421,12 +421,21 @@ router.get('/live-classes/:id/attendance', async (req: AuthRequest, res: Respons
 router.get('/messages/conversations', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
-    // Find all users the instructor has exchanged messages with
     const { rows } = await query(`
-      SELECT DISTINCT u.id, u.name, u.avatar, u.role
+      SELECT
+        u.id, u.name, u.avatar, u.role,
+        COALESCE(SUM(CASE WHEN dm.is_read = false AND dm.receiver_id = $1 THEN 1 ELSE 0 END), 0)::int AS unread_count,
+        (SELECT content FROM direct_messages
+         WHERE (sender_id = u.id AND receiver_id = $1) OR (sender_id = $1 AND receiver_id = u.id)
+         ORDER BY created_at DESC LIMIT 1) AS last_message,
+        (SELECT created_at FROM direct_messages
+         WHERE (sender_id = u.id AND receiver_id = $1) OR (sender_id = $1 AND receiver_id = u.id)
+         ORDER BY created_at DESC LIMIT 1) AS last_message_at
       FROM users u
       JOIN direct_messages dm ON (dm.sender_id = u.id OR dm.receiver_id = u.id)
       WHERE (dm.sender_id = $1 OR dm.receiver_id = $1) AND u.id != $1
+      GROUP BY u.id, u.name, u.avatar, u.role
+      ORDER BY last_message_at DESC NULLS LAST
     `, [userId]);
 
     res.json({ success: true, data: rows });
@@ -470,6 +479,37 @@ router.post('/messages', async (req: AuthRequest, res: Response, next: NextFunct
     io.to(receiver_id).emit('receive_message', newMessage);
 
     res.status(201).json({ success: true, data: newMessage });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /instructor/messages/read - mark messages as read from a sender
+router.put('/messages/read', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { senderId } = req.body;
+    const { rowCount } = await query(
+      `UPDATE direct_messages SET is_read = true WHERE sender_id = $1 AND receiver_id = $2 AND is_read = false`,
+      [senderId, userId]
+    );
+    res.json({ success: true, updated: rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /instructor/messages/:id - delete a message (own messages only)
+router.delete('/messages/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { rowCount } = await query(
+      `DELETE FROM direct_messages WHERE id = $1 AND sender_id = $2`,
+      [id, userId]
+    );
+    if (!rowCount) return res.status(404).json({ success: false, message: 'Message not found or not yours' });
+    res.json({ success: true, message: 'Message deleted' });
   } catch (error) {
     next(error);
   }
