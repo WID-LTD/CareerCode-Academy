@@ -7,6 +7,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import * as UserModel from '../models/user';
 import * as NotificationModel from '../models/notification';
 import * as TokenModel from '../models/token';
+import { emitDashboardUpdate } from '../index';
 import {
   generateToken,
   generateRefreshToken,
@@ -84,6 +85,8 @@ router.post(
       const refreshToken = generateRefreshToken(tokenPayload);
       const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
+
+      emitDashboardUpdate();
 
       res.status(201).json({
         success: true,

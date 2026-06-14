@@ -8,6 +8,7 @@ import * as EnrollmentModel from '../models/enrollment';
 import * as PaymentModel from '../models/payment';
 import * as ReviewModel from '../models/review';
 import { uploadSingle } from '../middleware/upload';
+import { emitDashboardUpdate } from '../index';
 import { slugify } from '../utils/helpers';
 import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
 
@@ -297,6 +298,7 @@ router.post(
       );
 
       res.status(201).json({ success: true, data: enrollment });
+      emitDashboardUpdate();
     } catch (error) {
       next(error);
     }

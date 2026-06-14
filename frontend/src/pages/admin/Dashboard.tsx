@@ -56,9 +56,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function AdminDashboard() {
   const { stats, recentUsers, recentPayments, monthlyRevenue, refundTrend, enrollmentTrend, userRegistrationTrend, topCourses, isLoading, error, fetchDashboardData } = useAdminStore();
-  const { onlineCount, onlineUsers } = useSocket();
+  const { socket, onlineCount, onlineUsers } = useSocket();
   const [timeRange, setTimeRange] = useState('6m');
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const autoRef = useRef<ReturnType<typeof setInterval>>();
 
   const loadData = useCallback((range?: string) => {
@@ -70,13 +69,16 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (autoRefresh) {
-      autoRef.current = setInterval(() => loadData(), 30000);
-      return () => { if (autoRef.current) clearInterval(autoRef.current); };
-    } else {
-      if (autoRef.current) clearInterval(autoRef.current);
-    }
-  }, [autoRefresh, loadData]);
+    if (!socket) return;
+    const handler = () => loadData();
+    socket.on('dashboard:update', handler);
+    return () => { socket.off('dashboard:update', handler); };
+  }, [socket, loadData]);
+
+  useEffect(() => {
+    autoRef.current = setInterval(() => loadData(), 60000);
+    return () => { if (autoRef.current) clearInterval(autoRef.current); };
+  }, [loadData]);
 
   const handleRangeChange = (range: string) => {
     setTimeRange(range);
@@ -124,12 +126,13 @@ export default function AdminDashboard() {
           <p className="text-gray-500 mt-1">Platform overview and key metrics.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${autoRefresh ? 'bg-success-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}`}
-          >
-            {autoRefresh ? 'Live' : 'Auto'}
-          </button>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success-500/10 text-success-600 text-xs font-medium">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success-500" />
+            </span>
+            Live
+          </div>
           <select
             value={timeRange}
             onChange={(e) => handleRangeChange(e.target.value)}

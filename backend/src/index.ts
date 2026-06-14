@@ -735,12 +735,19 @@ const io = new Server(server, {
 
 const onlineUsers = new Map<string, { socketId: string; name?: string; role?: string }>();
 
+export function emitDashboardUpdate() {
+  io.to('admin_room').emit('dashboard:update');
+}
+
 io.on('connection', (socket: Socket) => {
   console.log('A user connected via socket:', socket.id);
 
   socket.on('join_room', (userId: string, name?: string, role?: string) => {
     socket.join(userId);
-    console.log(`User ${userId} joined their personal room`);
+    if (role === 'admin' || role === 'super_admin') {
+      socket.join('admin_room');
+    }
+    console.log(`User ${userId} joined their personal room${role === 'admin' || role === 'super_admin' ? ' (admin)' : ''}`);
     onlineUsers.set(userId, { socketId: socket.id, name, role });
     io.emit('online_users', {
       count: onlineUsers.size,

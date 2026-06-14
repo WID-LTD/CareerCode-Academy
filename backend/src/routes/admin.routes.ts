@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail } from '../utils/helpers';
 import { logAudit } from '../middleware/audit';
-import { io } from '../index';
+import { io, emitDashboardUpdate } from '../index';
 
 const router = Router();
 
@@ -398,7 +398,7 @@ router.put('/applications/:id/approve', async (req: AuthRequest, res: Response, 
     }
 
     await logAudit({ adminId: req.user!.userId, action: 'approve', resourceType: 'application', resourceId: id, ipAddress: req.ip });
-
+    emitDashboardUpdate();
     res.json({ success: true, message: 'Application approved', data: application });
   } catch (error) { next(error); }
 });
@@ -415,6 +415,7 @@ router.put('/applications/:id/reject', async (req: AuthRequest, res: Response, n
     );
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Application not found' });
     await logAudit({ adminId, action: 'reject', resourceType: 'application', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, message: 'Application rejected', data: rows[0] });
   } catch (error) { next(error); }
 });
@@ -678,6 +679,7 @@ router.put('/users/:id/suspend', async (req: AuthRequest, res: Response, next: N
     );
     if (!rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
     await logAudit({ adminId: req.user!.userId, action: 'suspend', resourceType: 'user', resourceId: id, details: reason, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     next(error);
@@ -694,6 +696,7 @@ router.put('/users/:id/reactivate', async (req: AuthRequest, res: Response, next
     );
     if (!rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
     await logAudit({ adminId: req.user!.userId, action: 'reactivate', resourceType: 'user', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     next(error);
@@ -717,6 +720,7 @@ router.put('/courses/:id/review', async (req: AuthRequest, res: Response, next: 
     const course = await CourseModel.updateCourseStatus(id, status, review_notes, adminId);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
     await logAudit({ adminId, action: 'review', resourceType: 'course', resourceId: id, details: `Status set to ${status}`, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: course });
   } catch (error) {
     next(error);
@@ -731,6 +735,7 @@ router.put('/courses/:id/approve', async (req: AuthRequest, res: Response, next:
     const course = await CourseModel.updateCourseStatus(id, 'published', req.body.review_notes, adminId);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
     await logAudit({ adminId, action: 'approve', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: course });
   } catch (error) {
     next(error);
@@ -745,6 +750,7 @@ router.put('/courses/:id/reject', async (req: AuthRequest, res: Response, next: 
     const course = await CourseModel.updateCourseStatus(id, 'rejected', req.body.review_notes || req.body.reason, adminId);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
     await logAudit({ adminId, action: 'reject', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: course });
   } catch (error) {
     next(error);
@@ -756,9 +762,10 @@ router.put('/courses/:id/archive', async (req: AuthRequest, res: Response, next:
   try {
     const { id } = req.params;
     const adminId = req.user!.userId;
-    const course = await CourseModel.updateCourseStatus(id, 'archived');
+    const course = await CourseModel.updateCourseStatus(id, 'archived', req.body.review_notes, adminId);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
     await logAudit({ adminId, action: 'archive', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: course });
   } catch (error) {
     next(error);
@@ -777,6 +784,7 @@ router.put('/courses/:id/feature', async (req: AuthRequest, res: Response, next:
     );
     if (!rows[0]) return res.status(404).json({ success: false, message: 'Course not found' });
     await logAudit({ adminId: req.user!.userId, action: isFeatured ? 'unfeature' : 'feature', resourceType: 'course', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     next(error);
@@ -1162,6 +1170,7 @@ router.post('/payments/:id/refund', async (req: AuthRequest, res: Response, next
     const { rows } = await query(`UPDATE payments SET status = 'refunded' WHERE id = $1 RETURNING *`, [id]);
     if (!rows[0]) return res.status(404).json({ success: false, message: 'Payment not found' });
     await logAudit({ adminId: req.user!.userId, action: 'refund', resourceType: 'payment', resourceId: id, ipAddress: req.ip });
+    emitDashboardUpdate();
     res.json({ success: true, data: rows[0] });
   } catch (error) { next(error); }
 });

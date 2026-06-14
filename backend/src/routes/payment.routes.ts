@@ -7,6 +7,7 @@ import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
 import * as UserModel from '../models/user';
 import { NotFoundError, ConflictError } from '../utils/errors';
+import { emitDashboardUpdate } from '../index';
 
 const router = Router();
 
@@ -204,6 +205,7 @@ router.get(
         }
       }
 
+      emitDashboardUpdate();
       const updatedPayment = await PaymentModel.getPaymentByReference(reference);
       res.json({ success: true, data: updatedPayment });
     } catch (error) {
@@ -243,6 +245,7 @@ router.post(
             course_id: payment.course_id,
           });
         }
+        emitDashboardUpdate();
       }
 
       res.json({ success: true });
