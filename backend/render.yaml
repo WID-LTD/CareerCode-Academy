@@ -12,3 +12,7 @@ services:
         value: 5000
       - key: FRONTEND_URL
         value: https://career-code-academy.vercel.app
+      - key: BREVO_SENDER_EMAIL
+        value: johndavidnzubechukwu008@gmail.com
+      - key: BREVO_SENDER_NAME
+        value: CareerCode Academy

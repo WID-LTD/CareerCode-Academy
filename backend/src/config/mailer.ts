@@ -1,16 +1,4 @@
-let resendInstance: any = null;
-
-function getResend() {
-  if (!resendInstance) {
-    const key = process.env.RESEND_API_KEY;
-    if (!key || key === 're_xxxxxxxxxxxx') {
-      return null;
-    }
-    const { Resend } = require('resend');
-    resendInstance = new Resend(key);
-  }
-  return resendInstance;
-}
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 export async function sendMail(options: {
   to: string;
@@ -18,27 +6,42 @@ export async function sendMail(options: {
   html: string;
   text?: string;
 }): Promise<void> {
-  const resend = getResend();
-
-  if (!resend) {
-    console.log('[Mail] No API key - skipped:', options.to, options.subject);
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey || apiKey === 'xkeysib-xxxxxxxxxxxx') {
+    console.log('[Mail] No valid BREVO_API_KEY — skipped:', options.to, options.subject);
     return;
   }
 
   try {
-    const { error } = await resend.emails.send({
-      from: `CareerCode Academy <${process.env.RESEND_FROM || 'noreply@careercode.academy'}>`,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || 'johndavidnzubechukwu008@gmail.com';
+    const senderName = process.env.BREVO_SENDER_NAME || 'CareerCode Academy';
+
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { email: senderEmail, name: senderName },
+        to: [{ email: options.to }],
+        subject: options.subject,
+        htmlContent: options.html,
+        ...(options.text ? { textContent: options.text } : {}),
+      }),
     });
 
-    if (error) {
-      console.error('[Mail] Resend error:', error);
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error('[Mail] Brevo API error:', response.status, errBody);
+      return;
     }
-  } catch (err) {
-    console.error('[Mail] Resend exception:', err);
+
+    const result: any = await response.json();
+    console.log('[Mail] Sent to', options.to, '— messageId:', result.messageId);
+  } catch (err: any) {
+    console.error('[Mail] Brevo exception:', err.message || err);
   }
 }
 
