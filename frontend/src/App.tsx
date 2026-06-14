@@ -42,6 +42,7 @@ import StudentNotifications from '@/pages/student/Notifications';
 import StudentSettings from '@/pages/student/Settings';
 import StudentTickets from '@/pages/student/Tickets';
 import StudentMessages from '@/pages/student/Messages';
+import StudentQuizTake from '@/pages/student/QuizTake';
 
 import InstructorDashboard from '@/pages/instructor/Dashboard';
 import InstructorManageCourses from '@/pages/instructor/ManageCourses';
@@ -55,6 +56,7 @@ import InstructorLiveClasses from '@/pages/instructor/LiveClasses';
 import InstructorMessages from '@/pages/instructor/Messages';
 import InstructorSchedule from '@/pages/instructor/Schedule';
 import InstructorCourseProposals from '@/pages/instructor/CourseProposals';
+import InstructorQuizzes from '@/pages/instructor/Quizzes';
 
 import AdminDashboard from '@/pages/admin/Dashboard';
 import AdminUsers from '@/pages/admin/Users';
@@ -123,6 +125,7 @@ function App() {
           <Route path="notifications" element={<StudentNotifications />} />
           <Route path="tickets" element={<StudentTickets />} />
           <Route path="messages" element={<StudentMessages />} />
+          <Route path="quiz/:quizId" element={<StudentQuizTake />} />
           <Route path="profile" element={<StudentProfile />} />
           <Route path="settings" element={<StudentSettings />} />
         </Route>
@@ -141,6 +144,7 @@ function App() {
           <Route path="live-classes" element={<InstructorLiveClasses />} />
           <Route path="messages" element={<InstructorMessages />} />
           <Route path="schedule" element={<InstructorSchedule />} />
+          <Route path="quizzes" element={<InstructorQuizzes />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>
 
