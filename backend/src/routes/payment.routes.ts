@@ -7,7 +7,8 @@ import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
 import * as UserModel from '../models/user';
 import { NotFoundError, ConflictError } from '../utils/errors';
-import { emitDashboardUpdate } from '../index';
+import { emitDashboardUpdate, emitStudentUpdate } from '../config/socket';
+import { query } from '../config/db';
 
 const router = Router();
 
@@ -194,7 +195,6 @@ router.get(
             // Notify instructor
             const course = await CourseModel.getCourseById(payment.course_id);
             if (course) {
-              const { query } = await import('../config/db');
               await query(
                 `INSERT INTO notifications (user_id, title, message, type)
                  VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
@@ -206,6 +206,7 @@ router.get(
       }
 
       emitDashboardUpdate();
+      emitStudentUpdate(payment.user_id);
       const updatedPayment = await PaymentModel.getPaymentByReference(reference);
       res.json({ success: true, data: updatedPayment });
     } catch (error) {
@@ -246,6 +247,7 @@ router.post(
           });
         }
         emitDashboardUpdate();
+        emitStudentUpdate(payment.user_id);
       }
 
       res.json({ success: true });

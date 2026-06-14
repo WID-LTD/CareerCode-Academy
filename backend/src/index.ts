@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import http from 'http';
-import { Server, Socket } from 'socket.io';
+import { createSocketServer } from './config/socket';
 
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
@@ -41,9 +41,8 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    'https://career-code-academy.vercel.app',
-    'https://careercode-academy.onrender.com'
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []),
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -150,6 +149,7 @@ async function initDatabase() {
         bio TEXT,
         is_verified BOOLEAN DEFAULT false,
         verification_token VARCHAR(255),
+        verification_token_expires TIMESTAMPTZ,
         reset_token VARCHAR(255),
         reset_token_expiry TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -721,62 +721,7 @@ async function initDatabase() {
 
 // Setup HTTP server and Socket.IO
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      'https://career-code-academy.vercel.app',
-      'https://careercode-academy.onrender.com'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-  }
-});
-
-const onlineUsers = new Map<string, { socketId: string; name?: string; role?: string }>();
-
-export function emitDashboardUpdate() {
-  io.to('admin_room').emit('dashboard:update');
-}
-
-io.on('connection', (socket: Socket) => {
-  console.log('A user connected via socket:', socket.id);
-
-  socket.on('join_room', (userId: string, name?: string, role?: string) => {
-    socket.join(userId);
-    if (role === 'admin' || role === 'super_admin') {
-      socket.join('admin_room');
-    }
-    console.log(`User ${userId} joined their personal room${role === 'admin' || role === 'super_admin' ? ' (admin)' : ''}`);
-    onlineUsers.set(userId, { socketId: socket.id, name, role });
-    io.emit('online_users', {
-      count: onlineUsers.size,
-      users: Array.from(onlineUsers.entries()).map(([id, data]) => ({ id, name: data.name, role: data.role })),
-    });
-  });
-
-  socket.on('typing', (data: { receiverId: string; senderId: string }) => {
-    io.to(data.receiverId).emit('user_typing', { senderId: data.senderId, typing: true });
-  });
-
-  socket.on('stop_typing', (data: { receiverId: string; senderId: string }) => {
-    io.to(data.receiverId).emit('user_typing', { senderId: data.senderId, typing: false });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    for (const [userId, data] of onlineUsers.entries()) {
-      if (data.socketId === socket.id) {
-        onlineUsers.delete(userId);
-        break;
-      }
-    }
-    io.emit('online_users', {
-      count: onlineUsers.size,
-      users: Array.from(onlineUsers.entries()).map(([id, data]) => ({ id, name: data.name, role: data.role })),
-    });
-  });
-});
+const io = createSocketServer(server);
 
 // Retry database initialization with backoff
 async function initDatabaseWithRetry(retries: number = 3, delay: number = 3000): Promise<boolean> {
@@ -847,4 +792,4 @@ async function start() {
 
 start();
 
-export { app, io };
+export { app };

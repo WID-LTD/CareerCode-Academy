@@ -151,8 +151,8 @@ export default function Courses() {
                           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">{course.description}</p>
                           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-100 dark:border-gray-800 mt-auto">
                             <div className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{formatDuration(course.duration)}</div>
-                            <div className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{/* Missing enrollmentCount on list, mock or 0 */}0</div>
-                            <div className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-yellow-500" />{/* Missing rating on list */}0.0</div>
+                            <div className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{course.student_count ?? 0}</div>
+                            <div className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-yellow-500" />{course.avg_rating ?? '0.0'}</div>
                           </div>
                         </GlassCard>
                       </Link>

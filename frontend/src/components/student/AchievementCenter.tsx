@@ -13,9 +13,11 @@ export function AchievementCenter() {
 
   const earnedCount = badges.filter(b => b.earned).length;
   const totalXp = stats?.xpPoints || 0;
-  const xpToNextLevel = 5000;
   const currentLevel = stats?.level || 1;
-  const xpProgress = totalXp % xpToNextLevel;
+  const xpPerLevel = 500;
+  const xpForCurrentLevel = (currentLevel - 1) * xpPerLevel;
+  const xpProgress = totalXp - xpForCurrentLevel;
+  const xpToNextLevel = xpPerLevel;
 
   return (
     <section>
@@ -25,12 +27,12 @@ export function AchievementCenter() {
         <div className="mb-5">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="font-medium">Level {currentLevel}</span>
-            <span className="text-gray-500 text-xs">{totalXp} / {currentLevel * xpToNextLevel} XP</span>
+            <span className="text-gray-500 text-xs">{totalXp} / {currentLevel * xpPerLevel} XP</span>
           </div>
           <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(xpProgress / xpToNextLevel) * 100}%` }}
+              animate={{ width: `${Math.min((xpProgress / xpToNextLevel) * 100, 100)}%` }}
               transition={{ duration: 1, ease: 'easeOut' }}
               className="h-full rounded-full bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500"
             />

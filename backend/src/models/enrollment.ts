@@ -55,7 +55,8 @@ export async function getAllEnrollmentsPaginated(limit: number, offset: number, 
 export async function getEnrollmentsByUser(userId: string): Promise<Enrollment[]> {
   const { rows } = await query<Enrollment>(
     `SELECT e.*, c.title as course_title, c.thumbnail as course_thumbnail, c.slug as course_slug, c.category,
-            u.name as instructor_name
+            u.name as instructor_name,
+            (SELECT COUNT(*)::int FROM lessons WHERE course_id = c.id) as total_lessons
      FROM enrollments e
      JOIN courses c ON e.course_id = c.id
      JOIN users u ON c.instructor_id = u.id

@@ -47,7 +47,7 @@ export default function VerifyCertificate() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] pt-20 pb-12">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-20 pb-12">
       <div className="max-w-2xl mx-auto px-4">
         <div className="text-center mb-8">
           <Award className="w-16 h-16 text-blue-400 mx-auto mb-4" />
@@ -147,3 +147,4 @@ export default function VerifyCertificate() {
     </div>
   );
 }
+

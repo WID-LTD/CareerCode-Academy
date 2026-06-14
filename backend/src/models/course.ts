@@ -32,6 +32,8 @@ export interface CreateCourseInput {
   level: 'beginner' | 'intermediate' | 'advanced';
   duration: number;
   slug: string;
+  learning_outcomes?: string[];
+  published?: boolean;
 }
 
 export interface UpdateCourseInput {
@@ -56,21 +58,15 @@ export async function createCourse(input: CreateCourseInput): Promise<Course> {
   return rows[0];
 }
 
-export interface CreateCourseInput {
-  title: string;
-  description: string;
-  thumbnail?: string;
-  price: number;
-  category: string;
-  instructor_id: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  duration: number;
-  slug: string;
-  learning_outcomes?: string[];
-}
-
 export async function getAllCourses(limit: number = 50, offset: number = 0, filters?: { published?: boolean; status?: string; category?: string; level?: string; instructor_id?: string }): Promise<Course[]> {
-  let sql = 'SELECT c.*, u.name as instructor_name, u.avatar as instructor_avatar FROM courses c JOIN users u ON c.instructor_id = u.id WHERE 1=1';
+  let sql = `SELECT c.*, u.name as instructor_name, u.avatar as instructor_avatar,
+             COALESCE(COUNT(DISTINCT e.id)::int, 0) as student_count,
+             COALESCE(ROUND(AVG(r.rating)::numeric, 1), 0)::float as avg_rating
+             FROM courses c
+             JOIN users u ON c.instructor_id = u.id
+             LEFT JOIN enrollments e ON e.course_id = c.id
+             LEFT JOIN reviews r ON r.course_id = c.id
+             WHERE 1=1`;
   const params: any[] = [];
   let paramIndex = 1;
 
@@ -95,7 +91,7 @@ export async function getAllCourses(limit: number = 50, offset: number = 0, filt
     params.push(filters.instructor_id);
   }
 
-  sql += ' ORDER BY c.created_at DESC LIMIT $' + paramIndex++ + ' OFFSET $' + paramIndex++;
+  sql += ` GROUP BY c.id, u.name, u.avatar ORDER BY c.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
   params.push(limit, offset);
 
   const { rows } = await query<Course>(sql, params);

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { query } from '../config/db';
-import { io } from '../index'; // import the socket instance
+import { io } from '../config/socket';
 
 const router = Router();
 

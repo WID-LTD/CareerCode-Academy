@@ -8,9 +8,10 @@ import * as EnrollmentModel from '../models/enrollment';
 import * as PaymentModel from '../models/payment';
 import * as ReviewModel from '../models/review';
 import { uploadSingle } from '../middleware/upload';
-import { emitDashboardUpdate } from '../index';
+import { emitDashboardUpdate, emitStudentUpdate } from '../config/socket';
 import { slugify } from '../utils/helpers';
 import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
+import { query } from '../config/db';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ const createCourseSchema = z.object({
   level: z.enum(['beginner', 'intermediate', 'advanced']),
   duration: z.number().min(1, 'Duration must be at least 1 minute'),
   thumbnail: z.string().url().optional(),
+  published: z.boolean().optional(),
 });
 
 const updateCourseSchema = z.object({
@@ -270,7 +272,7 @@ router.post(
 
       if (course.price > 0) {
         // Check if payment completed
-        const { rows } = await (await import('../config/db')).query(
+        const { rows } = await query(
           `SELECT * FROM payments WHERE user_id = $1 AND course_id = $2 AND status = 'completed'`,
           [userId, courseId]
         );
@@ -291,7 +293,7 @@ router.post(
       const enrollment = await EnrollmentModel.createEnrollment({ user_id: userId, course_id: courseId });
 
       // Notify instructor
-      await (await import('../config/db')).query(
+      await query(
         `INSERT INTO notifications (user_id, title, message, type)
          VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
         [course.instructor_id, `A new student enrolled in "${course.title}"`]
@@ -299,6 +301,7 @@ router.post(
 
       res.status(201).json({ success: true, data: enrollment });
       emitDashboardUpdate();
+      emitStudentUpdate(userId);
     } catch (error) {
       next(error);
     }

@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { query } from './config/db';
 
 async function seedAdmin() {
+  dotenv.config();
   try {
     const adminEmail = 'admin@careercode.com';
     const adminPassword = 'Admin123!';

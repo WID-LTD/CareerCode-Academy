@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail } from '../utils/helpers';
 import { logAudit } from '../middleware/audit';
-import { io, emitDashboardUpdate } from '../index';
+import { io, emitDashboardUpdate } from '../config/socket';
 
 const router = Router();
 

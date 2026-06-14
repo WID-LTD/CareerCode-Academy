@@ -28,7 +28,7 @@ export function verifyRefreshToken(token: string): TokenPayload {
 }
 
 export function generateVerificationCode(): string {
-  return crypto.randomBytes(32).toString('hex');
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export function generatePasswordResetToken(): string {
@@ -43,7 +43,7 @@ export async function sendVerificationEmail(email: string, token: string): Promi
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
   await sendMail({
     to: email,
-    subject: 'Verify Your Email - CareerCode Academy',
+    subject: `Your verification code: ${token} - CareerCode Academy`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -59,27 +59,28 @@ export async function sendVerificationEmail(email: string, token: string): Promi
               <tr><td style="padding:40px;">
                 <h2 style="color:#1e293b;font-size:20px;margin:0 0 8px;">Welcome to CareerCode Academy!</h2>
                 <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 24px;">
-                  Thanks for creating an account. Please verify your email address to get started on your learning journey.
+                  Thanks for creating an account. Please use the verification code below to activate your account.
+                </p>
+                <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+                  <tr><td align="center" style="background:#f0f4ff;border-radius:12px;padding:20px 40px;border:2px dashed #6366f1;letter-spacing:12px;font-size:36px;font-weight:800;color:#4f46e5;font-family:monospace;">
+                    ${token}
+                  </td></tr>
+                </table>
+                <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 8px;text-align:center;">
+                  Or click the button below to verify instantly:
                 </p>
                 <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
                   <tr><td align="center">
                     <a href="${verificationUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">Verify Account</a>
                   </td></tr>
                 </table>
-                <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 8px;">
-                  Or copy this link into your browser:
-                </p>
-                <p style="color:#6366f1;font-size:13px;word-break:break-all;margin:0 0 24px;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
-                  ${verificationUrl}
-                </p>
-                <p style="color:#94a3b8;font-size:13px;margin:0;">
-                  This verification link expires in <strong>24 hours</strong>.
+                <p style="color:#94a3b8;font-size:13px;margin:0;text-align:center;">
+                  This code expires in <strong>24 hours</strong>. If you did not create this account, please ignore this email.
                 </p>
               </td></tr>
               <tr><td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
                 <p style="color:#94a3b8;font-size:12px;margin:0;">
-                  &copy; 2024 CareerCode Academy. All rights reserved.<br>
-                  If you did not create this account, please ignore this email.
+                  &copy; 2024 CareerCode Academy. All rights reserved.
                 </p>
               </td></tr>
             </table>

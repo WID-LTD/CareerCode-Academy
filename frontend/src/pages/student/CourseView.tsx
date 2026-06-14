@@ -95,7 +95,7 @@ export default function CourseView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <Loader size="lg" />
       </div>
     );
@@ -103,7 +103,7 @@ export default function CourseView() {
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-4">Course Not Found</h2>
           <Link to="/student/courses" className="text-blue-400 hover:underline">Back to My Courses</Link>
@@ -114,7 +114,7 @@ export default function CourseView() {
 
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <GlassCard className="max-w-md text-center p-8">
           <Lock className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Access Required</h2>
@@ -128,7 +128,7 @@ export default function CourseView() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col lg:flex-row">
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
@@ -261,3 +261,4 @@ export default function CourseView() {
     </div>
   );
 }
+

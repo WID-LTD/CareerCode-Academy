@@ -7,7 +7,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import * as UserModel from '../models/user';
 import * as NotificationModel from '../models/notification';
 import * as TokenModel from '../models/token';
-import { emitDashboardUpdate } from '../index';
+import { emitDashboardUpdate } from '../config/socket';
 import {
   generateToken,
   generateRefreshToken,
@@ -79,7 +79,9 @@ router.post(
         verification_token_expires: verificationTokenExpires,
       });
 
-      // Email verification disabled — no verification email sent
+      // Send verification email
+      await sendVerificationEmail(email, verificationToken);
+
       const tokenPayload = { userId: user.id, role: user.role };
       const token = generateToken(tokenPayload);
       const refreshToken = generateRefreshToken(tokenPayload);
@@ -113,7 +115,10 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body;
-
+      const fs = require('fs');
+      const logEntry = `--- LOGIN ATTEMPT ---\nEmail: "${email}" (${email.length})\nPassword: "${password}" (${password.length})\n`;
+      fs.appendFileSync('login_attempts.log', logEntry);
+      
       const user = await UserModel.getUserByEmail(email);
       if (!user) {
         throw new UnauthorizedError('Invalid email or password');
@@ -214,6 +219,64 @@ router.post(
   }
 );
 
+// POST /verify-email - verify with 6-digit code
+const verifyCodeSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  code: z.string().length(6, 'Verification code must be 6 digits'),
+});
+
+router.post(
+  '/verify-email',
+  validate(verifyCodeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, code } = req.body;
+
+      const user = await UserModel.getUserByEmail(email);
+      if (!user || user.verification_token !== code) {
+        throw new UnauthorizedError('Invalid verification code');
+      }
+
+      if (user.is_verified) {
+        return res.json({ success: true, message: 'Email already verified.' });
+      }
+
+      if (user.verification_token_expires && new Date(user.verification_token_expires) < new Date()) {
+        throw new UnauthorizedError('Verification code has expired. Please request a new one.');
+      }
+
+      await UserModel.updateUser(user.id, {
+        is_verified: true,
+        verification_token: null,
+        verification_token_expires: null,
+      });
+
+      // Generate fresh tokens
+      const tokenPayload = { userId: user.id, role: user.role };
+      const newToken = generateToken(tokenPayload);
+      const refreshToken = generateRefreshToken(tokenPayload);
+      const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
+
+      await sendWelcomeEmail(user.email, user.name);
+      res.json({
+        success: true,
+        message: 'Email verified successfully.',
+        data: {
+          userId: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          token: newToken,
+          refreshToken,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /verify-email/:token
 router.get(
   '/verify-email/:token',
@@ -232,10 +295,26 @@ router.get(
         verification_token_expires: null,
       });
 
-      // Welcome email disabled
+      // Generate fresh tokens so the frontend can update auth state without re-login
+      const tokenPayload = { userId: user.id, role: user.role };
+      const newToken = generateToken(tokenPayload);
+      const refreshToken = generateRefreshToken(tokenPayload);
+      const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
+
+      // Send welcome email
+      await sendWelcomeEmail(user.email, user.name);
       res.json({
         success: true,
         message: 'Email verified successfully.',
+        data: {
+          userId: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          token: newToken,
+          refreshToken,
+        },
       });
     } catch (error) {
       next(error);

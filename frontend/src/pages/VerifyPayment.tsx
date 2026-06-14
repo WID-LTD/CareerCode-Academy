@@ -41,7 +41,7 @@ export default function VerifyPayment() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
       <GlassCard className="max-w-md w-full text-center p-8">
         {state === 'loading' && (
           <div className="py-8">
@@ -88,3 +88,4 @@ export default function VerifyPayment() {
     </div>
   );
 }
+

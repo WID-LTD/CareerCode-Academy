@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useStudentStore } from '@/store/studentStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSocket } from '@/hooks/useSocket';
 import { HeroSection } from '@/components/student/HeroSection';
 import { StatsCards } from '@/components/student/StatsCards';
 import { LearningAnalytics } from '@/components/student/LearningAnalytics';
@@ -37,11 +38,19 @@ export default function StudentDashboard() {
     stats, recentCourses, recentActivity, upcomingAssignments,
     isLoading, error, fetchDashboard,
   } = useStudentStore();
+  const { socket } = useSocket();
   const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => fetchDashboard();
+    socket.on('student:dashboard:update', handler);
+    return () => { socket.off('student:dashboard:update', handler); };
+  }, [socket, fetchDashboard]);
 
   if (isLoading && !stats) {
     return (

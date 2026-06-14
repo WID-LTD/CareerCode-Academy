@@ -36,7 +36,7 @@ export const useInstructorExtendedStore = create<ExtendedState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.get('/instructor/course-proposals');
-      set({ courseProposals: data.data, isLoading: false });
+      set({ courseProposals: data.data || [], isLoading: false });
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
@@ -68,7 +68,7 @@ export const useInstructorExtendedStore = create<ExtendedState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.get('/instructor/submissions');
-      set({ submissions: data.data, isLoading: false });
+      set({ submissions: data.data || [], isLoading: false });
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
@@ -94,7 +94,7 @@ export const useInstructorExtendedStore = create<ExtendedState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.get('/instructor/announcements');
-      set({ announcements: data.data, isLoading: false });
+      set({ announcements: data.data || [], isLoading: false });
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
@@ -115,7 +115,7 @@ export const useInstructorExtendedStore = create<ExtendedState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.get('/instructor/live-classes');
-      set({ liveClasses: data.data, isLoading: false });
+      set({ liveClasses: data.data || [], isLoading: false });
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
@@ -136,10 +136,11 @@ export const useInstructorExtendedStore = create<ExtendedState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.get('/instructor/schedule');
-      set({ schedule: data.data, isLoading: false });
+      set({ schedule: data.data || [], isLoading: false });
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
     }
   }
 }));
+

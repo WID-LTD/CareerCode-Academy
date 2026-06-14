@@ -69,7 +69,7 @@ export default function Checkout() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
       <Loader size="lg" />
     </div>
   );
@@ -77,7 +77,7 @@ export default function Checkout() {
   if (!course) return null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] pt-20 pb-12">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-20 pb-12">
       <div className="max-w-2xl mx-auto px-4">
         <h1 className="text-2xl font-bold text-white mb-6">Checkout</h1>
 
@@ -162,3 +162,4 @@ export default function Checkout() {
     </div>
   );
 }
+

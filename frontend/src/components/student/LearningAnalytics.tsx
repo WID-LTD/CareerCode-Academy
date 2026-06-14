@@ -1,4 +1,3 @@
-import { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -7,6 +6,7 @@ import {
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useStudentStore } from '@/store/studentStore';
 import { ChartSkeleton } from './SkeletonLoader';
+import { cn } from '@/lib/utils';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -25,7 +25,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function LearningAnalytics() {
-  const { weeklyActivity, monthlyLearning, skillGrowth, isLoading } = useStudentStore();
+  const { weeklyActivity, monthlyLearning, skillGrowth, recentCourses, isLoading } = useStudentStore();
 
   if (isLoading) {
     return (
@@ -38,8 +38,11 @@ export function LearningAnalytics() {
     );
   }
 
-  const hasData = weeklyActivity.length > 0 || monthlyLearning.length > 0 || skillGrowth.length > 0;
+  const hasData = weeklyActivity.length > 0 || monthlyLearning.length > 0 || skillGrowth.length > 0 || recentCourses.length > 0;
   if (!hasData) return null;
+
+  const courseColors = ['#6366f1', '#7C3AED', '#06B6D4', '#F59E0B', '#10B981', '#EF4444'];
+  const topCourses = recentCourses.slice(0, 6);
 
   return (
     <section>
@@ -93,27 +96,25 @@ export function LearningAnalytics() {
           </GlassCard>
         </motion.div>
 
-        {/* Course Progress - Circular indicators */}
+        {/* Course Progress - from real enrolled courses */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <GlassCard className="p-5" hover={false}>
             <h3 className="text-sm font-medium mb-4 text-gray-600 dark:text-gray-400">Course Progress</h3>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: 'Advanced React', progress: 72, color: '#6366f1' },
-                { label: 'TypeScript', progress: 45, color: '#7C3AED' },
-                { label: 'Python DS', progress: 90, color: '#06B6D4' },
-              ].map((course) => (
-                <div key={course.label} className="flex flex-col items-center gap-2">
+            <div className={cn('grid gap-4', topCourses.length <= 3 ? 'grid-cols-3' : 'grid-cols-3')}>
+              {topCourses.length === 0 ? (
+                <div className="col-span-3 text-center py-6 text-sm text-gray-400">No enrolled courses yet.</div>
+              ) : topCourses.map((course, i) => (
+                <div key={course.id} className="flex flex-col items-center gap-2">
                   <div className="relative w-16 h-16">
                     <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
                       <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="text-gray-200 dark:text-gray-700" />
-                      <circle cx="32" cy="32" r="28" fill="none" stroke={course.color} strokeWidth="4" strokeDasharray={`${2 * Math.PI * 28}`} strokeDashoffset={`${2 * Math.PI * 28 * (1 - course.progress / 100)}`} strokeLinecap="round" className="transition-all duration-700" />
+                      <circle cx="32" cy="32" r="28" fill="none" stroke={courseColors[i % courseColors.length]} strokeWidth="4" strokeDasharray={`${2 * Math.PI * 28}`} strokeDashoffset={`${2 * Math.PI * 28 * (1 - (course.progress || 0) / 100)}`} strokeLinecap="round" className="transition-all duration-700" />
                     </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold" style={{ color: course.color }}>
-                      {course.progress}%
+                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold" style={{ color: courseColors[i % courseColors.length] }}>
+                      {course.progress || 0}%
                     </span>
                   </div>
-                  <span className="text-[10px] text-gray-500 text-center leading-tight">{course.label}</span>
+                  <span className="text-[10px] text-gray-500 text-center leading-tight line-clamp-2">{course.title}</span>
                 </div>
               ))}
             </div>

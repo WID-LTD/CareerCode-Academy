@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { query } from '../config/db';
+import { emitStudentUpdate } from '../config/socket';
 
 const router = Router();
 
@@ -155,6 +156,7 @@ router.post(
           isCompleted,
         },
       });
+      emitStudentUpdate(userId);
     } catch (error) {
       next(error);
     }

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Code2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import api from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
 
 export default function VerifyEmail() {
   const { token } = useParams();
@@ -12,7 +13,12 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (token) {
       api.get(`/auth/verify-email/${token}`)
-        .then(() => {
+        .then(({ data }) => {
+          const d = data.data;
+          if (d) {
+            useAuthStore.getState().setUser({ id: d.userId, name: d.name, email: d.email, role: d.role, isVerified: true });
+            useAuthStore.getState().setToken(d.token);
+          }
           navigate('/auth/verified', { replace: true });
         })
         .catch(() => {

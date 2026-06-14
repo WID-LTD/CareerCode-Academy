@@ -86,11 +86,16 @@ export default function MyCourses() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {enrollments.map((item: any, i: number) => {
             const enrollment = item.enrollment || item;
-            const course = item.course || item;
+            const course = item.course || {
+              ...item,
+              title: item.title || item.course_title,
+              slug: item.slug || item.course_slug,
+              thumbnail: item.thumbnail || item.course_thumbnail,
+            };
             const progress = enrollment.progress || 0;
             const status = enrollment.status || 'active';
-            const totalLessons = course.totalLessons || 0;
-            const completedLessons = enrollment.completed_lessons?.length || 0;
+            const totalLessons = Number(course.total_lessons ?? course.totalLessons ?? 0);
+            const completedLessons = Array.isArray(enrollment.completed_lessons) ? enrollment.completed_lessons.length : 0;
 
             return (
               <motion.div

@@ -209,42 +209,18 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       const [dashboardRes, notificationsRes] = await Promise.all([
         api.get('/student/dashboard'),
         api.get('/notifications').catch(() => ({ data: { data: [] } })),
-        api.get('/student/analytics').catch(() => ({
-          data: {
-            data: {
-              weeklyActivity: [
-                { day: 'Mon', hours: 2 }, { day: 'Tue', hours: 3 },
-                { day: 'Wed', hours: 1.5 }, { day: 'Thu', hours: 4 },
-                { day: 'Fri', hours: 2.5 }, { day: 'Sat', hours: 1 },
-                { day: 'Sun', hours: 0.5 },
-              ],
-              monthlyLearning: [
-                { month: 'Jan', hours: 20 }, { month: 'Feb', hours: 35 },
-                { month: 'Mar', hours: 28 }, { month: 'Apr', hours: 42 },
-                { month: 'May', hours: 38 }, { month: 'Jun', hours: 45 },
-              ],
-              skillGrowth: [
-                { skill: 'JavaScript', current: 75, previous: 55 },
-                { skill: 'React', current: 65, previous: 40 },
-                { skill: 'TypeScript', current: 50, previous: 25 },
-                { skill: 'Node.js', current: 60, previous: 45 },
-                { skill: 'CSS', current: 80, previous: 70 },
-              ],
-            },
-          },
-        })),
-        api.get('/student/recommended').catch(() => ({ data: { data: [] } })),
-        api.get('/student/badges').catch(() => ({ data: { data: [] } })),
       ]);
-      const data = dashboardRes.data.data;
-      const recommended = dashboardRes.data.recommendedCourses || [];
-      const badges = dashboardRes.data.badges || [];
-      const analytics = dashboardRes.data.analytics || {};
 
+      const data = dashboardRes.data.data;
       const notifs = notificationsRes.data.data || [];
+
       set({
         stats: {
-          ...data.stats,
+          enrolledCourses: data.stats.enrolledCourses || 0,
+          completedCourses: data.stats.completedCourses || 0,
+          completedLessons: data.stats.completedLessons || 0,
+          certificates: data.stats.certificates || 0,
+          averageProgress: data.stats.averageProgress || 0,
           totalLearningHours: data.stats.totalLearningHours || 0,
           currentStreak: data.stats.currentStreak || 0,
           xpPoints: data.stats.xpPoints || 0,
@@ -256,11 +232,11 @@ export const useStudentStore = create<StudentState>((set, get) => ({
         upcomingAssignments: data.upcomingAssignments || [],
         notifications: notifs,
         unreadNotifications: notifs.filter((n: Notification) => !n.read).length,
-        recommendedCourses: data.recommendedCourses || recommended || [],
-        badges: data.badges || badges || [],
-        weeklyActivity: analytics.weeklyActivity || [],
-        monthlyLearning: analytics.monthlyLearning || [],
-        skillGrowth: analytics.skillGrowth || [],
+        recommendedCourses: data.recommendedCourses || [],
+        badges: data.badges || [],
+        weeklyActivity: data.analytics?.weeklyActivity || [],
+        monthlyLearning: data.analytics?.monthlyLearning || [],
+        skillGrowth: data.analytics?.skillGrowth || [],
         isLoading: false,
       });
     } catch (error: any) {

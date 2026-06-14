@@ -1,11 +1,19 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, Code2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
+import { useAuthStore } from '@/store/authStore';
 
 export default function Verified() {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (isAuthenticated) {
+    const redirect = user?.role === 'instructor' ? '/instructor/dashboard' : '/student/dashboard';
+    return <Navigate to={redirect} replace />;
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <section className="min-h-screen flex items-center justify-center py-20 relative">

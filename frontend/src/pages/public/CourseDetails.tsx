@@ -93,7 +93,7 @@ export default function CourseDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a1a]">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <Loader size="lg" />
       </div>
     );
@@ -101,7 +101,7 @@ export default function CourseDetails() {
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a1a]">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-4">Course Not Found</h2>
           <Link to="/courses" className="text-blue-400 hover:underline">Browse Courses</Link>
@@ -122,9 +122,9 @@ export default function CourseDetails() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a]">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Header / Hero */}
-      <div className="relative bg-gradient-to-b from-blue-900/40 to-[#0a0a1a] pt-20 pb-12">
+      <div className="relative bg-gradient-to-b from-blue-900/40 dark:to-gray-950 to-white pt-20 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Left: Main Info */}
@@ -403,3 +403,4 @@ export default function CourseDetails() {
     </div>
   );
 }
+

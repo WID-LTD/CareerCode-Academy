@@ -79,6 +79,7 @@ function StatCard({ icon: Icon, label, value, color, bg, trend, suffix = '', del
 interface StatsCardsProps {
   stats: {
     enrolledCourses: number;
+    completedCourses: number;
     certificates: number;
     completedLessons: number;
     totalLearningHours: number;
@@ -90,7 +91,7 @@ interface StatsCardsProps {
 export function StatsCards({ stats }: StatsCardsProps) {
   const cards: StatCardProps[] = [
     { icon: BookOpen, label: 'Courses Enrolled', value: stats?.enrolledCourses || 0, color: 'text-blue-500', bg: 'bg-blue-500/10', trend: 12, delay: 0.05 },
-    { icon: CheckCircle, label: 'Courses Completed', value: 0, color: 'text-success-500', bg: 'bg-success-500/10', trend: 8, delay: 0.1 },
+    { icon: CheckCircle, label: 'Courses Completed', value: stats?.completedCourses || 0, color: 'text-success-500', bg: 'bg-success-500/10', trend: 8, delay: 0.1 },
     { icon: Award, label: 'Certificates Earned', value: stats?.certificates || 0, color: 'text-amber-500', bg: 'bg-amber-500/10', trend: 0, delay: 0.15 },
     { icon: Clock, label: 'Learning Hours', value: stats?.totalLearningHours || 0, color: 'text-purple-500', bg: 'bg-purple-500/10', suffix: 'h', trend: 15, delay: 0.2 },
     { icon: Flame, label: 'Current Streak', value: stats?.currentStreak || 0, color: 'text-orange-500', bg: 'bg-orange-500/10', suffix: 'd', trend: 5, delay: 0.25 },
