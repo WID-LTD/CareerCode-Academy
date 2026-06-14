@@ -3,6 +3,7 @@ import api from '@/lib/axios';
 
 export interface StudentStats {
   enrolledCourses: number;
+  completedCourses: number;
   certificates: number;
   averageProgress: number;
   completedLessons: number;

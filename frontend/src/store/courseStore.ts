@@ -44,6 +44,8 @@ export interface Course {
   reviews?: Review[];
   averageRating?: number;
   enrollmentCount?: number;
+  student_count?: number;
+  avg_rating?: number;
 }
 
 interface CourseState {
