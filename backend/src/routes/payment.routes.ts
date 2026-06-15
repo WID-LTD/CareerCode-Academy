@@ -135,6 +135,66 @@ router.post(
   }
 );
 
+async function verifyPaymentByReference(reference: string) {
+  const payment = await PaymentModel.getPaymentByReference(reference);
+  if (!payment) throw new NotFoundError('Payment');
+
+  if (payment.status === 'pending') {
+    const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
+    const flutterwaveKey = process.env.FLUTTERWAVE_SECRET_KEY || '';
+    const isPaystackConfigured = paystackKey.length > 20 && !paystackKey.includes('xxxx');
+    const isFlutterwaveConfigured = flutterwaveKey.length > 20 && !flutterwaveKey.includes('xxxx');
+    let verified = false;
+
+    if (payment.provider === 'paystack' && isPaystackConfigured) {
+      try {
+        const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+          headers: { Authorization: `Bearer ${paystackKey}` }
+        });
+        const paystackData: any = await response.json();
+        if (paystackData.status && paystackData.data?.status === 'success') {
+          verified = true;
+        }
+      } catch { /* fall through to dev mode */ }
+    } else if (payment.provider === 'flutterwave' && isFlutterwaveConfigured) {
+      try {
+        const response = await fetch(`https://api.flutterwave.com/v3/transactions/${reference}/verify`, {
+          headers: { Authorization: `Bearer ${flutterwaveKey}` }
+        });
+        const flwData: any = await response.json();
+        if (flwData.status === 'success' && flwData.data?.status === 'successful') {
+          verified = true;
+        }
+      } catch { /* fall through to dev mode */ }
+    } else {
+      verified = true;
+    }
+
+    if (verified) {
+      await PaymentModel.updatePaymentStatus(reference, 'completed', { verified: true });
+      const existing = await EnrollmentModel.getEnrollment(payment.user_id, payment.course_id);
+      if (!existing) {
+        await EnrollmentModel.createEnrollment({
+          user_id: payment.user_id,
+          course_id: payment.course_id,
+        });
+        const course = await CourseModel.getCourseById(payment.course_id);
+        if (course) {
+          await query(
+            `INSERT INTO notifications (user_id, title, message, type)
+             VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
+            [course.instructor_id, `A student enrolled in "${course.title}" (paid)`]
+          );
+        }
+      }
+    }
+  }
+
+  emitDashboardUpdate();
+  emitStudentUpdate(payment.user_id);
+  return PaymentModel.getPaymentByReference(reference);
+}
+
 // GET /payments/verify/:reference
 router.get(
   '/verify/:reference',
@@ -152,63 +212,36 @@ router.get(
         return res.status(403).json({ success: false, message: 'Forbidden' });
       }
 
-      if (payment.status === 'pending') {
-        const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
-        const flutterwaveKey = process.env.FLUTTERWAVE_SECRET_KEY || '';
-        const isPaystackConfigured = paystackKey.length > 20 && !paystackKey.includes('xxxx');
-        const isFlutterwaveConfigured = flutterwaveKey.length > 20 && !flutterwaveKey.includes('xxxx');
-        let verified = false;
+      const updatedPayment = await verifyPaymentByReference(reference);
+      res.json({ success: true, data: updatedPayment, enrollment: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
-        if (payment.provider === 'paystack' && isPaystackConfigured) {
-          try {
-            const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-              headers: { Authorization: `Bearer ${paystackKey}` }
-            });
-            const paystackData: any = await response.json();
-            if (paystackData.status && paystackData.data?.status === 'success') {
-              verified = true;
-            }
-          } catch { /* fall through to dev mode */ }
-        } else if (payment.provider === 'flutterwave' && isFlutterwaveConfigured) {
-          try {
-            const response = await fetch(`https://api.flutterwave.com/v3/transactions/${reference}/verify`, {
-              headers: { Authorization: `Bearer ${flutterwaveKey}` }
-            });
-            const flwData: any = await response.json();
-            if (flwData.status === 'success' && flwData.data?.status === 'successful') {
-              verified = true;
-            }
-          } catch { /* fall through to dev mode */ }
-        } else {
-          // Dev mode: auto-complete
-          verified = true;
-        }
-
-        if (verified) {
-          await PaymentModel.updatePaymentStatus(reference, 'completed', { verified: true });
-          const existing = await EnrollmentModel.getEnrollment(payment.user_id, payment.course_id);
-          if (!existing) {
-            const enrollment = await EnrollmentModel.createEnrollment({
-              user_id: payment.user_id,
-              course_id: payment.course_id,
-            });
-            // Notify instructor
-            const course = await CourseModel.getCourseById(payment.course_id);
-            if (course) {
-              await query(
-                `INSERT INTO notifications (user_id, title, message, type)
-                 VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
-                [course.instructor_id, `A student enrolled in "${course.title}" (paid)`]
-              );
-            }
-          }
-        }
+// POST /payments/verify (alternative for frontend compatibility)
+router.post(
+  '/verify',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        return res.status(400).json({ success: false, message: 'Reference is required' });
       }
 
-      emitDashboardUpdate();
-      emitStudentUpdate(payment.user_id);
-      const updatedPayment = await PaymentModel.getPaymentByReference(reference);
-      res.json({ success: true, data: updatedPayment });
+      const payment = await PaymentModel.getPaymentByReference(reference);
+      if (!payment) {
+        throw new NotFoundError('Payment');
+      }
+
+      if (payment.user_id !== req.user!.userId && req.user!.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+
+      const updatedPayment = await verifyPaymentByReference(reference);
+      res.json({ success: true, data: updatedPayment, enrollment: true });
     } catch (error) {
       next(error);
     }
