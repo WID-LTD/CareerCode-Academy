@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Code2, Github, Twitter } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -86,7 +87,7 @@ export default function Login() {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-primary-600 dark:text-primary-400 font-semibold hover:underline">Create one</Link>
+            <Link to="/signup" state={location.state} className="text-primary-600 dark:text-primary-400 font-semibold hover:underline">Create one</Link>
           </p>
         </div>
       </section>

@@ -1,9 +1,10 @@
 import { useAuthStore } from '@/store/authStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export function useAuth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     user,
     token,
@@ -23,7 +24,10 @@ export function useAuth() {
       const role = useAuthStore.getState().user?.role;
       if (role === 'admin' || role === 'super_admin') navigate('/admin/dashboard');
       else if (role === 'instructor') navigate('/instructor/dashboard');
-      else navigate('/student/dashboard');
+      else {
+        const from = (location.state as any)?.from || '/student/dashboard';
+        navigate(from);
+      }
     } catch (err: any) {
       const message = err?.response?.data?.message || '';
       if (message.includes('unavailable')) {

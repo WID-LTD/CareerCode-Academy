@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, Mail, Lock, Eye, EyeOff, Code2, GraduationCap, Users } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -14,6 +14,7 @@ const roles = [
 ];
 
 export default function Signup() {
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -120,7 +121,7 @@ export default function Signup() {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary-600 dark:text-primary-400 font-semibold hover:underline">Sign in</Link>
+            <Link to="/login" state={location.state} className="text-primary-600 dark:text-primary-400 font-semibold hover:underline">Sign in</Link>
           </p>
         </div>
       </section>
