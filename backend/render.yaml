@@ -13,7 +13,7 @@ services:
       - key: FRONTEND_URL
         value: https://career-code-academy.vercel.app
       - key: CORS_ORIGINS
-        value: https://career-code-academy.vercel.app,https://careercode-academy.onrender.com
+        value: https://career-code-academy.vercel.app,https://careercode-academy-1.onrender.com
       - key: BREVO_SENDER_EMAIL
         value: johndavidnzubechukwu008@gmail.com
       - key: BREVO_SENDER_NAME

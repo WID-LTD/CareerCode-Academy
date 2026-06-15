@@ -8,8 +8,12 @@ const onlineUsers = new Map<string, { socketId: string; name?: string; role?: st
 export function createSocketServer(server: http.Server) {
   io = new Server(server, {
     cors: {
-    origin: [
+      origin: [
         process.env.FRONTEND_URL || 'http://localhost:3000',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
         ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []),
       ],
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
