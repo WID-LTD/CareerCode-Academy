@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
 import toast from 'react-hot-toast';
 import { CreditCard, Wallet, Lock, ShieldCheck, CheckCircle, ChevronLeft } from 'lucide-react';
+import { optimizeImageUrl } from '@/lib/cloudinary';
 
 const providers = [
   { 
@@ -212,7 +213,7 @@ export default function Checkout() {
                   <div className="flex gap-4 items-start mb-8">
                     <div className="w-24 h-20 rounded-xl bg-gray-100 dark:bg-gray-800 shrink-0 overflow-hidden relative group border border-gray-200 dark:border-gray-700">
                       {course.thumbnail ? (
-                        <img src={course.thumbnail} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <img src={optimizeImageUrl(course.thumbnail, 120, 90)} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-blue-600/20 dark:to-purple-600/20">
                           <span className="text-2xl">📚</span>

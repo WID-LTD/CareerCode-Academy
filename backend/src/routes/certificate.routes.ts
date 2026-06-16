@@ -6,6 +6,8 @@ import * as CertificateModel from '../models/certificate';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
 import { generateCertificateCode } from '../utils/helpers';
+import { generateCertificatePdf } from '../utils/certificatePdf';
+import { query } from '../config/db';
 import { NotFoundError, ConflictError } from '../utils/errors';
 
 const router = Router();
@@ -141,6 +143,47 @@ router.post(
       });
 
       res.status(201).json({ success: true, data: certificate });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /certificates/:id/download - download PDF certificate
+router.get(
+  '/:id/download',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const certificate = await CertificateModel.getCertificateById(req.params.id);
+      if (!certificate) throw new NotFoundError('Certificate');
+
+      const isOwner = certificate.user_id === req.user!.userId;
+      const isAdmin = req.user!.role === 'admin' || req.user!.role === 'super_admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+
+      const course = await CourseModel.getCourseById(certificate.course_id);
+      const instructorRes = await query(
+        'SELECT u.name FROM courses c JOIN users u ON c.instructor_id = u.id WHERE c.id = $1',
+        [certificate.course_id]
+      );
+      const { rows: userRows } = await query('SELECT name FROM users WHERE id = $1', [certificate.user_id]);
+
+      const doc = generateCertificatePdf({
+        user_name: userRows[0]?.name || 'Student',
+        course_title: course?.title || 'Course',
+        course_category: course?.category || '',
+        verification_code: certificate.verification_code,
+        issued_at: certificate.issued_at,
+        instructor_name: instructorRes.rows[0]?.name,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="certificate-${certificate.verification_code}.pdf"`);
+      doc.pipe(res);
+      doc.end();
     } catch (error) {
       next(error);
     }

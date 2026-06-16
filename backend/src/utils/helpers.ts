@@ -39,6 +39,30 @@ export function generateCertificateCode(): string {
   return 'CERT-' + crypto.randomBytes(12).toString('hex').toUpperCase();
 }
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' as const : 'lax' as const,
+  path: '/',
+};
+
+export function setAuthCookies(res: any, token: string, refreshToken: string): void {
+  res.cookie('token', token, {
+    ...COOKIE_OPTIONS,
+    maxAge: 15 * 60 * 1000, // 15 minutes
+  });
+  res.cookie('refreshToken', refreshToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/api/v1/auth',
+  });
+}
+
+export function clearAuthCookies(res: any): void {
+  res.clearCookie('token', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/api/v1/auth' });
+}
+
 export async function sendVerificationEmail(email: string, token: string): Promise<void> {
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
   await sendMail({

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { useAuthStore } from '@/store/authStore';
 
 const baseApiUrl = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -8,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 function resolveUploadPaths(obj: any, baseUrl: string): any {
@@ -33,21 +33,10 @@ function resolveUploadPaths(obj: any, baseUrl: string): any {
   return obj;
 }
 
-api.interceptors.request.use(
-  (config) => {
-    const token = useAuthStore.getState().token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
 api.interceptors.response.use(
   (response) => {
-    const baseUrl = import.meta.env.VITE_API_URL 
-      ? import.meta.env.VITE_API_URL.replace('/api/v1', '') 
+    const baseUrl = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace('/api/v1', '')
       : 'http://localhost:5000';
     if (response.data) {
       response.data = resolveUploadPaths(response.data, baseUrl);
@@ -55,39 +44,22 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    if (error.response?.status === 401 && !error.config._retry) {
+      error.config._retry = true;
       try {
-        const refreshToken = useAuthStore.getState().refreshToken;
-        if (refreshToken) {
-          const refreshUrl = import.meta.env.VITE_API_URL
-            ? `${import.meta.env.VITE_API_URL}/auth/refresh-token`
-            : '/api/v1/auth/refresh-token';
-          const { data } = await axios.post(refreshUrl, {
-            refreshToken,
-          });
-          const newToken = data.data?.token || data.token;
-          useAuthStore.getState().setToken(newToken);
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          return api(originalRequest);
-        }
+        const refreshUrl = import.meta.env.VITE_API_URL
+          ? `${import.meta.env.VITE_API_URL}/auth/refresh-token`
+          : '/api/v1/auth/refresh-token';
+        const { data } = await axios.post(refreshUrl, {}, { withCredentials: true });
+        return api(error.config);
       } catch {
+        const { useAuthStore } = await import('@/store/authStore');
         useAuthStore.getState().logout();
       }
     }
     return Promise.reject(error);
   }
 );
-
-export const setAuthToken = (token: string | null) => {
-  if (token) {
-    api.defaults.headers.common.Authorization = `Bearer ${token}`;
-  } else {
-    delete api.defaults.headers.common.Authorization;
-  }
-};
 
 export { api };
 export default api;

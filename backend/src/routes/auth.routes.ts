@@ -17,6 +17,8 @@ import {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
+  setAuthCookies,
+  clearAuthCookies,
 } from '../utils/helpers';
 import { UnauthorizedError, NotFoundError, ConflictError } from '../utils/errors';
 
@@ -90,6 +92,8 @@ router.post(
 
       emitDashboardUpdate();
 
+      setAuthCookies(res, token, refreshToken);
+
       res.status(201).json({
         success: true,
         message: 'Account created. Please verify your email.',
@@ -98,8 +102,6 @@ router.post(
           name: user.name,
           email: user.email,
           role: user.role,
-          token,
-          refreshToken,
         },
       });
     } catch (error) {
@@ -139,6 +141,8 @@ router.post(
       const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
 
+      setAuthCookies(res, token, refreshToken);
+
       res.json({
         success: true,
         data: {
@@ -148,8 +152,6 @@ router.post(
           role: user.role,
           avatar: user.avatar,
           isVerified: user.is_verified,
-          token,
-          refreshToken,
         },
       });
     } catch (error) {
@@ -259,6 +261,7 @@ router.post(
       await TokenModel.createRefreshToken(user.id, refreshToken, refreshTokenExpiresAt);
 
       await sendWelcomeEmail(user.email, user.name);
+      setAuthCookies(res, newToken, refreshToken);
       res.json({
         success: true,
         message: 'Email verified successfully.',
@@ -267,8 +270,6 @@ router.post(
           name: user.name,
           email: user.email,
           role: user.role,
-          token: newToken,
-          refreshToken,
         },
       });
     } catch (error) {
@@ -304,6 +305,7 @@ router.get(
 
       // Send welcome email
       await sendWelcomeEmail(user.email, user.name);
+      setAuthCookies(res, newToken, refreshToken);
       res.json({
         success: true,
         message: 'Email verified successfully.',
@@ -312,8 +314,6 @@ router.get(
           name: user.name,
           email: user.email,
           role: user.role,
-          token: newToken,
-          refreshToken,
         },
       });
     } catch (error) {
@@ -401,6 +401,8 @@ router.post(
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await TokenModel.createRefreshToken(user.id, newRefreshToken, expiresAt);
 
+      setAuthCookies(res, newToken, newRefreshToken);
+
       res.json({
         success: true,
         data: {
@@ -428,6 +430,7 @@ router.post(
       
       // Delete token from database
       await TokenModel.deleteRefreshToken(refreshToken);
+      clearAuthCookies(res);
       
       res.json({
         success: true,

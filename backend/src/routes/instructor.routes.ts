@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { query } from '../config/db';
 import { io } from '../config/socket';
+import { createNotification } from '../models/notification';
 
 const router = Router();
 
@@ -266,6 +267,93 @@ router.put('/submissions/:id/grade', async (req: AuthRequest, res: Response, nex
       WHERE id = $3
       RETURNING *
     `, [score, feedback, submissionId]);
+
+    // Notify student
+    if (rows[0]) {
+      try {
+        await createNotification({
+          user_id: rows[0].student_id,
+          title: 'Assignment Graded',
+          message: `Your assignment has been graded with a score of ${score}.`,
+          type: 'success',
+        });
+        io.to(rows[0].student_id).emit('new_notification', {
+          title: 'Assignment Graded',
+          message: `Your assignment has been graded with a score of ${score}.`,
+        });
+      } catch { }
+    }
+
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ----------------------------------------------------------------------
+// CHALLENGE SUBMISSIONS
+// ----------------------------------------------------------------------
+router.get('/challenge-submissions', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { rows } = await query(`
+      SELECT cs.id, cs.challenge_id, cs.code, cs.passed, cs.score, cs.feedback, cs.submitted_at,
+        cc.title as challenge_title, cc.language, cc.difficulty,
+        l.title as lesson_title, c.title as course_title,
+        u.name as student_name, u.email as student_email
+      FROM challenge_submissions cs
+      JOIN coding_challenges cc ON cs.challenge_id = cc.id
+      JOIN lessons l ON cc.lesson_id = l.id
+      JOIN courses c ON l.course_id = c.id
+      JOIN users u ON cs.user_id = u.id
+      WHERE c.instructor_id = $1
+      ORDER BY cs.submitted_at DESC
+    `, [instructorId]);
+
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/challenge-submissions/:id/grade', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { id } = req.params;
+    const { score, feedback } = req.body;
+
+    const checkRes = await query(`
+      SELECT cs.user_id
+      FROM challenge_submissions cs
+      JOIN coding_challenges cc ON cs.challenge_id = cc.id
+      JOIN lessons l ON cc.lesson_id = l.id
+      JOIN courses c ON l.course_id = c.id
+      WHERE cs.id = $1 AND c.instructor_id = $2
+    `, [id, instructorId]);
+
+    if (checkRes.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { rows } = await query(
+      `UPDATE challenge_submissions SET score = $1, feedback = $2 WHERE id = $3 RETURNING *`,
+      [score, feedback, id]
+    );
+
+    if (rows[0]) {
+      try {
+        await createNotification({
+          user_id: rows[0].user_id,
+          title: 'Challenge Graded',
+          message: `Your coding challenge has been graded with a score of ${score}.`,
+          type: 'success',
+        });
+        io.to(rows[0].user_id).emit('new_notification', {
+          title: 'Challenge Graded',
+          message: `Your coding challenge has been graded with a score of ${score}.`,
+        });
+      } catch { }
+    }
 
     res.json({ success: true, data: rows[0] });
   } catch (error) {
@@ -561,6 +649,38 @@ router.get('/schedule', async (req: AuthRequest, res: Response, next: NextFuncti
     );
 
     res.json({ success: true, data: schedule });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /instructor/students - Get all students enrolled in instructor's courses
+router.get('/students', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+
+    const { rows } = await query(`
+      SELECT 
+        u.id, u.name, u.email, u.avatar,
+        COUNT(DISTINCT e.course_id) as courses_count,
+        ROUND(AVG(e.progress))::int as avg_progress,
+        COALESCE(AVG(r.rating), 0) as avg_rating,
+        MIN(e.enrolled_at) as first_enrolled,
+        CASE 
+          WHEN AVG(e.progress) >= 80 THEN 'active'
+          WHEN AVG(e.progress) >= 40 THEN 'at-risk'
+          ELSE 'inactive'
+        END as status
+      FROM enrollments e
+      JOIN users u ON e.user_id = u.id
+      JOIN courses c ON e.course_id = c.id
+      LEFT JOIN reviews r ON r.course_id = c.id AND r.user_id = u.id
+      WHERE c.instructor_id = $1
+      GROUP BY u.id, u.name, u.email, u.avatar
+      ORDER BY first_enrolled DESC
+    `, [instructorId]);
+
+    res.json({ success: true, data: rows, count: rows.length });
   } catch (error) {
     next(error);
   }

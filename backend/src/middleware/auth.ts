@@ -9,12 +9,23 @@ export interface AuthRequest extends Request {
 
 export function authenticate(req: AuthRequest, _res: Response, next: NextFunction): void {
   try {
+    let token: string | undefined;
+
+    // Check Authorization header first
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+
+    // Fallback to httpOnly cookie
+    if (!token && req.cookies?.token) {
+      token = req.cookies.token;
+    }
+
+    if (!token) {
       throw new UnauthorizedError('No token provided');
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = verifyToken(token);
     req.user = decoded;
     next();
@@ -57,9 +68,12 @@ export async function requireVerifiedEmail(req: AuthRequest, _res: Response, nex
 export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): void {
   try {
     const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       const decoded = verifyToken(token);
+      req.user = decoded;
+    } else if (req.cookies?.token) {
+      const decoded = verifyToken(req.cookies.token);
       req.user = decoded;
     }
   } catch {

@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useThemeStore } from '@/store/themeStore';
+import { useAuthStore } from '@/store/authStore';
 
 import Home from '@/pages/Home';
 import About from '@/pages/About';
@@ -43,6 +44,7 @@ import StudentSettings from '@/pages/student/Settings';
 import StudentTickets from '@/pages/student/Tickets';
 import StudentMessages from '@/pages/student/Messages';
 import StudentQuizTake from '@/pages/student/QuizTake';
+import StudentChallenges from '@/pages/student/Challenges';
 
 import InstructorDashboard from '@/pages/instructor/Dashboard';
 import InstructorManageCourses from '@/pages/instructor/ManageCourses';
@@ -76,6 +78,11 @@ import AdminMessages from '@/pages/admin/Messages';
 
 function App() {
   const { darkMode } = useThemeStore();
+  const initialize = useAuthStore((s) => s.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   useEffect(() => {
     if (darkMode) {
@@ -126,6 +133,7 @@ function App() {
           <Route path="tickets" element={<StudentTickets />} />
           <Route path="messages" element={<StudentMessages />} />
           <Route path="quiz/:quizId" element={<StudentQuizTake />} />
+          <Route path="challenges" element={<StudentChallenges />} />
           <Route path="profile" element={<StudentProfile />} />
           <Route path="settings" element={<StudentSettings />} />
         </Route>

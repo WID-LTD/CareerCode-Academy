@@ -6,7 +6,9 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { BookOpen, ArrowRight, Clock, PlayCircle } from 'lucide-react';
+import { optimizeImageUrl } from '@/lib/cloudinary';
 import { PageSkeleton, CardSkeleton } from '@/components/student/SkeletonLoader';
+import toast from 'react-hot-toast';
 
 const statusColors: Record<string, string> = {
   active: 'bg-success-500/20 text-success-400',
@@ -27,6 +29,30 @@ export default function MyCourses() {
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [unenrollingIds, setUnenrollingIds] = useState<string[]>([]);
+
+  const handleUnenroll = async (e: React.MouseEvent, courseId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to un-enroll from this course? This will delete all your progress.')) {
+      return;
+    }
+    setUnenrollingIds((prev) => [...prev, courseId]);
+    try {
+      await api.delete(`/courses/${courseId}/enroll`);
+      setEnrollments((prev) =>
+        prev.filter((item) => {
+          const cId = item.course_id || item.course?.id || item.id;
+          return cId !== courseId;
+        })
+      );
+      toast.success('Successfully un-enrolled from course');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to un-enroll from course');
+    } finally {
+      setUnenrollingIds((prev) => prev.filter((id) => id !== courseId));
+    }
+  };
 
   useEffect(() => {
     fetchEnrollments();
@@ -108,7 +134,7 @@ export default function MyCourses() {
                   <GlassCard className="h-full p-0 overflow-hidden" hover>
                     <div className={`aspect-video bg-gradient-to-br ${categoryGradients[course.category] || 'from-primary-600 to-secondary-600'} flex items-center justify-center relative overflow-hidden`}>
                       {course.thumbnail ? (
-                        <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" loading="lazy" />
+                        <img src={optimizeImageUrl(course.thumbnail, 480, 270)} alt={course.title} className="w-full h-full object-cover" loading="lazy" />
                       ) : (
                         <BookOpen className="w-10 h-10 text-white/50" />
                       )}
@@ -139,6 +165,16 @@ export default function MyCourses() {
                           <Clock className="w-3 h-3" />
                           {completedLessons}/{totalLessons} lessons
                         </span>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          loading={unenrollingIds.includes(item.course_id)}
+                          onClick={(e) => handleUnenroll(e, item.course_id)}
+                        >
+                          Un-enroll
+                        </Button>
                       </div>
                     </div>
                   </GlassCard>

@@ -163,4 +163,58 @@ router.post(
   }
 );
 
+// GET /progress/continue-watching - get last watched lessons per course
+router.get(
+  '/continue-watching',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const { rows } = await query(
+        `SELECT DISTINCT ON (lp.course_id)
+           lp.course_id, l.title as lesson_title, lp.watch_position, lp.watch_percentage,
+           c.title as course_title, c.slug as course_slug, c.thumbnail
+         FROM lesson_progress lp
+         JOIN lessons l ON lp.lesson_id = l.id
+         JOIN courses c ON lp.course_id = c.id
+         WHERE lp.user_id = $1 AND lp.completed = false
+         ORDER BY lp.course_id, lp.updated_at DESC
+         LIMIT 10`,
+        [userId]
+      );
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /progress/watch-position - update watch position
+router.put(
+  '/watch-position',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const { lessonId, courseId, watchPosition, watchPercentage } = req.body;
+
+      const { rows } = await query(
+        `INSERT INTO lesson_progress (user_id, lesson_id, course_id, completed, watch_position, watch_percentage)
+         VALUES ($1, $2, $3, false, $4, $5)
+         ON CONFLICT (user_id, lesson_id)
+         DO UPDATE SET
+           watch_position = COALESCE($4, lesson_progress.watch_position),
+           watch_percentage = COALESCE($5, lesson_progress.watch_percentage),
+           updated_at = NOW()
+         RETURNING *`,
+        [userId, lessonId, courseId, watchPosition ?? 0, watchPercentage ?? 0]
+      );
+
+      res.json({ success: true, data: rows[0] });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

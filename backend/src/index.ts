@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import http from 'http';
 import { createSocketServer } from './config/socket';
 
@@ -32,6 +33,10 @@ import quizRoutes from './routes/quiz.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import progressRoutes from './routes/progress.routes';
 import ticketRoutes from './routes/ticket.routes';
+import learningPathRoutes from './routes/learningPath.routes';
+import pageRoutes from './routes/page.routes';
+import videoRoutes from './routes/video.routes';
+import challengeRoutes from './routes/challenge.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -69,6 +74,7 @@ import path from 'path';
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -128,6 +134,10 @@ app.use('/api/v1/quizzes', quizRoutes);
 app.use('/api/v1/wishlists', wishlistRoutes);
 app.use('/api/v1/progress', progressRoutes);
 app.use('/api/v1/tickets', ticketRoutes);
+app.use('/api/v1/learning-paths', learningPathRoutes);
+app.use('/api/v1/pages', pageRoutes);
+app.use('/api/v1/videos', videoRoutes);
+app.use('/api/v1/challenges', challengeRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -537,6 +547,74 @@ async function initDatabase() {
 
     await query('ALTER TABLE lessons ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id) ON DELETE SET NULL');
     await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires TIMESTAMPTZ');
+    await query('ALTER TABLE lessons ADD COLUMN IF NOT EXISTS video_thumbnail TEXT');
+
+    // Learning paths table
+    await query(`
+      CREATE TABLE IF NOT EXISTS learning_paths (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        icon VARCHAR(50) DEFAULT 'GitBranch',
+        color VARCHAR(100) DEFAULT 'from-blue-600 to-cyan-600',
+        level VARCHAR(20) DEFAULT 'beginner',
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS learning_path_courses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        path_id UUID NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(path_id, course_id)
+      )
+    `);
+
+    // CMS pages table
+    await query(`
+      CREATE TABLE IF NOT EXISTS pages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        content JSONB DEFAULT '{}',
+        meta JSONB DEFAULT '{}',
+        published BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Coding challenges table
+    await query(`
+      CREATE TABLE IF NOT EXISTS coding_challenges (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT NOT NULL,
+        instructions TEXT NOT NULL,
+        starter_code TEXT DEFAULT '',
+        test_code TEXT DEFAULT '',
+        language VARCHAR(50) DEFAULT 'javascript',
+        difficulty VARCHAR(20) DEFAULT 'easy',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS challenge_submissions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        challenge_id UUID NOT NULL REFERENCES coding_challenges(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code TEXT NOT NULL,
+        passed BOOLEAN DEFAULT false,
+        score INTEGER,
+        feedback TEXT,
+        submitted_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
 
     // Create indexes
     await query('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
@@ -660,34 +738,17 @@ async function initDatabase() {
         lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
         course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
         completed BOOLEAN DEFAULT false,
+        watch_position NUMERIC DEFAULT 0,
+        watch_percentage NUMERIC DEFAULT 0,
         completed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(user_id, lesson_id)
       )
     `);
+    await query('ALTER TABLE lesson_progress ADD COLUMN IF NOT EXISTS watch_position NUMERIC DEFAULT 0');
+    await query('ALTER TABLE lesson_progress ADD COLUMN IF NOT EXISTS watch_percentage NUMERIC DEFAULT 0');
 
-    // Add featured and status columns to courses
-    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft'`);
-
-    // Review columns for courses
-    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_notes TEXT`);
-    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL`);
-    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ`);
-
-    // Add learning_outcomes to courses if not exists
-    await query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS learning_outcomes JSONB DEFAULT '[]'`);
-
-    // Add status column to enrollments if not exists
-    await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
-    await query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
-
-    // Add status constraint to courses
-    await query(`ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_status_check`);
-    await query(`ALTER TABLE courses ADD CONSTRAINT courses_status_check CHECK (status IN ('draft', 'pending_review', 'approved', 'published', 'rejected', 'archived'))`);
-
-    // Categories table
     await query(`
       CREATE TABLE IF NOT EXISTS categories (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -717,7 +778,12 @@ async function initDatabase() {
     await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON lesson_progress(lesson_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id)');
- 
+    await query('CREATE INDEX IF NOT EXISTS idx_learning_paths_slug ON learning_paths(slug)');
+    await query('CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)');
+    await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
+
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);

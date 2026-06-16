@@ -57,6 +57,7 @@ interface CourseState {
   fetchCourses: (filters?: { category?: string; level?: string }) => Promise<void>;
   fetchCourseBySlug: (slug: string) => Promise<void>;
   enrollCourse: (courseId: string) => Promise<void>;
+  unenrollCourse: (courseId: string) => Promise<void>;
   initializePayment: (courseId: string, provider?: string) => Promise<string>;
 }
 
@@ -109,6 +110,20 @@ export const useCourseStore = create<CourseState>((set) => ({
       set({ 
         isLoading: false, 
         error: error.response?.data?.message || 'Failed to enroll in course' 
+      });
+      throw error;
+    }
+  },
+
+  unenrollCourse: async (courseId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await api.delete(`/courses/${courseId}/enroll`);
+      set({ isLoading: false });
+    } catch (error: any) {
+      set({ 
+        isLoading: false, 
+        error: error.response?.data?.message || 'Failed to un-enroll from course' 
       });
       throw error;
     }

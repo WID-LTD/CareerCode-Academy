@@ -7,7 +7,6 @@ export function useAuth() {
   const location = useLocation();
   const {
     user,
-    token,
     isAuthenticated,
     isLoading,
     login: storeLogin,
@@ -70,7 +69,6 @@ export function useAuth() {
 
   return {
     user,
-    token,
     isAuthenticated,
     isLoading,
     login,

@@ -13,6 +13,8 @@ import {
   BarChart, User, Globe, Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { optimizeImageUrl } from '@/lib/cloudinary';
+import { api } from '@/lib/axios';
 
 const levelColors: Record<string, string> = {
   beginner: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -28,6 +30,12 @@ export default function CourseDetails() {
   const { wishlistItems, addToWishlist, removeFromWishlist, fetchWishlist } = useWishlistStore();
   const [curriculumOpen, setCurriculumOpen] = useState(true);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(false);
+
+  const course = currentCourse;
+  const isInWishlist = course ? wishlistItems.some(w => w.course_id === course.id) : false;
+  const isFree = course ? Number(course.price) === 0 : false;
 
   useEffect(() => {
     if (slug) {
@@ -36,9 +44,29 @@ export default function CourseDetails() {
     }
   }, [slug]);
 
-  const course = currentCourse;
-  const isInWishlist = course ? wishlistItems.some(w => w.course_id === course.id) : false;
-  const isFree = course ? Number(course.price) === 0 : false;
+  useEffect(() => {
+    const checkUserEnrollment = async () => {
+      if (user && course) {
+        setCheckingEnrollment(true);
+        try {
+          const { data } = await api.get('/enrollments');
+          const enrollments = data.data || [];
+          const enrolled = enrollments.some((item: any) => {
+            const c = item.course || item;
+            return (c.id === course.id || c.course_id === course.id);
+          });
+          setIsEnrolled(enrolled);
+        } catch (error) {
+          console.error('Failed to check enrollment status', error);
+        } finally {
+          setCheckingEnrollment(false);
+        }
+      } else {
+        setIsEnrolled(false);
+      }
+    };
+    checkUserEnrollment();
+  }, [user, course]);
 
   const handleEnroll = async () => {
     if (!user) {
@@ -46,6 +74,12 @@ export default function CourseDetails() {
       return;
     }
     if (!course) return;
+
+    if (isEnrolled) {
+      navigate(`/student/courses/${course.slug}`);
+      return;
+    }
+
     setIsEnrolling(true);
     try {
       if (isFree) {
@@ -114,12 +148,7 @@ export default function CourseDetails() {
   const reviews = course.reviews || [];
   const avgRating = course.averageRating ? Number(course.averageRating).toFixed(1) : '0.0';
   const enrollmentCount = course.enrollmentCount || 0;
-  const learningOutcomes = course.learningOutcomes || [
-    'Build real-world projects and portfolio',
-    'Learn from industry experts with practical experience',
-    'Get hands-on with coding exercises and quizzes',
-    'Earn a certificate upon completion',
-  ];
+  const learningOutcomes = course.learningOutcomes || [];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -189,7 +218,7 @@ export default function CourseDetails() {
               <GlassCard className="overflow-hidden">
                 <div className="aspect-video bg-gradient-to-br from-blue-500/20 to-purple-600/20 flex items-center justify-center">
                   {course.thumbnail ? (
-                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                    <img src={optimizeImageUrl(course.thumbnail, 640, 360)} alt={course.title} className="w-full h-full object-cover" />
                   ) : (
                     <BookOpen className="w-16 h-16 text-blue-400/50" />
                   )}
@@ -225,12 +254,12 @@ export default function CourseDetails() {
                   <Button
                     className="w-full py-6 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     onClick={handleEnroll}
-                    disabled={isEnrolling}
+                    disabled={isEnrolling || checkingEnrollment}
                   >
-                    {isEnrolling ? (
+                    {isEnrolling || checkingEnrollment ? (
                       <Loader size="sm" className="mr-2" />
                     ) : null}
-                    {isFree ? 'Enroll Free' : 'Enroll Now'}
+                    {isEnrolled ? 'Go to Course' : isFree ? 'Enroll Free' : 'Enroll Now'}
                   </Button>
 
                   <div className="flex gap-2">

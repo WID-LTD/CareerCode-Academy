@@ -6,6 +6,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useStudentStore } from '@/store/studentStore';
+import { optimizeImageUrl } from '@/lib/cloudinary';
 
 const difficultyColors: Record<string, string> = {
   beginner: 'bg-success-500/10 text-success-500 border-success-500/20',
@@ -69,7 +70,7 @@ export function RecommendedCourses() {
               <Link to={`/courses/${course.slug}`} className="block">
                 <div className="aspect-video bg-gradient-to-br from-primary-600/20 to-accent-600/20 flex items-center justify-center relative">
                   {course.thumbnail ? (
-                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={optimizeImageUrl(course.thumbnail, 400, 225)} alt={course.title} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     <BookOpen className="w-10 h-10 text-gray-400" />
                   )}

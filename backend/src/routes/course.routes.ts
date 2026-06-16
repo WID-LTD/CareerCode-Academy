@@ -308,4 +308,34 @@ router.post(
   }
 );
 
+// DELETE /courses/:id/enroll - Un-enroll from a course
+router.delete(
+  '/:id/enroll',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const courseId = req.params.id;
+      const userId = req.user!.userId;
+
+      const course = await CourseModel.getCourseById(courseId);
+      if (!course) {
+        throw new NotFoundError('Course');
+      }
+
+      const existing = await EnrollmentModel.getEnrollment(userId, courseId);
+      if (!existing) {
+        throw new NotFoundError('Enrollment');
+      }
+
+      await EnrollmentModel.deleteEnrollment(userId, courseId);
+
+      res.json({ success: true, message: 'Un-enrolled from course successfully' });
+      emitDashboardUpdate();
+      emitStudentUpdate(userId);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

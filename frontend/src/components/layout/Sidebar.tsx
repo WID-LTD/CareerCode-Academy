@@ -31,6 +31,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'My Courses', path: '/student/courses', icon: BookOpen },
     { label: 'Learning Paths', path: '/student/learning-paths', icon: GitBranch },
     { label: 'Assignments', path: '/student/assignments', icon: ClipboardList },
+    { label: 'Challenges', path: '/student/challenges', icon: ClipboardList },
     { label: 'Certificates', path: '/student/certificates', icon: Award },
     { label: 'Community', path: '/community', icon: Users },
     { label: 'Leaderboard', path: '/student/leaderboard', icon: Trophy },

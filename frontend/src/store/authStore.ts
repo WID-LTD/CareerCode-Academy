@@ -16,31 +16,27 @@ export interface User {
 
 interface AuthState {
   user: User | null;
-  token: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  initialized: boolean;
   setUser: (user: User | null) => void;
-  setToken: (token: string) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   fetchUser: () => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      token: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
+      initialized: false,
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
-
-      setToken: (token) => set({ token }),
 
       login: async (email, password) => {
         set({ isLoading: true });
@@ -56,8 +52,6 @@ export const useAuthStore = create<AuthState>()(
               avatar: userData.avatar,
               isVerified: userData.isVerified,
             },
-            token: userData.token,
-            refreshToken: userData.refreshToken,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -70,12 +64,7 @@ export const useAuthStore = create<AuthState>()(
       register: async (name, email, password, role) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post('/auth/register', {
-            name,
-            email,
-            password,
-            role,
-          });
+          const { data } = await api.post('/auth/register', { name, email, password, role });
           const userData = data.data;
           set({
             user: {
@@ -84,8 +73,6 @@ export const useAuthStore = create<AuthState>()(
               email: userData.email,
               role: userData.role,
             },
-            token: userData.token,
-            refreshToken: userData.refreshToken,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -95,11 +82,12 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
+      logout: async () => {
+        try {
+          await api.post('/auth/logout', {});
+        } catch { }
         set({
           user: null,
-          token: null,
-          refreshToken: null,
           isAuthenticated: false,
         });
       },
@@ -148,12 +136,35 @@ export const useAuthStore = create<AuthState>()(
           set({ user: null, isAuthenticated: false });
         }
       },
+
+      initialize: async () => {
+        if (get().initialized) return;
+        try {
+          const { data } = await api.get('/auth/me');
+          const userData = data.data;
+          set({
+            user: {
+              id: userData.id,
+              name: userData.name,
+              email: userData.email,
+              role: userData.role,
+              avatar: userData.avatar,
+              bio: userData.bio,
+              isVerified: userData.is_verified,
+              createdAt: userData.created_at,
+              updatedAt: userData.updated_at,
+            },
+            isAuthenticated: true,
+            initialized: true,
+          });
+        } catch {
+          set({ initialized: true, user: null, isAuthenticated: false });
+        }
+      },
     }),
     {
       name: 'careercode-auth',
       partialize: (state) => ({
-        token: state.token,
-        refreshToken: state.refreshToken,
         user: state.user,
       }),
     }

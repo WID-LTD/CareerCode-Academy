@@ -8,6 +8,19 @@ function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+const sampleVideos = [
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+  'https://cdn.plyr.io/static/demo/View_From_A_Blue_Moon_Trailer-576p.mp4',
+  'https://cdn.plyr.io/static/demo/Big_Buck_Bunny_1080p_Mp4_30fps.mp4',
+];
+
 const courses = [
   {
     title: 'Python for Everybody',
@@ -1380,10 +1393,11 @@ async function seedCourses() {
 
         for (let li = 0; li < mod.lessons.length; li++) {
           const lesson = mod.lessons[li];
+          const videoIndex = (totalLessons + li) % sampleVideos.length;
           await query(
-            `INSERT INTO lessons (course_id, module_id, title, description, duration, order_index, is_free)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [courseId, moduleId, lesson.title, lesson.description, lesson.duration, li, li < 2]
+            `INSERT INTO lessons (course_id, module_id, title, description, duration, order_index, is_free, video_url)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [courseId, moduleId, lesson.title, lesson.description, lesson.duration, li, li < 2, sampleVideos[videoIndex]]
           );
           totalLessons++;
         }

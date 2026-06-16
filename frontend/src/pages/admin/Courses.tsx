@@ -8,6 +8,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAdminStore } from '@/store/adminStore';
+import { optimizeImageUrl } from '@/lib/cloudinary';
 
 const TABS = ['all', 'draft', 'pending_review', 'published', 'rejected', 'archived'];
 const CATEGORIES = ['all', 'Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'AI/ML', 'Cloud', 'Cybersecurity'];
@@ -172,7 +173,7 @@ export default function AdminCourses() {
             <GlassCard className="p-0 overflow-hidden" hover>
               {course.thumbnail && (
                 <div className="relative">
-                  <img src={course.thumbnail} alt={course.title} className="w-full h-36 object-cover" />
+                  <img src={optimizeImageUrl(course.thumbnail, 400, 200)} alt={course.title} className="w-full h-36 object-cover" />
                   {course.is_featured && (
                     <div className="absolute top-2 right-2 bg-amber-400 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
                       <Star className="w-3 h-3 fill-white" /> Featured

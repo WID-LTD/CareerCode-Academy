@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, ChevronLeft, Video, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, ChevronLeft, Video, Loader2, Upload, CheckCircle, XCircle, Film } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,16 +17,17 @@ export default function CourseEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [course, setCourse] = useState<any>(null);
+  const [uploadingLesson, setUploadingLesson] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Form fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('Web Development');
   const [level, setLevel] = useState('beginner');
+  const [duration, setDuration] = useState('');
   const [published, setPublished] = useState(false);
 
-  // Curriculum state
   const [modules, setModules] = useState<any[]>([]);
 
   useEffect(() => {
@@ -45,13 +46,11 @@ export default function CourseEditor() {
         setPrice(c.price.toString());
         setCategory(c.category);
         setLevel(c.level);
+        setDuration(c.duration?.toString() || '');
         setPublished(c.published);
 
-        // Fetch modules
         const modulesRes = await api.get(`/modules/course/${c.id}`);
         const rawModules = modulesRes.data.data;
-
-        // Group lessons by module_id
         const lessons = c.lessons || [];
         const enrichedModules = rawModules.map((m: any) => ({
           ...m,
@@ -61,8 +60,8 @@ export default function CourseEditor() {
         }));
 
         setModules(enrichedModules);
-      } catch (err: any) {
-        toast.error('Failed to load course details');
+      } catch {
+        toast.error('Failed to load course');
         navigate('/instructor/courses');
       } finally {
         setIsLoading(false);
@@ -75,143 +74,144 @@ export default function CourseEditor() {
   const handleSaveCourse = async () => {
     setIsSaving(true);
     try {
-      const payload = {
-        title,
-        description,
-        price: parseFloat(price) || 0,
-        category,
-        level,
-        published,
-        duration: 120, // default placeholder duration
-      };
+      const payload = { title, description, price: parseFloat(price) || 0, category, level, published, duration: parseInt(duration) || 0 };
 
       if (isNew) {
         const { data } = await api.post('/courses', payload);
-        toast.success('Course created successfully!');
+        toast.success('Course created!');
         navigate(`/instructor/courses/${data.data.slug}/edit`);
       } else {
         await api.put(`/courses/${course.id}`, payload);
-        toast.success('Course details updated!');
+        toast.success('Course saved!');
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save course');
+    } catch {
+      toast.error('Failed to save course');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Module actions
   const handleAddModule = async () => {
-    if (!course) {
-      toast.error('Please save course details first');
-      return;
-    }
+    if (!course) { toast.error('Save course details first'); return; }
+    const moduleTitle = prompt('Enter module title:');
+    if (!moduleTitle) return;
     try {
-      const moduleTitle = prompt('Enter module title:');
-      if (!moduleTitle) return;
-
-      const { data } = await api.post('/modules', {
-        courseId: course.id,
-        title: moduleTitle,
-        orderIndex: modules.length,
-      });
-
+      const { data } = await api.post('/modules', { courseId: course.id, title: moduleTitle, orderIndex: modules.length });
       setModules([...modules, { ...data.data, lessons: [] }]);
       toast.success('Module added');
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to add module');
     }
   };
 
   const handleUpdateModule = async (moduleId: string, currentTitle: string) => {
+    const newTitle = prompt('Update module title:', currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
     try {
-      const newTitle = prompt('Update module title:', currentTitle);
-      if (!newTitle || newTitle === currentTitle) return;
-
       await api.put(`/modules/${moduleId}`, { title: newTitle });
       setModules(modules.map((m) => (m.id === moduleId ? { ...m, title: newTitle } : m)));
-      toast.success('Module title updated');
-    } catch (err) {
+      toast.success('Module updated');
+    } catch {
       toast.error('Failed to update module');
     }
   };
 
   const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Are you sure you want to delete this module and all its lessons?')) return;
+    if (!confirm('Delete this module and all its lessons?')) return;
     try {
       await api.delete(`/modules/${moduleId}`);
       setModules(modules.filter((m) => m.id !== moduleId));
       toast.success('Module deleted');
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete module');
     }
   };
 
-  // Lesson actions
   const handleAddLesson = async (moduleId: string, lessonIndex: number) => {
+    const lessonTitle = prompt('Enter lesson title:');
+    if (!lessonTitle) return;
     try {
-      const lessonTitle = prompt('Enter lesson title:');
-      if (!lessonTitle) return;
-
       const { data } = await api.post('/lessons', {
-        courseId: course.id,
-        moduleId: moduleId,
-        title: lessonTitle,
-        description: 'Learn the fundamentals of this topic.',
-        duration: 15,
-        orderIndex: lessonIndex,
-        isFree: false,
+        courseId: course.id, moduleId, title: lessonTitle,
+        description: 'Learn the fundamentals of this topic.', duration: 15, orderIndex: lessonIndex, isFree: false,
       });
-
-      setModules(
-        modules.map((m) =>
-          m.id === moduleId ? { ...m, lessons: [...m.lessons, data.data] } : m
-        )
-      );
+      setModules(modules.map((m) => m.id === moduleId ? { ...m, lessons: [...m.lessons, data.data] } : m));
       toast.success('Lesson added');
-    } catch (err) {
+    } catch {
       toast.error('Failed to add lesson');
     }
   };
 
   const handleUpdateLesson = async (moduleId: string, lessonId: string, currentTitle: string) => {
+    const newTitle = prompt('Update lesson title:', currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
     try {
-      const newTitle = prompt('Update lesson title:', currentTitle);
-      if (!newTitle || newTitle === currentTitle) return;
-
       await api.put(`/lessons/${lessonId}`, { title: newTitle });
-      setModules(
-        modules.map((m) =>
-          m.id === moduleId
-            ? {
-                ...m,
-                lessons: m.lessons.map((l: any) =>
-                  l.id === lessonId ? { ...l, title: newTitle } : l
-                ),
-              }
-            : m
-        )
-      );
+      setModules(modules.map((m) => m.id === moduleId ? {
+        ...m, lessons: m.lessons.map((l: any) => l.id === lessonId ? { ...l, title: newTitle } : l)
+      } : m));
       toast.success('Lesson updated');
-    } catch (err) {
+    } catch {
       toast.error('Failed to update lesson');
     }
   };
 
   const handleDeleteLesson = async (moduleId: string, lessonId: string) => {
-    if (!confirm('Are you sure you want to delete this lesson?')) return;
+    if (!confirm('Delete this lesson?')) return;
     try {
       await api.delete(`/lessons/${lessonId}`);
-      setModules(
-        modules.map((m) =>
-          m.id === moduleId
-            ? { ...m, lessons: m.lessons.filter((l: any) => l.id !== lessonId) }
-            : m
-        )
-      );
+      setModules(modules.map((m) => m.id === moduleId ? {
+        ...m, lessons: m.lessons.filter((l: any) => l.id !== lessonId)
+      } : m));
       toast.success('Lesson deleted');
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete lesson');
+    }
+  };
+
+  const handleUploadVideo = async (lessonId: string, file: File) => {
+    setUploadingLesson(lessonId);
+    setUploadProgress(0);
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const { data } = await api.post(`/videos/upload/${lessonId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const pct = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
+          setUploadProgress(pct);
+        },
+      });
+
+      // Update local state
+      setModules(modules.map((m) => ({
+        ...m,
+        lessons: m.lessons.map((l: any) =>
+          l.id === lessonId ? { ...l, video_url: data.data.streaming_url || data.data.video_url, video_thumbnail: data.data.thumbnail } : l
+        ),
+      })));
+
+      toast.success('Video uploaded!');
+    } catch {
+      toast.error('Failed to upload video');
+    } finally {
+      setUploadingLesson(null);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleRemoveVideo = async (lessonId: string) => {
+    if (!confirm('Remove video from this lesson?')) return;
+    try {
+      await api.delete(`/videos/${lessonId}`);
+      setModules(modules.map((m) => ({
+        ...m,
+        lessons: m.lessons.map((l: any) => l.id === lessonId ? { ...l, video_url: null, video_thumbnail: null } : l),
+      })));
+      toast.success('Video removed');
+    } catch {
+      toast.error('Failed to remove video');
     }
   };
 
@@ -257,6 +257,7 @@ export default function CourseEditor() {
                 />
               </div>
               <div className="grid grid-cols-3 gap-4">
+                <Input label="Duration (hours)" type="number" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="40" />
                 <Input label="Price (₦)" type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="25000" />
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
@@ -299,16 +300,17 @@ export default function CourseEditor() {
                       </button>
                     </div>
                     <div className="p-4 space-y-2">
-                      {(module.lessons || []).map((lesson: any, idx: number) => (
-                        <div key={lesson.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                          <Video className="w-4 h-4 text-gray-400" />
-                          <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => handleUpdateLesson(module.id, lesson.id, lesson.title)}>
-                            {lesson.title}
-                          </span>
-                          <button className="text-gray-400 hover:text-red-400" onClick={() => handleDeleteLesson(module.id, lesson.id)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      {(module.lessons || []).map((lesson: any) => (
+                        <LessonRow
+                          key={lesson.id}
+                          lesson={lesson}
+                          uploadingLesson={uploadingLesson}
+                          uploadProgress={uploadProgress}
+                          onUpdate={() => handleUpdateLesson(module.id, lesson.id, lesson.title)}
+                          onDelete={() => handleDeleteLesson(module.id, lesson.id)}
+                          onUploadVideo={(file) => handleUploadVideo(lesson.id, file)}
+                          onRemoveVideo={() => handleRemoveVideo(lesson.id)}
+                        />
                       ))}
                       <Button variant="ghost" size="sm" onClick={() => handleAddLesson(module.id, (module.lessons || []).length)} icon={<Plus className="w-3.5 h-3.5" />}>Add Lesson</Button>
                     </div>
@@ -332,5 +334,86 @@ export default function CourseEditor() {
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function LessonRow({
+  lesson, uploadingLesson, uploadProgress,
+  onUpdate, onDelete, onUploadVideo, onRemoveVideo,
+}: {
+  lesson: any;
+  uploadingLesson: string | null;
+  uploadProgress: number;
+  onUpdate: () => void;
+  onDelete: () => void;
+  onUploadVideo: (file: File) => void;
+  onRemoveVideo: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isUploading = uploadingLesson === lesson.id;
+  const hasVideo = !!lesson.video_url;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error('Video must be under 100MB');
+        return;
+      }
+      if (!file.type.startsWith('video/')) {
+        toast.error('Only video files are allowed');
+        return;
+      }
+      onUploadVideo(file);
+    }
+    e.target.value = '';
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 group">
+      {hasVideo ? (
+        <Film className="w-4 h-4 text-emerald-400 shrink-0" />
+      ) : (
+        <Video className="w-4 h-4 text-gray-400 shrink-0" />
+      )}
+      <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 cursor-pointer truncate" onClick={onUpdate}>
+        {lesson.title}
+      </span>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {hasVideo && (
+          <button
+            onClick={onRemoveVideo}
+            className="text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove video"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        {isUploading ? (
+          <div className="flex items-center gap-1.5 text-xs text-blue-400">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            {uploadProgress}%
+          </div>
+        ) : (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className={`text-gray-400 hover:text-blue-400 transition-colors ${hasVideo ? 'opacity-0 group-hover:opacity-100' : ''}`}
+            title="Upload video"
+          >
+            <Upload className="w-3.5 h-3.5" />
+          </button>
+        )}
+        <button className="text-gray-400 hover:text-red-400" onClick={onDelete}>
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }

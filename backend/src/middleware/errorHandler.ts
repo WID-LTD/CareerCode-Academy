@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/errors';
-import { isDatabaseAvailable } from '../config/db';
+import fs from 'fs';
+import path from 'path';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
@@ -41,6 +42,14 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       });
       return;
     }
+  }
+
+  try {
+    const logPath = path.join(process.cwd(), 'error.log');
+    const logMessage = `[${new Date().toISOString()}] Unhandled error: ${err.message}\nStack: ${err.stack}\n\n`;
+    fs.appendFileSync(logPath, logMessage);
+  } catch (logErr) {
+    console.error('Failed to write to error log:', logErr);
   }
 
   console.error('Unhandled error:', err);

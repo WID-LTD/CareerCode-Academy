@@ -332,30 +332,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       const { data } = await api.get('/student/recommended');
       set({ recommendedCourses: data.data || [] });
     } catch {
-      set({
-        recommendedCourses: [
-          {
-            id: '1', title: 'Advanced React Patterns', slug: 'advanced-react',
-            thumbnail: null, instructor_name: 'Sarah Chen', duration: 480,
-            difficulty: 'advanced', rating: 4.8, studentCount: 1234, category: 'Web Development',
-          },
-          {
-            id: '2', title: 'TypeScript Masterclass', slug: 'typescript-masterclass',
-            thumbnail: null, instructor_name: 'Alex Rivera', duration: 360,
-            difficulty: 'intermediate', rating: 4.9, studentCount: 892, category: 'Programming',
-          },
-          {
-            id: '3', title: 'Python for Data Science', slug: 'python-data-science',
-            thumbnail: null, instructor_name: 'Dr. Maria Lopez', duration: 600,
-            difficulty: 'beginner', rating: 4.7, studentCount: 2100, category: 'Data Science',
-          },
-          {
-            id: '4', title: 'Cloud Architecture on AWS', slug: 'cloud-architecture',
-            thumbnail: null, instructor_name: 'James Wilson', duration: 540,
-            difficulty: 'advanced', rating: 4.6, studentCount: 756, category: 'Cloud Computing',
-          },
-        ],
-      });
+      set({ recommendedCourses: [] });
     }
   },
 
@@ -364,16 +341,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       const { data } = await api.get('/student/badges');
       set({ badges: data.data || [] });
     } catch {
-      set({
-        badges: [
-          { id: '1', name: 'Fast Learner', description: 'Completed 5 lessons in a day', icon: 'Zap', earned: true, earned_at: '2025-05-10' },
-          { id: '2', name: 'Quiz Master', description: 'Scored 100% on 3 quizzes', icon: 'Brain', earned: true, earned_at: '2025-05-15' },
-          { id: '3', name: '30-Day Streak', description: 'Maintained a 30-day learning streak', icon: 'Flame', earned: false, progress: 65 },
-          { id: '4', name: 'Top Performer', description: 'Reached top 10 on the leaderboard', icon: 'Award', earned: true, earned_at: '2025-06-01' },
-          { id: '5', name: 'Course Completer', description: 'Completed your first course', icon: 'GraduationCap', earned: true, earned_at: '2025-04-20' },
-          { id: '6', name: 'Helper', description: 'Answered 10 community questions', icon: 'HeartHandshake', earned: false, progress: 40 },
-        ],
-      });
+      set({ badges: [] });
     }
   },
 
@@ -383,19 +351,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       const { data } = await api.get('/student/leaderboard');
       set({ leaderboard: data.data || [], isLoading: false });
     } catch {
-      set({
-        leaderboard: [
-          { userId: '1', name: 'Alex Rivera', avatar: null, xpPoints: 12500, badges: 12, rank: 1, rankChange: 0, isCurrentUser: false },
-          { userId: '2', name: 'Maria Chen', avatar: null, xpPoints: 11200, badges: 10, rank: 2, rankChange: 2, isCurrentUser: false },
-          { userId: '3', name: 'James Wilson', avatar: null, xpPoints: 10800, badges: 9, rank: 3, rankChange: -1, isCurrentUser: false },
-          { userId: '4', name: 'Sarah Johnson', avatar: null, xpPoints: 9800, badges: 8, rank: 4, rankChange: 1, isCurrentUser: true },
-          { userId: '5', name: 'David Kim', avatar: null, xpPoints: 9200, badges: 7, rank: 5, rankChange: -2, isCurrentUser: false },
-          { userId: '6', name: 'Emily Davis', avatar: null, xpPoints: 8700, badges: 6, rank: 6, rankChange: 3, isCurrentUser: false },
-          { userId: '7', name: 'Michael Brown', avatar: null, xpPoints: 8100, badges: 5, rank: 7, rankChange: 0, isCurrentUser: false },
-          { userId: '8', name: 'Lisa Wang', avatar: null, xpPoints: 7600, badges: 4, rank: 8, rankChange: -1, isCurrentUser: false },
-        ],
-        isLoading: false,
-      });
+      set({ leaderboard: [], isLoading: false });
     }
   },
 
@@ -404,16 +360,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       const { data } = await api.get('/student/calendar');
       set({ calendarEvents: data.data || [] });
     } catch {
-      set({
-        calendarEvents: [
-          { id: '1', title: 'Live: React Hooks Deep Dive', type: 'live-class', date: '2025-06-15', time: '10:00 AM', course_title: 'Advanced React' },
-          { id: '2', title: 'Assignment: Build a Dashboard', type: 'assignment', date: '2025-06-18', time: '11:59 PM', course_title: 'Advanced React' },
-          { id: '3', title: 'Week 3 Quiz', type: 'quiz', date: '2025-06-20', time: '2:00 PM', course_title: 'TypeScript Masterclass' },
-          { id: '4', title: 'Midterm Exam', type: 'exam', date: '2025-06-25', time: '9:00 AM', course_title: 'Python for Data Science' },
-          { id: '5', title: 'Webinar: Career in Tech', type: 'webinar', date: '2025-06-22', time: '3:00 PM', course_title: 'Career Development' },
-          { id: '6', title: 'Live: TypeScript Generics', type: 'live-class', date: '2025-06-17', time: '11:00 AM', course_title: 'TypeScript Masterclass' },
-        ],
-      });
+      set({ calendarEvents: [] });
     }
   },
 

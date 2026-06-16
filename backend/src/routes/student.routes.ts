@@ -476,6 +476,54 @@ router.get('/assignments', async (req: AuthRequest, res: Response, next: NextFun
   } catch (error) { next(error); }
 });
 
+// GET /student/challenges - all coding challenges for enrolled courses
+router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { rows } = await query(`
+      SELECT cc.*, l.title as lesson_title, c.title as course_title, c.slug as course_slug,
+        cs.id as submission_id, cs.code as submission_code, cs.passed as submission_passed,
+        cs.score as submission_score, cs.feedback as submission_feedback, cs.submitted_at as submission_at
+      FROM coding_challenges cc
+      JOIN lessons l ON cc.lesson_id = l.id
+      JOIN courses c ON l.course_id = c.id
+      JOIN enrollments e ON e.course_id = c.id AND e.user_id = $1
+      LEFT JOIN LATERAL (
+        SELECT * FROM challenge_submissions
+        WHERE challenge_id = cc.id AND user_id = $1
+        ORDER BY submitted_at DESC
+        LIMIT 1
+      ) cs ON true
+      ORDER BY cc.created_at DESC
+    `, [userId]);
+
+    const challenges = rows.map((r: any) => ({
+      id: r.id,
+      lesson_id: r.lesson_id,
+      title: r.title,
+      description: r.description,
+      instructions: r.instructions,
+      starter_code: r.starter_code,
+      test_code: r.test_code,
+      language: r.language,
+      difficulty: r.difficulty,
+      lesson_title: r.lesson_title,
+      course_title: r.course_title,
+      course_slug: r.course_slug,
+      submission: r.submission_id ? {
+        id: r.submission_id,
+        code: r.submission_code,
+        passed: r.submission_passed,
+        score: r.submission_score,
+        feedback: r.submission_feedback,
+        submitted_at: r.submission_at,
+      } : null,
+    }));
+
+    res.json({ success: true, data: challenges });
+  } catch (error) { next(error); }
+});
+
 // Messages routes
 router.get('/messages/conversations', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

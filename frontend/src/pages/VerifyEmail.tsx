@@ -17,7 +17,6 @@ export default function VerifyEmail() {
           const d = data.data;
           if (d) {
             useAuthStore.getState().setUser({ id: d.userId, name: d.name, email: d.email, role: d.role, isVerified: true });
-            useAuthStore.getState().setToken(d.token);
           }
           navigate('/auth/verified', { replace: true });
         })
