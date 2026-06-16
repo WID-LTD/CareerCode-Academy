@@ -46,7 +46,7 @@ const resetPasswordSchema = z.object({
 });
 
 const refreshTokenSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
+  refreshToken: z.string().min(1, 'Refresh token is required').optional(),
 });
 
 const updateProfileSchema = z.object({
@@ -117,10 +117,6 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body;
-      const fs = require('fs');
-      const logEntry = `--- LOGIN ATTEMPT ---\nEmail: "${email}" (${email.length})\nPassword: "${password}" (${password.length})\n`;
-      fs.appendFileSync('login_attempts.log', logEntry);
-      
       const user = await UserModel.getUserByEmail(email);
       if (!user) {
         throw new UnauthorizedError('Invalid email or password');
@@ -375,10 +371,12 @@ router.post(
 // POST /refresh-token
 router.post(
   '/refresh-token',
-  validate(refreshTokenSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
+      if (!refreshToken) {
+        throw new UnauthorizedError('Refresh token is required');
+      }
       const decoded = verifyRefreshToken(refreshToken);
 
       // Verify token exists in database (whitelist)
@@ -423,13 +421,13 @@ router.post(
 // POST /logout
 router.post(
   '/logout',
-  validate(refreshTokenSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
       
-      // Delete token from database
-      await TokenModel.deleteRefreshToken(refreshToken);
+      if (refreshToken) {
+        await TokenModel.deleteRefreshToken(refreshToken);
+      }
       clearAuthCookies(res);
       
       res.json({

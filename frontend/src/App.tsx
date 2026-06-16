@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { useThemeStore } from '@/store/themeStore';
 import { useAuthStore } from '@/store/authStore';
 
 import Home from '@/pages/Home';
@@ -77,20 +76,11 @@ import AdminReports from '@/pages/admin/Reports';
 import AdminMessages from '@/pages/admin/Messages';
 
 function App() {
-  const { darkMode } = useThemeStore();
   const initialize = useAuthStore((s) => s.initialize);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
 
   return (
     <AnimatePresence mode="wait">

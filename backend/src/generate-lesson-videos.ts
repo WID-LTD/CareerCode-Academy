@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { query } from './config/db';
-import { uploadVideo, getStreamingUrl, isCloudinaryConfigured } from './config/cloudinary';
+import { uploadFile } from './config/storage';
 
 const OUT_DIR = path.join(process.cwd(), 'generated-videos');
 const TMP_DIR = path.join(OUT_DIR, '_tmp');
@@ -73,7 +73,7 @@ ffmpeg -y -f lavfi -i "color=c=0x${bg}:s=${W}x${H}:d=${dur}" -filter_complex_scr
     const batPath = path.join(TMP_DIR, 'render.bat');
     fs.writeFileSync(batPath, batContent, 'utf8');
 
-    exec(`"${batPath}"`, { maxBuffer: 200 * 1024 * 1024, shell: true, cwd: process.cwd() }, (err, stdout, stderr) => {
+    exec(`"${batPath}"`, { maxBuffer: 200 * 1024 * 1024, cwd: process.cwd() }, (err: any, stdout: string, stderr: string) => {
       if (err) reject(new Error(stderr || err.message));
       else resolve();
     });
@@ -136,26 +136,21 @@ async function main() {
             const size = fs.statSync(out).size;
             process.stdout.write(`✓ ${(size / 1024 / 1024).toFixed(1)}MB`);
 
-            // Upload to Cloudinary
-            if (isCloudinaryConfigured()) {
+            // Upload to S3
+            if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
               try {
                 const buffer = fs.readFileSync(out);
-                const publicId = `careercode/videos/lesson-${lesson.id}-${Date.now()}`;
-                const uploadResult = await uploadVideo(buffer, publicId);
-                let videoUrl = uploadResult.secure_url;
-                try {
-                  const streamingUrl = await getStreamingUrl(publicId);
-                  if (streamingUrl) videoUrl = streamingUrl;
-                } catch (_) {}
+                const filename = path.basename(out);
+                const publicUrl = await uploadFile(buffer, filename, 'videos');
                 await query(
-                  `UPDATE lessons SET video_url = $1, video_thumbnail = $2 WHERE id = $3`,
-                  [videoUrl, uploadResult.eager?.[0]?.secure_url || null, lesson.id]
+                  `UPDATE lessons SET video_url = $1, video_thumbnail = NULL WHERE id = $2`,
+                  [publicUrl, lesson.id]
                 );
-                process.stdout.write(', ☁ uploaded');
-              } catch (ce) {
+                process.stdout.write(', ☁ uploaded to S3');
+              } catch (s3Error) {
                 const localUrl = `/generated-videos/${path.basename(out)}`;
                 await query(`UPDATE lessons SET video_url = $1 WHERE id = $2`, [localUrl, lesson.id]);
-                process.stdout.write(', 💾 local');
+                process.stdout.write(', 💾 local fallback');
               }
             } else {
               const localUrl = `/generated-videos/${path.basename(out)}`;

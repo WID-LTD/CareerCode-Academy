@@ -2,8 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { uploadSingle } from '../middleware/upload';
 import { query } from '../config/db';
-import { uploadVideo, getStreamingUrl, deleteVideo, isCloudinaryConfigured } from '../config/cloudinary';
-import { uploadFile } from '../config/storage';
+import { uploadFile, deleteFile } from '../config/storage';
 import fs from 'fs';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 
@@ -34,32 +33,20 @@ router.post(
       }
 
       let videoUrl: string;
-      let thumbnailUrl: string | null = null;
-      let streamingUrl: string | null = null;
+      const localPath = req.file.path;
 
-      // Try Cloudinary first
-      if (isCloudinaryConfigured()) {
+      if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
         try {
-          const buffer = fs.readFileSync(req.file.path);
-          const publicId = `careercode/videos/lesson-${lessonId}-${Date.now()}`;
-          const uploadResult = await uploadVideo(buffer, publicId);
-          videoUrl = uploadResult.secure_url;
-          streamingUrl = await getStreamingUrl(publicId);
-          thumbnailUrl = uploadResult.eager?.[0]?.secure_url || null;
-          // Clean up local file
-          fs.unlinkSync(req.file.path);
-        } catch (cloudError) {
-          console.error('Cloudinary upload failed, falling back to local:', cloudError);
-          videoUrl = `/uploads/${req.file.filename}`;
-        }
-      } else if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
-        // Try S3 as backup
-        try {
-          const buffer = fs.readFileSync(req.file.path);
+          const buffer = fs.readFileSync(localPath);
           const publicUrl = await uploadFile(buffer, req.file.filename, 'videos');
           videoUrl = publicUrl;
-          fs.unlinkSync(req.file.path);
-        } catch {
+          try {
+            fs.unlinkSync(localPath);
+          } catch (unlinkError) {
+            console.error('Failed to clean up local upload file:', unlinkError);
+          }
+        } catch (s3Error) {
+          console.error('S3 upload failed, falling back to local:', s3Error);
           videoUrl = `/uploads/${req.file.filename}`;
         }
       } else {
@@ -67,16 +54,16 @@ router.post(
       }
 
       await query(
-        `UPDATE lessons SET video_url = $1, video_thumbnail = $2 WHERE id = $3`,
-        [streamingUrl || videoUrl, thumbnailUrl, lessonId]
+        `UPDATE lessons SET video_url = $1, video_thumbnail = NULL WHERE id = $2`,
+        [videoUrl, lessonId]
       );
 
       res.json({
         success: true,
         data: {
           video_url: videoUrl,
-          streaming_url: streamingUrl,
-          thumbnail: thumbnailUrl,
+          streaming_url: null,
+          thumbnail: null,
           filename: req.file.filename,
         },
       });
@@ -124,6 +111,15 @@ router.delete(
       if (lessonRes.rows.length === 0) throw new NotFoundError('Lesson');
       if (req.user!.role !== 'admin' && lessonRes.rows[0].instructor_id !== userId) {
         throw new ForbiddenError('Unauthorized');
+      }
+
+      const oldVideoUrl = lessonRes.rows[0].video_url;
+      if (oldVideoUrl) {
+        try {
+          await deleteFile(oldVideoUrl);
+        } catch (deleteError) {
+          console.error('Failed to delete S3 file on video removal:', deleteError);
+        }
       }
 
       await query(`UPDATE lessons SET video_url = NULL, video_thumbnail = NULL WHERE id = $1`, [lessonId]);

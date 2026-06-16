@@ -57,7 +57,7 @@ fs.writeFileSync(batPath, batContent, 'utf8');
 
 console.log('Running ffmpeg...');
 
-exec(`"${batPath}"`, { maxBuffer: 200 * 1024 * 1024, shell: true, cwd: process.cwd() }, (err, stdout, stderr) => {
+exec(`"${batPath}"`, { maxBuffer: 200 * 1024 * 1024, cwd: process.cwd() }, (err: any, stdout: string, stderr: string) => {
   if (err) {
     console.error('ERROR:', stderr || err.message);
     process.exit(1);
