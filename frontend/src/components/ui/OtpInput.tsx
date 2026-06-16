@@ -58,7 +58,7 @@ export function OtpInput({ length = 6, value, onChange, disabled, error }: OtpIn
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-2" role="group" aria-label={`Verification code, ${length} digits`}>
         {digits.map((digit, i) => (
           <input
             key={i}
@@ -69,6 +69,8 @@ export function OtpInput({ length = 6, value, onChange, disabled, error }: OtpIn
             maxLength={1}
             value={digit}
             disabled={disabled}
+            aria-label={`Digit ${i + 1}`}
+            aria-invalid={!!error}
             onFocus={() => setFocusedIndex(i)}
             onBlur={() => setFocusedIndex(-1)}
             onChange={(e) => handleChange(i, e.target.value)}
@@ -85,7 +87,7 @@ export function OtpInput({ length = 6, value, onChange, disabled, error }: OtpIn
         ))}
       </div>
       {error && (
-        <p className="text-sm text-danger-500 text-center">{error}</p>
+        <p className="text-sm text-danger-500 text-center" role="alert">{error}</p>
       )}
     </div>
   );

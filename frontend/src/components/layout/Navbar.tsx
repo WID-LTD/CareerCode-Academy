@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -32,10 +32,23 @@ const navLinks = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { darkMode, toggleDarkMode } = useThemeStore();
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDropdown]);
 
   const getDashboardLink = () => {
     if (!user) return '/login';
@@ -67,18 +80,20 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/20 dark:border-gray-800/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2 group">
+          <Link to="/" className="flex items-center gap-2 group" aria-label="Go to homepage">
             <div className="w-9 h-9 gradient-bg rounded-lg flex items-center justify-center overflow-hidden">
               <img src="/screen.png" alt="CareerCode Logo" className="w-full h-full object-contain" />
             </div>
             <span className="text-xl font-bold gradient-text">CareerCode</span>
           </Link>
 
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-1" role="list">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
+                role="listitem"
+                aria-current={location.pathname === link.path ? 'page' : undefined}
                 className={cn(
                   'px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                   location.pathname === link.path
@@ -94,6 +109,7 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             <button
               onClick={toggleDarkMode}
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
               className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -104,9 +120,12 @@ export function Navbar() {
             )}
 
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
+                  aria-haspopup="true"
+                  aria-expanded={showDropdown}
+                  aria-label="User menu"
                   className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <div className="w-8 h-8 gradient-bg rounded-full flex items-center justify-center text-white text-sm font-semibold">
@@ -120,6 +139,7 @@ export function Navbar() {
                 <AnimatePresence>
                   {showDropdown && (
                     <motion.div
+                      role="menu"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
@@ -127,6 +147,7 @@ export function Navbar() {
                     >
                       <Link
                         to={getDashboardLink()}
+                        role="menuitem"
                         onClick={() => setShowDropdown(false)}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
@@ -135,6 +156,7 @@ export function Navbar() {
                       </Link>
                       <Link
                         to={getProfileLink()}
+                        role="menuitem"
                         onClick={() => setShowDropdown(false)}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
@@ -143,6 +165,7 @@ export function Navbar() {
                       </Link>
                       <hr className="my-1 border-gray-200 dark:border-gray-700" />
                       <button
+                        role="menuitem"
                         onClick={() => {
                           setShowDropdown(false);
                           logout();
@@ -172,6 +195,8 @@ export function Navbar() {
 
             <button
               onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isOpen}
               className="lg:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -194,6 +219,7 @@ export function Navbar() {
                   key={link.path}
                   to={link.path}
                   onClick={() => setIsOpen(false)}
+                  aria-current={location.pathname === link.path ? 'page' : undefined}
                   className={cn(
                     'block px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                     location.pathname === link.path

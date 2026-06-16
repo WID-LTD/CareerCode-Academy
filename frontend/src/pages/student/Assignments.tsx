@@ -31,7 +31,7 @@ export default function Assignments() {
       setSelectedAssignment(null);
       setFileUrl('');
     } catch (error) {
-      console.error(error);
+      // Silently handle
     } finally {
       setIsSubmitting(false);
     }

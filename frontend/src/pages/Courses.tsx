@@ -137,7 +137,7 @@ export default function Courses() {
                         <GlassCard hover className="h-full p-6 group">
                           {course.thumbnail ? (
                             <div className="w-full h-32 rounded-xl overflow-hidden mb-4 bg-gray-100 dark:bg-gray-800">
-                              <img src={optimizeImageUrl(course.thumbnail, 400, 170)} alt={course.title} className="w-full h-full object-cover" />
+                              <img src={optimizeImageUrl(course.thumbnail, 400, 170)} alt={course.title} loading="lazy" width="400" height="250" className="w-full h-full object-cover" />
                             </div>
                           ) : (
                             <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${style.color} flex items-center justify-center mb-4`}>

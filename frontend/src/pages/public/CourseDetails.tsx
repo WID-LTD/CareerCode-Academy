@@ -57,7 +57,7 @@ export default function CourseDetails() {
           });
           setIsEnrolled(enrolled);
         } catch (error) {
-          console.error('Failed to check enrollment status', error);
+          // Failed to check enrollment status
         } finally {
           setCheckingEnrollment(false);
         }

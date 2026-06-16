@@ -49,7 +49,7 @@ export default function AdminCourseProposals() {
       }
       setProposals(filtered || []);
     } catch (error) {
-      console.error('Failed to fetch course proposals', error);
+      // Failed to fetch course proposals
     } finally {
       setIsLoading(false);
     }
@@ -70,7 +70,7 @@ export default function AdminCourseProposals() {
       setProposals(proposals.map(p => p.id === selectedProposal.id ? data.data : p));
       setSelectedProposal(data.data);
     } catch (error) {
-      console.error('Failed to update proposal', error);
+      // Failed to update proposal
     } finally {
       setIsUpdating(false);
     }
@@ -86,7 +86,7 @@ export default function AdminCourseProposals() {
       setProposals(proposals.map(p => p.id === selectedProposal.id ? data.data : p));
       setSelectedProposal(data.data);
     } catch (error) {
-      console.error('Failed to save notes', error);
+      // Failed to save notes
     } finally {
       setIsUpdating(false);
     }

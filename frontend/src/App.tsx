@@ -1,79 +1,92 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { Loader } from '@/components/ui/Loader';
 import { useAuthStore } from '@/store/authStore';
 
-import Home from '@/pages/Home';
-import About from '@/pages/About';
-import Courses from '@/pages/Courses';
-import CourseDetails from '@/pages/public/CourseDetails';
-import Checkout from '@/pages/public/Checkout';
-import Blog from '@/pages/Blog';
-import BlogPost from '@/pages/BlogPost';
-import Contact from '@/pages/Contact';
-import Pricing from '@/pages/Pricing';
-import Community from '@/pages/Community';
-import Login from '@/pages/Login';
-import Signup from '@/pages/Signup';
-import ForgotPassword from '@/pages/ForgotPassword';
-import ResetPassword from '@/pages/ResetPassword';
-import VerifyEmail from '@/pages/VerifyEmail';
-import VerifyPending from '@/pages/VerifyPending';
-import Verified from '@/pages/Verified';
-import VerificationError from '@/pages/VerificationError';
-import BecomeInstructor from '@/pages/BecomeInstructor';
-import Apply from '@/pages/Apply';
-import NotFound from '@/pages/NotFound';
-import VerifyPayment from '@/pages/VerifyPayment';
-import VerifyCertificate from '@/pages/public/VerifyCertificate';
+function SuspenseWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader text="Loading..." /></div>}>
+      {children}
+    </Suspense>
+  );
+}
 
-import StudentDashboard from '@/pages/student/Dashboard';
-import StudentMyCourses from '@/pages/student/MyCourses';
-import StudentCourseView from '@/pages/student/CourseView';
-import StudentAssignments from '@/pages/student/Assignments';
-import StudentCertificate from '@/pages/student/Certificate';
-import StudentProfile from '@/pages/student/Profile';
-import StudentLearningPaths from '@/pages/student/LearningPaths';
-import StudentLeaderboard from '@/pages/student/Leaderboard';
-import StudentCalendar from '@/pages/student/Calendar';
-import StudentNotifications from '@/pages/student/Notifications';
-import StudentSettings from '@/pages/student/Settings';
-import StudentTickets from '@/pages/student/Tickets';
-import StudentMessages from '@/pages/student/Messages';
-import StudentQuizTake from '@/pages/student/QuizTake';
-import StudentChallenges from '@/pages/student/Challenges';
+// Public pages
+const Home = lazy(() => import('@/pages/Home'));
+const About = lazy(() => import('@/pages/About'));
+const Courses = lazy(() => import('@/pages/Courses'));
+const CourseDetails = lazy(() => import('@/pages/public/CourseDetails'));
+const Checkout = lazy(() => import('@/pages/public/Checkout'));
+const Blog = lazy(() => import('@/pages/Blog'));
+const BlogPost = lazy(() => import('@/pages/BlogPost'));
+const Contact = lazy(() => import('@/pages/Contact'));
+const Pricing = lazy(() => import('@/pages/Pricing'));
+const Community = lazy(() => import('@/pages/Community'));
+const Login = lazy(() => import('@/pages/Login'));
+const Signup = lazy(() => import('@/pages/Signup'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
+const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
+const VerifyPending = lazy(() => import('@/pages/VerifyPending'));
+const Verified = lazy(() => import('@/pages/Verified'));
+const VerificationError = lazy(() => import('@/pages/VerificationError'));
+const BecomeInstructor = lazy(() => import('@/pages/BecomeInstructor'));
+const Apply = lazy(() => import('@/pages/Apply'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
+const VerifyPayment = lazy(() => import('@/pages/VerifyPayment'));
+const VerifyCertificate = lazy(() => import('@/pages/public/VerifyCertificate'));
 
-import InstructorDashboard from '@/pages/instructor/Dashboard';
-import InstructorManageCourses from '@/pages/instructor/ManageCourses';
-import InstructorCourseEditor from '@/pages/instructor/CourseEditor';
-import InstructorAssignments from '@/pages/instructor/Assignments';
-import InstructorStudents from '@/pages/instructor/Students';
-import InstructorAnalytics from '@/pages/instructor/Analytics';
-import InstructorSubmissions from '@/pages/instructor/Submissions';
-import InstructorAnnouncements from '@/pages/instructor/Announcements';
-import InstructorLiveClasses from '@/pages/instructor/LiveClasses';
-import InstructorMessages from '@/pages/instructor/Messages';
-import InstructorSchedule from '@/pages/instructor/Schedule';
-import InstructorCourseProposals from '@/pages/instructor/CourseProposals';
-import InstructorQuizzes from '@/pages/instructor/Quizzes';
+// Student pages
+const StudentDashboard = lazy(() => import('@/pages/student/Dashboard'));
+const StudentMyCourses = lazy(() => import('@/pages/student/MyCourses'));
+const StudentCourseView = lazy(() => import('@/pages/student/CourseView'));
+const StudentAssignments = lazy(() => import('@/pages/student/Assignments'));
+const StudentCertificate = lazy(() => import('@/pages/student/Certificate'));
+const StudentProfile = lazy(() => import('@/pages/student/Profile'));
+const StudentLearningPaths = lazy(() => import('@/pages/student/LearningPaths'));
+const StudentLeaderboard = lazy(() => import('@/pages/student/Leaderboard'));
+const StudentCalendar = lazy(() => import('@/pages/student/Calendar'));
+const StudentNotifications = lazy(() => import('@/pages/student/Notifications'));
+const StudentSettings = lazy(() => import('@/pages/student/Settings'));
+const StudentTickets = lazy(() => import('@/pages/student/Tickets'));
+const StudentMessages = lazy(() => import('@/pages/student/Messages'));
+const StudentQuizTake = lazy(() => import('@/pages/student/QuizTake'));
+const StudentChallenges = lazy(() => import('@/pages/student/Challenges'));
 
-import AdminDashboard from '@/pages/admin/Dashboard';
-import AdminUsers from '@/pages/admin/Users';
-import AdminCourses from '@/pages/admin/Courses';
-import AdminApplications from '@/pages/admin/Applications';
-import AdminPayments from '@/pages/admin/Payments';
-import AdminAnalytics from '@/pages/admin/Analytics';
-import AdminCourseProposals from '@/pages/admin/CourseProposals';
-import AdminSettings from '@/pages/admin/Settings';
-import AdminCertificates from '@/pages/admin/Certificates';
-import AdminTickets from '@/pages/admin/Tickets';
-import AdminBroadcasts from '@/pages/admin/Broadcasts';
-import AdminAuditLog from '@/pages/admin/AuditLog';
-import AdminCategories from '@/pages/admin/Categories';
-import AdminReports from '@/pages/admin/Reports';
-import AdminMessages from '@/pages/admin/Messages';
+// Instructor pages
+const InstructorDashboard = lazy(() => import('@/pages/instructor/Dashboard'));
+const InstructorManageCourses = lazy(() => import('@/pages/instructor/ManageCourses'));
+const InstructorCourseEditor = lazy(() => import('@/pages/instructor/CourseEditor'));
+const InstructorAssignments = lazy(() => import('@/pages/instructor/Assignments'));
+const InstructorStudents = lazy(() => import('@/pages/instructor/Students'));
+const InstructorAnalytics = lazy(() => import('@/pages/instructor/Analytics'));
+const InstructorSubmissions = lazy(() => import('@/pages/instructor/Submissions'));
+const InstructorAnnouncements = lazy(() => import('@/pages/instructor/Announcements'));
+const InstructorLiveClasses = lazy(() => import('@/pages/instructor/LiveClasses'));
+const InstructorMessages = lazy(() => import('@/pages/instructor/Messages'));
+const InstructorSchedule = lazy(() => import('@/pages/instructor/Schedule'));
+const InstructorCourseProposals = lazy(() => import('@/pages/instructor/CourseProposals'));
+const InstructorQuizzes = lazy(() => import('@/pages/instructor/Quizzes'));
+
+// Admin pages
+const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
+const AdminUsers = lazy(() => import('@/pages/admin/Users'));
+const AdminCourses = lazy(() => import('@/pages/admin/Courses'));
+const AdminApplications = lazy(() => import('@/pages/admin/Applications'));
+const AdminPayments = lazy(() => import('@/pages/admin/Payments'));
+const AdminAnalytics = lazy(() => import('@/pages/admin/Analytics'));
+const AdminCourseProposals = lazy(() => import('@/pages/admin/CourseProposals'));
+const AdminSettings = lazy(() => import('@/pages/admin/Settings'));
+const AdminCertificates = lazy(() => import('@/pages/admin/Certificates'));
+const AdminTickets = lazy(() => import('@/pages/admin/Tickets'));
+const AdminBroadcasts = lazy(() => import('@/pages/admin/Broadcasts'));
+const AdminAuditLog = lazy(() => import('@/pages/admin/AuditLog'));
+const AdminCategories = lazy(() => import('@/pages/admin/Categories'));
+const AdminReports = lazy(() => import('@/pages/admin/Reports'));
+const AdminMessages = lazy(() => import('@/pages/admin/Messages'));
 
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
@@ -86,85 +99,85 @@ function App() {
     <AnimatePresence mode="wait">
       <Routes>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/courses" element={<Courses />} />
-          <Route path="/courses/:slug" element={<CourseDetails />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/:slug" element={<BlogPost />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/verify-email/:token" element={<VerifyEmail />} />
-          <Route path="/auth/verify-pending" element={<VerifyPending />} />
-          <Route path="/auth/verified" element={<Verified />} />
-          <Route path="/auth/verification-error" element={<VerificationError />} />
-          <Route path="/become-instructor" element={<BecomeInstructor />} />
-          <Route path="/apply" element={<Apply />} />
-          <Route path="/verify-payment" element={<VerifyPayment />} />
-          <Route path="/verify-certificate" element={<VerifyCertificate />} />
-          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/" element={<SuspenseWrapper><Home /></SuspenseWrapper>} />
+          <Route path="/about" element={<SuspenseWrapper><About /></SuspenseWrapper>} />
+          <Route path="/courses" element={<SuspenseWrapper><Courses /></SuspenseWrapper>} />
+          <Route path="/courses/:slug" element={<SuspenseWrapper><CourseDetails /></SuspenseWrapper>} />
+          <Route path="/blog" element={<SuspenseWrapper><Blog /></SuspenseWrapper>} />
+          <Route path="/blog/:slug" element={<SuspenseWrapper><BlogPost /></SuspenseWrapper>} />
+          <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
+          <Route path="/pricing" element={<SuspenseWrapper><Pricing /></SuspenseWrapper>} />
+          <Route path="/community" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
+          <Route path="/login" element={<SuspenseWrapper><Login /></SuspenseWrapper>} />
+          <Route path="/signup" element={<SuspenseWrapper><Signup /></SuspenseWrapper>} />
+          <Route path="/forgot-password" element={<SuspenseWrapper><ForgotPassword /></SuspenseWrapper>} />
+          <Route path="/reset-password/:token" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
+          <Route path="/verify-email/:token" element={<SuspenseWrapper><VerifyEmail /></SuspenseWrapper>} />
+          <Route path="/auth/verify-pending" element={<SuspenseWrapper><VerifyPending /></SuspenseWrapper>} />
+          <Route path="/auth/verified" element={<SuspenseWrapper><Verified /></SuspenseWrapper>} />
+          <Route path="/auth/verification-error" element={<SuspenseWrapper><VerificationError /></SuspenseWrapper>} />
+          <Route path="/become-instructor" element={<SuspenseWrapper><BecomeInstructor /></SuspenseWrapper>} />
+          <Route path="/apply" element={<SuspenseWrapper><Apply /></SuspenseWrapper>} />
+          <Route path="/verify-payment" element={<SuspenseWrapper><VerifyPayment /></SuspenseWrapper>} />
+          <Route path="/verify-certificate" element={<SuspenseWrapper><VerifyCertificate /></SuspenseWrapper>} />
+          <Route path="/checkout" element={<SuspenseWrapper><Checkout /></SuspenseWrapper>} />
         </Route>
 
         <Route path="/student" element={<DashboardLayout requiredRole="student" />}>
-          <Route path="dashboard" element={<StudentDashboard />} />
-          <Route path="courses" element={<StudentMyCourses />} />
-          <Route path="courses/:slug" element={<StudentCourseView />} />
-          <Route path="learning-paths" element={<StudentLearningPaths />} />
-          <Route path="assignments" element={<StudentAssignments />} />
-          <Route path="certificates" element={<StudentCertificate />} />
-          <Route path="leaderboard" element={<StudentLeaderboard />} />
-          <Route path="calendar" element={<StudentCalendar />} />
-          <Route path="notifications" element={<StudentNotifications />} />
-          <Route path="tickets" element={<StudentTickets />} />
-          <Route path="messages" element={<StudentMessages />} />
-          <Route path="quiz/:quizId" element={<StudentQuizTake />} />
-          <Route path="challenges" element={<StudentChallenges />} />
-          <Route path="profile" element={<StudentProfile />} />
-          <Route path="settings" element={<StudentSettings />} />
+          <Route path="dashboard" element={<SuspenseWrapper><StudentDashboard /></SuspenseWrapper>} />
+          <Route path="courses" element={<SuspenseWrapper><StudentMyCourses /></SuspenseWrapper>} />
+          <Route path="courses/:slug" element={<SuspenseWrapper><StudentCourseView /></SuspenseWrapper>} />
+          <Route path="learning-paths" element={<SuspenseWrapper><StudentLearningPaths /></SuspenseWrapper>} />
+          <Route path="assignments" element={<SuspenseWrapper><StudentAssignments /></SuspenseWrapper>} />
+          <Route path="certificates" element={<SuspenseWrapper><StudentCertificate /></SuspenseWrapper>} />
+          <Route path="leaderboard" element={<SuspenseWrapper><StudentLeaderboard /></SuspenseWrapper>} />
+          <Route path="calendar" element={<SuspenseWrapper><StudentCalendar /></SuspenseWrapper>} />
+          <Route path="notifications" element={<SuspenseWrapper><StudentNotifications /></SuspenseWrapper>} />
+          <Route path="tickets" element={<SuspenseWrapper><StudentTickets /></SuspenseWrapper>} />
+          <Route path="messages" element={<SuspenseWrapper><StudentMessages /></SuspenseWrapper>} />
+          <Route path="quiz/:quizId" element={<SuspenseWrapper><StudentQuizTake /></SuspenseWrapper>} />
+          <Route path="challenges" element={<SuspenseWrapper><StudentChallenges /></SuspenseWrapper>} />
+          <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
+          <Route path="settings" element={<SuspenseWrapper><StudentSettings /></SuspenseWrapper>} />
         </Route>
 
         <Route path="/instructor" element={<DashboardLayout requiredRole="instructor" />}>
-          <Route path="dashboard" element={<InstructorDashboard />} />
-          <Route path="analytics" element={<InstructorAnalytics />} />
-          <Route path="courses" element={<InstructorManageCourses />} />
-          <Route path="course-proposals" element={<InstructorCourseProposals />} />
-          <Route path="courses/new" element={<InstructorCourseEditor />} />
-          <Route path="courses/:slug/edit" element={<InstructorCourseEditor />} />
-          <Route path="students" element={<InstructorStudents />} />
-          <Route path="assignments" element={<InstructorAssignments />} />
-          <Route path="submissions" element={<InstructorSubmissions />} />
-          <Route path="announcements" element={<InstructorAnnouncements />} />
-          <Route path="live-classes" element={<InstructorLiveClasses />} />
-          <Route path="messages" element={<InstructorMessages />} />
-          <Route path="schedule" element={<InstructorSchedule />} />
-          <Route path="quizzes" element={<InstructorQuizzes />} />
-          <Route path="profile" element={<StudentProfile />} />
+          <Route path="dashboard" element={<SuspenseWrapper><InstructorDashboard /></SuspenseWrapper>} />
+          <Route path="analytics" element={<SuspenseWrapper><InstructorAnalytics /></SuspenseWrapper>} />
+          <Route path="courses" element={<SuspenseWrapper><InstructorManageCourses /></SuspenseWrapper>} />
+          <Route path="course-proposals" element={<SuspenseWrapper><InstructorCourseProposals /></SuspenseWrapper>} />
+          <Route path="courses/new" element={<SuspenseWrapper><InstructorCourseEditor /></SuspenseWrapper>} />
+          <Route path="courses/:slug/edit" element={<SuspenseWrapper><InstructorCourseEditor /></SuspenseWrapper>} />
+          <Route path="students" element={<SuspenseWrapper><InstructorStudents /></SuspenseWrapper>} />
+          <Route path="assignments" element={<SuspenseWrapper><InstructorAssignments /></SuspenseWrapper>} />
+          <Route path="submissions" element={<SuspenseWrapper><InstructorSubmissions /></SuspenseWrapper>} />
+          <Route path="announcements" element={<SuspenseWrapper><InstructorAnnouncements /></SuspenseWrapper>} />
+          <Route path="live-classes" element={<SuspenseWrapper><InstructorLiveClasses /></SuspenseWrapper>} />
+          <Route path="messages" element={<SuspenseWrapper><InstructorMessages /></SuspenseWrapper>} />
+          <Route path="schedule" element={<SuspenseWrapper><InstructorSchedule /></SuspenseWrapper>} />
+          <Route path="quizzes" element={<SuspenseWrapper><InstructorQuizzes /></SuspenseWrapper>} />
+          <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
         </Route>
 
         <Route path="/admin" element={<DashboardLayout requiredRole="admin" />}>
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="courses" element={<AdminCourses />} />
-          <Route path="course-proposals" element={<AdminCourseProposals />} />
-          <Route path="applications" element={<AdminApplications />} />
-          <Route path="payments" element={<AdminPayments />} />
-          <Route path="certificates" element={<AdminCertificates />} />
-          <Route path="tickets" element={<AdminTickets />} />
-          <Route path="broadcasts" element={<AdminBroadcasts />} />
-          <Route path="categories" element={<AdminCategories />} />
-          <Route path="reports" element={<AdminReports />} />
-          <Route path="messages" element={<AdminMessages />} />
-          <Route path="audit-log" element={<AdminAuditLog />} />
-          <Route path="analytics" element={<AdminAnalytics />} />
-          <Route path="settings" element={<AdminSettings />} />
+          <Route path="dashboard" element={<SuspenseWrapper><AdminDashboard /></SuspenseWrapper>} />
+          <Route path="users" element={<SuspenseWrapper><AdminUsers /></SuspenseWrapper>} />
+          <Route path="courses" element={<SuspenseWrapper><AdminCourses /></SuspenseWrapper>} />
+          <Route path="course-proposals" element={<SuspenseWrapper><AdminCourseProposals /></SuspenseWrapper>} />
+          <Route path="applications" element={<SuspenseWrapper><AdminApplications /></SuspenseWrapper>} />
+          <Route path="payments" element={<SuspenseWrapper><AdminPayments /></SuspenseWrapper>} />
+          <Route path="certificates" element={<SuspenseWrapper><AdminCertificates /></SuspenseWrapper>} />
+          <Route path="tickets" element={<SuspenseWrapper><AdminTickets /></SuspenseWrapper>} />
+          <Route path="broadcasts" element={<SuspenseWrapper><AdminBroadcasts /></SuspenseWrapper>} />
+          <Route path="categories" element={<SuspenseWrapper><AdminCategories /></SuspenseWrapper>} />
+          <Route path="reports" element={<SuspenseWrapper><AdminReports /></SuspenseWrapper>} />
+          <Route path="messages" element={<SuspenseWrapper><AdminMessages /></SuspenseWrapper>} />
+          <Route path="audit-log" element={<SuspenseWrapper><AdminAuditLog /></SuspenseWrapper>} />
+          <Route path="analytics" element={<SuspenseWrapper><AdminAnalytics /></SuspenseWrapper>} />
+          <Route path="settings" element={<SuspenseWrapper><AdminSettings /></SuspenseWrapper>} />
         </Route>
 
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<SuspenseWrapper><NotFound /></SuspenseWrapper>} />
       </Routes>
     </AnimatePresence>
   );

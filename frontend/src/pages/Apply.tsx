@@ -64,7 +64,7 @@ export default function Apply() {
       
       setIsSuccess(true);
     } catch (error: any) {
-      console.error(error);
+      // Silently handle
       setErrorMsg(error.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);

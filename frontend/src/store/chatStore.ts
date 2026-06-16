@@ -73,7 +73,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   initializeSocket: (userId: string) => {
     let { socket } = get();
     if (!socket) {
-      const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:5000';
+      const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
       socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
 
       socket.on('connect', () => {

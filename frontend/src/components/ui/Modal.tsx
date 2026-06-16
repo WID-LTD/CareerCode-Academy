@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,9 +19,37 @@ const sizeClasses = {
   xl: 'max-w-xl',
 };
 
+function focusTrap(element: HTMLElement, previousActive: Element | null) {
+  const focusable = element.querySelectorAll<HTMLElement>(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  function handleTab(e: KeyboardEvent) {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last?.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first?.focus();
+    }
+  }
+
+  element.addEventListener('keydown', handleTab);
+  first?.focus();
+  return () => element.removeEventListener('keydown', handleTab);
+}
+
 export function Modal({ isOpen, onClose, title, children, className, size = 'md' }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousActiveRef = useRef<Element | null>(null);
+
   useEffect(() => {
     if (isOpen) {
+      previousActiveRef.current = document.activeElement;
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -29,6 +57,18 @@ export function Modal({ isOpen, onClose, title, children, className, size = 'md'
     return () => {
       document.body.style.overflow = '';
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !dialogRef.current) return;
+    const cleanup = focusTrap(dialogRef.current, previousActiveRef.current);
+    return cleanup;
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen && previousActiveRef.current instanceof HTMLElement) {
+      previousActiveRef.current.focus();
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -49,8 +89,13 @@ export function Modal({ isOpen, onClose, title, children, className, size = 'md'
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
+            aria-hidden="true"
           />
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={title ? titleId : undefined}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -63,9 +108,10 @@ export function Modal({ isOpen, onClose, title, children, className, size = 'md'
           >
             {title && (
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">{title}</h2>
+                <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
                 <button
                   onClick={onClose}
+                  aria-label="Close dialog"
                   className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <X className="w-5 h-5" />

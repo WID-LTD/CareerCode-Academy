@@ -35,9 +35,7 @@ function resolveUploadPaths(obj: any, baseUrl: string): any {
 
 api.interceptors.response.use(
   (response) => {
-    const baseUrl = import.meta.env.VITE_API_URL
-      ? import.meta.env.VITE_API_URL.replace('/api/v1', '')
-      : 'http://localhost:5000';
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
     if (response.data) {
       response.data = resolveUploadPaths(response.data, baseUrl);
     }

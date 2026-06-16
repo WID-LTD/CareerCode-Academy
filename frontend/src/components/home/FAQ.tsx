@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ const faqs = [
 
 export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const baseId = useId();
 
   return (
     <section className="py-20 relative">
@@ -60,49 +61,60 @@ export function FAQ() {
         </motion.div>
 
         <div className="space-y-3">
-          {faqs.map((faq, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.05 }}
-              className={cn(
-                'rounded-2xl border transition-all duration-300 cursor-pointer',
-                openIndex === index
-                  ? 'border-primary-500/30 bg-primary-500/5'
-                  : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white/50 dark:bg-gray-900/50'
-              )}
-              onClick={() => setOpenIndex(openIndex === index ? null : index)}
-            >
-              <div className="flex items-center justify-between p-5">
-                <h3 className="font-medium text-gray-900 dark:text-white pr-4">
-                  {faq.question}
-                </h3>
-                <ChevronDown
-                  className={cn(
-                    'w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-300',
-                    openIndex === index && 'rotate-180'
-                  )}
-                />
-              </div>
-              <AnimatePresence>
-                {openIndex === index && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
-                  >
-                    <p className="px-5 pb-5 text-gray-600 dark:text-gray-400 leading-relaxed">
-                      {faq.answer}
-                    </p>
-                  </motion.div>
+          {faqs.map((faq, index) => {
+            const isOpen = openIndex === index;
+            const headingId = `${baseId}-h-${index}`;
+            const panelId = `${baseId}-p-${index}`;
+            return (
+              <div
+                key={index}
+                className={cn(
+                  'rounded-2xl border transition-all duration-300',
+                  isOpen
+                    ? 'border-primary-500/30 bg-primary-500/5'
+                    : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white/50 dark:bg-gray-900/50'
                 )}
-              </AnimatePresence>
-            </motion.div>
-          ))}
+              >
+                <h3>
+                  <button
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    id={headingId}
+                    className="flex items-center justify-between w-full p-5 text-left cursor-pointer"
+                  >
+                    <span className="font-medium text-gray-900 dark:text-white pr-4">
+                      {faq.question}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-300',
+                        isOpen && 'rotate-180'
+                      )}
+                    />
+                  </button>
+                </h3>
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div
+                      id={panelId}
+                      role="region"
+                      aria-labelledby={headingId}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="px-5 pb-5 text-gray-600 dark:text-gray-400 leading-relaxed">
+                        {faq.answer}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
