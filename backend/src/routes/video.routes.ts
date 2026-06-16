@@ -52,8 +52,8 @@ router.post(
           console.error('Cloudinary upload failed, falling back to local:', cloudError);
           videoUrl = `/uploads/${req.file.filename}`;
         }
-      } else if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
-        // Try Supabase as backup
+      } else if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
+        // Try S3 as backup
         try {
           const buffer = fs.readFileSync(req.file.path);
           const publicUrl = await uploadFile(buffer, req.file.filename, 'videos');

@@ -20,7 +20,7 @@
     "@radix-ui/react-tooltip": "^1.0.7",
     "axios": "^1.6.8",
     "clsx": "^2.1.1",
-    "framer-motion": "^11.0.25",
+    "framer-motion": "^12.40.0",
     "lucide-react": "^0.364.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

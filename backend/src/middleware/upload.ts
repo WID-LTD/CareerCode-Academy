@@ -44,14 +44,18 @@ export function uploadToCloud(fieldName: string, folder: string = 'uploads') {
     async (req: any, _res: any, next: any) => {
       if (req.file) {
         try {
-          const buffer = fs.readFileSync(req.file.path);
+          const localPath = req.file.path;
+          const buffer = fs.readFileSync(localPath);
           const publicUrl = await uploadFile(buffer, req.file.originalname, folder);
-          // Replace local path with cloud URL
+          
+          try {
+            fs.unlinkSync(localPath);
+          } catch (unlinkError) {
+            console.error('Failed to clean up local upload file:', unlinkError);
+          }
+
           req.file.filename = publicUrl;
           req.file.path = publicUrl;
-          // Clean up local file
-          fs.unlinkSync(req.file.path);
-          // Actually we need to be careful here - let's just set req.body[fieldName] to the URL
           req.body[fieldName] = publicUrl;
         } catch (error) {
           console.error('Cloud upload failed, using local file:', error);
