@@ -38,6 +38,7 @@ import learningPathRoutes from './routes/learningPath.routes';
 import pageRoutes from './routes/page.routes';
 import videoRoutes from './routes/video.routes';
 import challengeRoutes from './routes/challenge.routes';
+import examRoutes from './routes/exam.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -140,6 +141,7 @@ app.use('/api/v1/learning-paths', learningPathRoutes);
 app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/challenges', challengeRoutes);
+app.use('/api/v1/exams', examRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -773,6 +775,64 @@ async function initDatabase() {
     // Add payment provider enum constraint check
     await query(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_provider_check`);
     await query(`ALTER TABLE payments ADD CONSTRAINT payments_provider_check CHECK (provider IN ('paystack', 'flutterwave', 'manual'))`);
+
+    // Exam tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS exams (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        duration_minutes INTEGER NOT NULL DEFAULT 60,
+        passing_score INTEGER NOT NULL DEFAULT 70,
+        max_attempts INTEGER NOT NULL DEFAULT 1,
+        shuffle_questions BOOLEAN DEFAULT false,
+        show_results BOOLEAN DEFAULT true,
+        is_published BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS exam_questions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+        question TEXT NOT NULL,
+        question_type VARCHAR(20) NOT NULL DEFAULT 'mcq',
+        options JSONB NOT NULL DEFAULT '[]',
+        correct_answer VARCHAR(500) NOT NULL,
+        points INTEGER NOT NULL DEFAULT 1,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS exam_attempts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        submitted_at TIMESTAMPTZ,
+        score INTEGER DEFAULT 0,
+        passed BOOLEAN DEFAULT false,
+        status VARCHAR(20) DEFAULT 'in_progress'
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS exam_answers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        attempt_id UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+        question_id UUID NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
+        answer TEXT,
+        is_correct BOOLEAN DEFAULT false,
+        points_earned INTEGER DEFAULT 0
+      )
+    `);
+    await query('CREATE INDEX IF NOT EXISTS idx_exams_course ON exams(course_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_exam_questions_exam ON exam_questions(exam_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam ON exam_attempts(exam_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_user ON exam_attempts(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)');
 
     // Add indexes for new tables
     await query('CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)');

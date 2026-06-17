@@ -53,6 +53,9 @@ const StudentSettings = lazy(() => import('@/pages/student/Settings'));
 const StudentTickets = lazy(() => import('@/pages/student/Tickets'));
 const StudentMessages = lazy(() => import('@/pages/student/Messages'));
 const StudentQuizTake = lazy(() => import('@/pages/student/QuizTake'));
+const StudentExamsList = lazy(() => import('@/pages/student/ExamsList'));
+const StudentExamTake = lazy(() => import('@/pages/student/ExamTake'));
+const StudentExamResults = lazy(() => import('@/pages/student/ExamResults'));
 const StudentChallenges = lazy(() => import('@/pages/student/Challenges'));
 
 // Instructor pages
@@ -79,6 +82,7 @@ const AdminPayments = lazy(() => import('@/pages/admin/Payments'));
 const AdminAnalytics = lazy(() => import('@/pages/admin/Analytics'));
 const AdminCourseProposals = lazy(() => import('@/pages/admin/CourseProposals'));
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'));
+const AdminExams = lazy(() => import('@/pages/admin/Exams'));
 const AdminCertificates = lazy(() => import('@/pages/admin/Certificates'));
 const AdminTickets = lazy(() => import('@/pages/admin/Tickets'));
 const AdminBroadcasts = lazy(() => import('@/pages/admin/Broadcasts'));
@@ -151,6 +155,9 @@ function App() {
           <Route path="tickets" element={<SuspenseWrapper><StudentTickets /></SuspenseWrapper>} />
           <Route path="messages" element={<SuspenseWrapper><StudentMessages /></SuspenseWrapper>} />
           <Route path="quiz/:quizId" element={<SuspenseWrapper><StudentQuizTake /></SuspenseWrapper>} />
+          <Route path="exams" element={<SuspenseWrapper><StudentExamsList /></SuspenseWrapper>} />
+          <Route path="exams/:examId" element={<SuspenseWrapper><StudentExamTake /></SuspenseWrapper>} />
+          <Route path="exams/:examId/results/:attemptId" element={<SuspenseWrapper><StudentExamResults /></SuspenseWrapper>} />
           <Route path="challenges" element={<SuspenseWrapper><StudentChallenges /></SuspenseWrapper>} />
           <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
           <Route path="settings" element={<SuspenseWrapper><StudentSettings /></SuspenseWrapper>} />
@@ -181,6 +188,7 @@ function App() {
           <Route path="course-proposals" element={<SuspenseWrapper><AdminCourseProposals /></SuspenseWrapper>} />
           <Route path="applications" element={<SuspenseWrapper><AdminApplications /></SuspenseWrapper>} />
           <Route path="payments" element={<SuspenseWrapper><AdminPayments /></SuspenseWrapper>} />
+          <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
           <Route path="certificates" element={<SuspenseWrapper><AdminCertificates /></SuspenseWrapper>} />
           <Route path="tickets" element={<SuspenseWrapper><AdminTickets /></SuspenseWrapper>} />
           <Route path="broadcasts" element={<SuspenseWrapper><AdminBroadcasts /></SuspenseWrapper>} />
