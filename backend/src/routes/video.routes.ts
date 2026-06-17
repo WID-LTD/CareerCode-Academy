@@ -1,8 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { query } from '../config/db';
-import { uploadFile, deleteFile } from '../config/storage';
+import { deleteFile } from '../config/storage';
 import fs from 'fs';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 
@@ -13,7 +13,7 @@ router.post(
   '/upload/:lessonId',
   authenticate,
   authorize('instructor', 'admin', 'super_admin'),
-  uploadSingle('video'),
+  uploadSingle('video', 'videos'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { lessonId } = req.params;
@@ -32,26 +32,7 @@ router.post(
         return res.status(400).json({ success: false, message: 'No video file provided' });
       }
 
-      let videoUrl: string;
-      const localPath = req.file.path;
-
-      if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
-        try {
-          const buffer = fs.readFileSync(localPath);
-          const publicUrl = await uploadFile(buffer, req.file.filename, 'videos');
-          videoUrl = publicUrl;
-          try {
-            fs.unlinkSync(localPath);
-          } catch (unlinkError) {
-            console.error('Failed to clean up local upload file:', unlinkError);
-          }
-        } catch (s3Error) {
-          console.error('S3 upload failed, falling back to local:', s3Error);
-          videoUrl = `/uploads/${req.file.filename}`;
-        }
-      } else {
-        videoUrl = `/uploads/${req.file.filename}`;
-      }
+      const videoUrl = getFileUrl(req.file) || '';
 
       await query(
         `UPDATE lessons SET video_url = $1, video_thumbnail = NULL WHERE id = $2`,

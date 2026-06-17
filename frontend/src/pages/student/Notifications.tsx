@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
+import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
 import { useStudentStore } from '@/store/studentStore';
 
@@ -19,12 +20,14 @@ const typeStyles: Record<string, { icon: any; color: string; bg: string }> = {
 const filterOptions = ['all', 'unread', 'info', 'success', 'warning'];
 
 export default function Notifications() {
-  const { notifications, fetchNotifications, markNotificationRead, markAllNotificationsRead } = useStudentStore();
+  const { notifications, notificationsPagination, fetchNotifications, markNotificationRead, markAllNotificationsRead } = useStudentStore();
   const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    fetchNotifications({ page, limit: pageSize });
+  }, [fetchNotifications, page, pageSize]);
 
   const filtered = filter === 'all' ? notifications :
     filter === 'unread' ? notifications.filter(n => !n.read) :
@@ -134,6 +137,17 @@ export default function Notifications() {
           })
         )}
       </div>
+
+      {notificationsPagination && (
+        <Pagination
+          page={page}
+          totalPages={notificationsPagination.pages}
+          totalItems={notificationsPagination.total}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+        />
+      )}
     </motion.div>
   );
 }

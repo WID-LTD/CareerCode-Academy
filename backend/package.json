@@ -11,6 +11,9 @@
     "seed:admin": "tsx --require dotenv/config src/seed-admin.ts",
     "generate-videos": "tsx --require dotenv/config src/generate-lesson-videos.ts",
     "migrate": "tsx --require dotenv/config src/migrate.ts",
+    "migrate:s3": "tsx --require dotenv/config src/migrate-local-to-s3.ts",
+    "migrate:videos": "tsx --require dotenv/config src/migrate-local-videos-to-s3.ts",
+    "migrate:placeholders": "tsx --require dotenv/config src/link-unmatched-videos.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

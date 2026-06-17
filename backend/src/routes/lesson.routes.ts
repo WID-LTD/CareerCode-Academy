@@ -5,7 +5,7 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as LessonModel from '../models/lesson';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 
 const router = Router();
@@ -74,7 +74,7 @@ router.post(
         course_id: data.courseId,
         title: data.title,
         description: data.description,
-        video_url: (req as any).file ? `/uploads/${(req as any).file.filename}` : data.videoUrl,
+        video_url: (req as any).file ? getFileUrl((req as any).file) : data.videoUrl,
         duration: data.duration,
         order_index: data.orderIndex,
         resources: data.resources,
@@ -114,7 +114,7 @@ router.put(
       if (req.body.orderIndex !== undefined) data.order_index = req.body.orderIndex;
       if (req.body.resources !== undefined) data.resources = req.body.resources;
       if (req.body.isFree !== undefined) data.is_free = req.body.isFree;
-      if ((req as any).file?.filename) data.video_url = `/uploads/${(req as any).file.filename}`;
+      if ((req as any).file) data.video_url = getFileUrl((req as any).file);
       if (req.body.videoUrl) data.video_url = req.body.videoUrl;
 
       const updated = await LessonModel.updateLesson(req.params.id, data);

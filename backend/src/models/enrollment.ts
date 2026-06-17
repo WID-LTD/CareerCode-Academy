@@ -52,19 +52,30 @@ export async function getAllEnrollmentsPaginated(limit: number, offset: number, 
   return rows;
 }
 
-export async function getEnrollmentsByUser(userId: string): Promise<Enrollment[]> {
-  const { rows } = await query<Enrollment>(
-    `SELECT e.*, c.title as course_title, c.thumbnail as course_thumbnail, c.slug as course_slug, c.category,
+export async function getEnrollmentsByUser(userId: string, limit?: number, offset?: number): Promise<Enrollment[]> {
+  let sql = `SELECT e.*, c.title as course_title, c.thumbnail as course_thumbnail, c.slug as course_slug, c.category,
             u.name as instructor_name,
             (SELECT COUNT(*)::int FROM lessons WHERE course_id = c.id) as total_lessons
      FROM enrollments e
      JOIN courses c ON e.course_id = c.id
      JOIN users u ON c.instructor_id = u.id
      WHERE e.user_id = $1
-     ORDER BY e.enrolled_at DESC`,
+     ORDER BY e.enrolled_at DESC`;
+  const params: any[] = [userId];
+  if (limit !== undefined && offset !== undefined) {
+    sql += ` LIMIT $2 OFFSET $3`;
+    params.push(limit, offset);
+  }
+  const { rows } = await query<Enrollment>(sql, params);
+  return rows;
+}
+
+export async function countEnrollmentsByUser(userId: string): Promise<number> {
+  const { rows } = await query(
+    'SELECT COUNT(*)::int as total FROM enrollments WHERE user_id = $1',
     [userId]
   );
-  return rows;
+  return rows[0]?.total || 0;
 }
 
 export async function getEnrollmentsByCourse(courseId: string): Promise<Enrollment[]> {

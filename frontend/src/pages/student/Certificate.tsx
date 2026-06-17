@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Award, Share2, Calendar, Search, ExternalLink } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
+import { Pagination } from '@/components/ui/Pagination';
 import { formatDate } from '@/lib/utils';
 import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import toast from 'react-hot-toast';
@@ -15,15 +16,23 @@ export default function Certificate() {
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyResult, setVerifyResult] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     loadCertificates();
-  }, []);
+  }, [page, pageSize]);
 
   const loadCertificates = async () => {
     try {
-      const { data } = await api.get('/certificates');
+      const { data } = await api.get(`/certificates?page=${page}&limit=${pageSize}`);
       setCertificates(data.data || []);
+      if (data.pagination) {
+        setTotalItems(data.pagination.total);
+        setTotalPages(data.pagination.pages);
+      }
     } catch {
       // ignore
     } finally {
@@ -159,6 +168,15 @@ export default function Certificate() {
           })}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+      />
     </motion.div>
   );
 }

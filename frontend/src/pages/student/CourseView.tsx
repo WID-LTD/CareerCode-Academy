@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/axios';
 import { useAuthStore } from '../../store/authStore';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -13,6 +14,7 @@ import {
   PlayCircle, CheckCircle, Lock, ChevronLeft, ChevronRight,
   FileText, Download, Maximize, BookOpen, Clock, Award,
   ChevronDown, ChevronUp, PenLine, HelpCircle, Monitor, Code,
+  Bookmark, BookmarkCheck, Gauge, Minimize2, PartyPopper,
 } from 'lucide-react';
 
 type Tab = 'notes' | 'quiz' | 'resources' | 'challenge';
@@ -37,6 +39,21 @@ export default function CourseView() {
   const [resources, setResources] = useState<any[]>([]);
   const [lessonQuiz, setLessonQuiz] = useState<any>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
+  const [bookmarkedLessons, setBookmarkedLessons] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('bookmarkedLessons');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [autoPlayNext, setAutoPlayNext] = useState(true);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const courseContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('bookmarkedLessons', JSON.stringify(bookmarkedLessons));
+  }, [bookmarkedLessons]);
 
   useEffect(() => {
     loadData();
@@ -167,8 +184,8 @@ export default function CourseView() {
       }));
       toast.success(newCompleted ? 'Lesson completed!' : 'Progress updated');
 
-      // Auto advance to next lesson
-      if (newCompleted && currentLessonIndex < totalLessons - 1) {
+      // Auto advance to next lesson (respect autoplay setting)
+      if (newCompleted && autoPlayNext && currentLessonIndex < totalLessons - 1) {
         setTimeout(() => goToLesson(currentLessonIndex + 1), 800);
       }
     } catch (error: any) {
@@ -233,6 +250,37 @@ export default function CourseView() {
     return moduleLessons.filter((l: any) => lessonProgress[l.id]).length;
   };
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowLeft') {
+        if (currentLessonIndex > 0) goToLesson(currentLessonIndex - 1);
+      }
+      if (e.key === 'ArrowRight') {
+        if (currentLessonIndex < totalLessons - 1) goToLesson(currentLessonIndex + 1);
+      }
+      if (e.key === ' ' && videoRef.current) {
+        e.preventDefault();
+        videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
+      }
+      if ((e.key === 'm' || e.key === 'M') && videoRef.current) {
+        videoRef.current.muted = !videoRef.current.muted;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [currentLessonIndex, totalLessons]);
+
+  // Course completion celebration
+  useEffect(() => {
+    if (totalLessons > 0 && completedCount === totalLessons && !showCompletion) {
+      setShowCompletion(true);
+      const timer = setTimeout(() => setShowCompletion(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [completedCount, totalLessons]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -280,7 +328,18 @@ export default function CourseView() {
             <p className="text-gray-500 text-xs truncate">{currentLesson?.title || 'Select a lesson'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Autoplay toggle */}
+          <button
+            onClick={() => setAutoPlayNext(!autoPlayNext)}
+            className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors ${
+              autoPlayNext ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'
+            }`}
+            title={autoPlayNext ? 'Autoplay next lesson is on' : 'Autoplay next lesson is off'}
+          >
+            <PlayCircle className="w-3 h-3" />
+            Auto
+          </button>
           <Badge className="bg-blue-500/20 text-blue-400 text-xs">
             {progressPercent}% complete
           </Badge>
@@ -360,33 +419,49 @@ export default function CourseView() {
                     const isCurrent = calculatedFlatIdx === currentLessonIndex;
                     const isLCompleted = lessonProgress[lesson.id];
                     const watchPos = watchPosition[lesson.id] || 0;
+                    const isBookmarked = bookmarkedLessons[lesson.id];
 
                     return (
-                      <button
+                      <div
                         key={lesson.id}
-                        onClick={() => goToLesson(calculatedFlatIdx)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 transition-colors ${
+                        className={`flex items-center gap-0 transition-colors ${
                           isCurrent
                             ? 'bg-blue-500/10 border-l-2 border-blue-500'
                             : 'hover:bg-gray-800/30 border-l-2 border-transparent'
                         }`}
                       >
-                        {isLCompleted ? (
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        ) : (
-                          <PlayCircle className={`w-3.5 h-3.5 shrink-0 ${lesson.isFree ? 'text-blue-400' : 'text-gray-600'}`} />
-                        )}
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className={`text-xs truncate ${isCurrent ? 'text-white' : 'text-gray-400'}`}>
-                            {lesson.title}
-                          </p>
-                          {watchPos > 0 && !isLCompleted && (
-                            <div className="w-full bg-gray-800 rounded-full h-0.5 mt-0.5">
-                              <div className="bg-blue-500 h-0.5 rounded-full" style={{ width: `${Math.min((watchPos / 600) * 100, 100)}%` }} />
-                            </div>
+                        <button
+                          onClick={() => { if (!isCurrent) goToLesson(calculatedFlatIdx); }}
+                          className="flex-1 flex items-center gap-2 py-1.5 px-1 min-w-0"
+                        >
+                          {isLCompleted ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          ) : (
+                            <PlayCircle className={`w-3.5 h-3.5 shrink-0 ${lesson.isFree ? 'text-blue-400' : 'text-gray-600'}`} />
                           )}
-                        </div>
-                      </button>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className={`text-xs truncate ${isCurrent ? 'text-white' : 'text-gray-400'}`}>
+                              {lesson.title}
+                            </p>
+                            {watchPos > 0 && !isLCompleted && (
+                              <div className="w-full bg-gray-800 rounded-full h-0.5 mt-0.5">
+                                <div className="bg-blue-500 h-0.5 rounded-full" style={{ width: `${Math.min((watchPos / 600) * 100, 100)}%` }} />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setBookmarkedLessons(prev => ({ ...prev, [lesson.id]: !prev[lesson.id] }))}
+                          className="p-1.5 shrink-0 hover:text-yellow-400 transition-colors"
+                          title={isBookmarked ? 'Remove bookmark' : 'Bookmark lesson'}
+                        >
+                          {isBookmarked ? (
+                            <BookmarkCheck className="w-3 h-3 text-yellow-400" />
+                          ) : (
+                            <Bookmark className="w-3 h-3 text-gray-600" />
+                          )}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -398,16 +473,53 @@ export default function CourseView() {
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Video Area */}
-          <div className="bg-black flex items-center justify-center relative" style={{ maxHeight: '55vh' }}>
+          <div className="bg-black flex items-center justify-center relative" style={{ maxHeight: '55vh' }} ref={courseContainerRef}>
             {currentLesson?.video_url ? (
-              <video
-                className="w-full h-full object-contain"
-                src={currentLesson.video_url}
-                controls
-                poster={optimizeVideoThumbnail(currentLesson.video_url, 1280, 720)}
-                onTimeUpdate={() => handleWatchProgress(currentLesson.id)}
-                onPause={() => handleWatchProgress(currentLesson.id)}
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-contain"
+                  src={currentLesson.video_url}
+                  controls
+                  poster={optimizeVideoThumbnail(currentLesson.video_url, 1280, 720)}
+                  onTimeUpdate={() => handleWatchProgress(currentLesson.id)}
+                  onPause={() => handleWatchProgress(currentLesson.id)}
+                  onRateChange={() => { if (videoRef.current) videoRef.current.playbackRate = playbackSpeed; }}
+                />
+                {/* Speed Control */}
+                <div className="absolute bottom-2 right-14 z-10 flex gap-1">
+                  {[0.5, 1, 1.25, 1.5, 2].map(speed => (
+                    <button
+                      key={speed}
+                      onClick={() => {
+                        setPlaybackSpeed(speed);
+                        if (videoRef.current) videoRef.current.playbackRate = speed;
+                      }}
+                      className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                        playbackSpeed === speed
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-800/80 text-gray-300 hover:bg-gray-700/80'
+                      }`}
+                    >
+                      {speed}x
+                    </button>
+                  ))}
+                </div>
+                {/* Fullscreen Toggle */}
+                <button
+                  onClick={() => {
+                    if (document.fullscreenElement) {
+                      document.exitFullscreen();
+                    } else {
+                      courseContainerRef.current?.requestFullscreen();
+                    }
+                  }}
+                  className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-gray-700/80 transition-colors z-10"
+                  title="Toggle fullscreen"
+                >
+                  <Maximize className="w-4 h-4" />
+                </button>
+              </>
             ) : (
               <div className="text-center p-12">
                 <PlayCircle className="w-20 h-20 text-blue-400/50 mx-auto mb-4" />
@@ -554,6 +666,47 @@ export default function CourseView() {
           </div>
         </div>
       </div>
+      {/* Completion Celebration */}
+      <AnimatePresence>
+        {showCompletion && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowCompletion(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={{ type: 'spring', damping: 15 }}
+              className="bg-gray-900 rounded-2xl p-8 text-center max-w-sm mx-4 border border-emerald-500/30 shadow-2xl shadow-emerald-500/10"
+              onClick={e => e.stopPropagation()}
+            >
+              <motion.div
+                animate={{ rotate: [0, -10, 10, -10, 0], scale: [1, 1.1, 1] }}
+                transition={{ duration: 0.6 }}
+              >
+                <PartyPopper className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+              </motion.div>
+              <h2 className="text-2xl font-bold text-white mb-2">Congratulations!</h2>
+              <p className="text-gray-400 mb-2">
+                You completed all lessons in <span className="text-emerald-400 font-semibold">{course?.title}</span>
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Great dedication! Keep up the amazing work.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={() => setShowCompletion(false)}>Continue</Button>
+                <Link to="/student/certificates">
+                  <Button variant="outline">View Certificate</Button>
+                </Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
