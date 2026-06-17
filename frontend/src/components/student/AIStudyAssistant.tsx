@@ -5,6 +5,7 @@ import {
   Loader2, BookOpen, HelpCircle, FileText, ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import api from '@/lib/axios';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -44,34 +45,30 @@ export function AIStudyAssistant() {
   const handleSend = async (content: string) => {
     if (!content.trim()) return;
     const userMsg: ChatMessage = { role: 'user', content: content.trim() };
+    const updatedMessages = [...messages, userMsg];
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
 
-    const responses: Record<string, string> = {
-      summarize: "Here's a summary of your current lesson:\n\n**Key Points:**\n1. Core concepts and fundamentals covered\n2. Practical examples demonstrated\n3. Best practices and common patterns\n4. Next steps for deeper learning\n\nWould you like me to elaborate on any section?",
-      explain: "Let me break this down simply:\n\nThink of it like building blocks. Each concept builds on the previous one. The main idea is to **understand the relationship** between components and how they work together.\n\nDoes that help? Would you like a more detailed explanation?",
-      quiz: "Here's a quick quiz:\n\n1. What is the primary purpose of this concept?\n   a) Data management\n   b) User interface\n   c) Performance optimization\n   d) All of the above\n\n2. Which pattern is most commonly used?\n   a) Singleton\n   b) Observer\n   c) Factory\n   d) Decorator\n\nReply with your answers!",
-      plan: "Here's a personalized study plan:\n\n**Week 1:** Foundation & Basics\n- Complete core modules\n- Practice exercises daily\n\n**Week 2:** Intermediate Concepts\n- Build a small project\n- Review community examples\n\n**Week 3:** Advanced Topics\n- Deep dive into complex patterns\n- Contribute to open source\n\n**Week 4:** Mastery\n- Build a portfolio project\n- Teach others to solidify knowledge",
-    };
-
-    const lower = content.toLowerCase();
-    let reply: string;
-    if (lower.includes('summar')) {
-      reply = responses.summarize;
-    } else if (lower.includes('explain')) {
-      reply = responses.explain;
-    } else if (lower.includes('quiz')) {
-      reply = responses.quiz;
-    } else if (lower.includes('plan')) {
-      reply = responses.plan;
-    } else {
-      reply = `Great question about "${content}"!\n\nBased on your learning history and current courses, here's what I recommend:\n\n1. **Review the core concepts** in your current lesson\n2. **Practice with the exercises** provided\n3. **Check the community forum** for discussions\n4. **Try the hands-on project** to solidify understanding\n\nWould you like me to dive deeper into any specific aspect?`;
+    try {
+      const { data } = await api.post('/student/ai/chat', { messages: updatedMessages });
+      if (data.success && data.data) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.data.content }]);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error in AI assistant:', error);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error while communicating with the AI service. Please try again.',
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
     }
-
-    await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    setIsTyping(false);
   };
 
   return (

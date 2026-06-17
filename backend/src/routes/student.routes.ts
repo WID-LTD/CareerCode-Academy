@@ -179,9 +179,20 @@ router.get('/dashboard', async (req: AuthRequest, res: Response, next: NextFunct
       `, [userId]),
 
       query(`
-        SELECT a.id, a.title, a.due_date, a.max_score, c.title as course_title, 'medium' as priority, 'pending' as status
+        SELECT a.id, a.title, a.due_date, a.max_score, c.title as course_title,
+          CASE 
+            WHEN a.due_date - NOW() <= INTERVAL '2 days' THEN 'high'
+            WHEN a.due_date - NOW() <= INTERVAL '7 days' THEN 'medium'
+            ELSE 'low'
+          END as priority,
+          CASE 
+            WHEN s.score IS NOT NULL THEN 'graded' 
+            WHEN s.id IS NOT NULL THEN 'submitted' 
+            ELSE 'not-started' 
+          END as status
         FROM assignments a
         JOIN courses c ON c.id = a.course_id
+        LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = $1
         WHERE a.due_date >= NOW() AND a.course_id IN (
           SELECT course_id FROM enrollments WHERE user_id = $1
         )
@@ -450,8 +461,12 @@ router.get('/assignments', async (req: AuthRequest, res: Response, next: NextFun
     const { rows } = await query(`
       SELECT a.id, a.title, a.description, a.due_date, a.max_score, a.course_id,
         c.title as course, c.slug as course_slug,
-        COALESCE(s.status, 'not-started') as status,
-        s.grade, s.feedback
+        CASE 
+          WHEN s.score IS NOT NULL THEN 'graded' 
+          WHEN s.id IS NOT NULL THEN 'submitted' 
+          ELSE 'not-started' 
+        END as status,
+        s.score as grade, s.feedback
       FROM assignments a
       JOIN courses c ON c.id = a.course_id
       LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = $1
