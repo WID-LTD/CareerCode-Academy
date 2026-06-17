@@ -32,7 +32,7 @@ export default function Login() {
               <span className="text-xl font-bold gradient-text">CareerCode</span>
             </Link>
             <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
-            <p className="text-gray-500">Sign in to continue your learning journey.</p>
+            <p className="text-gray-600 dark:text-gray-400">Sign in to continue your learning journey.</p>
           </div>
 
           <GlassCard className="p-8">
@@ -52,7 +52,7 @@ export default function Login() {
                 placeholder="Enter your password"
                 icon={<Lock className="w-4 h-4" />}
                 rightIcon={
-                  <button type="button" onClick={() => setShowPassword(!showPassword)}>
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 }
@@ -74,12 +74,12 @@ export default function Login() {
 
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200 dark:border-gray-800" /></div>
-              <div className="relative flex justify-center text-sm"><span className="px-3 bg-white dark:bg-gray-900 text-gray-500">or continue with</span></div>
+              <div className="relative flex justify-center text-sm"><span className="px-3 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400">or continue with</span></div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" icon={<Github className="w-4 h-4" />}>GitHub</Button>
-              <Button variant="outline" icon={<Twitter className="w-4 h-4" />}>Twitter</Button>
+              <Button variant="outline" icon={<Github className="w-4 h-4" />} aria-label="Sign in with GitHub" disabled>GitHub</Button>
+              <Button variant="outline" icon={<Twitter className="w-4 h-4" />} aria-label="Sign in with Twitter" disabled>Twitter</Button>
             </div>
           </GlassCard>
 

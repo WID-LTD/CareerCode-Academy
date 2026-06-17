@@ -1,6 +1,5 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Loader } from '@/components/ui/Loader';
@@ -96,7 +95,6 @@ function App() {
   }, [initialize]);
 
   return (
-    <AnimatePresence mode="wait">
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<SuspenseWrapper><Home /></SuspenseWrapper>} />
@@ -179,7 +177,6 @@ function App() {
 
         <Route path="*" element={<SuspenseWrapper><NotFound /></SuspenseWrapper>} />
       </Routes>
-    </AnimatePresence>
   );
 }
 
