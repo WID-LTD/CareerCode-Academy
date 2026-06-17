@@ -28,6 +28,62 @@ export default function Leaderboard() {
         <p className="text-gray-500 mt-1">See how you rank among your peers.</p>
       </div>
 
+      {/* Podium */}
+      {leaderboard.length >= 3 && (
+        <div className="flex items-end justify-center gap-4 mb-8">
+          {/* 2nd Place */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="flex flex-col items-center gap-2"
+          >
+            <div className="w-12 h-12 rounded-full bg-gray-400 flex items-center justify-center text-lg font-bold text-white shadow-lg">
+              {leaderboard[1].name.charAt(0)}
+            </div>
+            <span className="text-xs font-medium text-gray-500 truncate max-w-[80px] text-center">{leaderboard[1].name}</span>
+            <div className="w-16 h-20 bg-gray-200 dark:bg-gray-800 rounded-t-xl flex items-center justify-center">
+              <Medal className="w-5 h-5 text-gray-400" />
+            </div>
+            <span className="text-[10px] text-gray-500 font-medium">2nd</span>
+          </motion.div>
+
+          {/* 1st Place */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0 }}
+            className="flex flex-col items-center gap-2"
+          >
+            <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center text-xl font-bold text-white shadow-lg ring-4 ring-yellow-500/30">
+              {leaderboard[0].name.charAt(0)}
+            </div>
+            <span className="text-sm font-semibold truncate max-w-[90px] text-center">{leaderboard[0].name}</span>
+            <div className="w-20 h-28 bg-gradient-to-t from-yellow-500/20 to-transparent rounded-t-xl flex items-center justify-center border border-yellow-500/30">
+              <Crown className="w-6 h-6 text-yellow-500" />
+            </div>
+            <span className="text-xs font-semibold text-yellow-500">1st</span>
+          </motion.div>
+
+          {/* 3rd Place */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex flex-col items-center gap-2"
+          >
+            <div className="w-12 h-12 rounded-full bg-amber-600 flex items-center justify-center text-lg font-bold text-white shadow-lg">
+              {leaderboard[2].name.charAt(0)}
+            </div>
+            <span className="text-xs font-medium text-gray-500 truncate max-w-[80px] text-center">{leaderboard[2].name}</span>
+            <div className="w-16 h-16 bg-amber-600/10 dark:bg-amber-900/20 rounded-t-xl flex items-center justify-center border border-amber-600/20">
+              <Medal className="w-5 h-5 text-amber-600" />
+            </div>
+            <span className="text-[10px] text-gray-500 font-medium">3rd</span>
+          </motion.div>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-3">
           <GlassCard className="p-0 overflow-hidden" hover={false}>

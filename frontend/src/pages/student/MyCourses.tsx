@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Pagination } from '@/components/ui/Pagination';
 import { BookOpen, ArrowRight, Clock, PlayCircle } from 'lucide-react';
 import { optimizeImageUrl } from '@/lib/cloudinary';
 import { PageSkeleton, CardSkeleton } from '@/components/student/SkeletonLoader';
@@ -30,6 +31,10 @@ export default function MyCourses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [unenrollingIds, setUnenrollingIds] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const handleUnenroll = async (e: React.MouseEvent, courseId: string) => {
     e.preventDefault();
@@ -56,14 +61,18 @@ export default function MyCourses() {
 
   useEffect(() => {
     fetchEnrollments();
-  }, []);
+  }, [page, pageSize]);
 
   const fetchEnrollments = async () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get('/enrollments');
+      const { data } = await api.get(`/enrollments?page=${page}&limit=${pageSize}`);
       setEnrollments(data.data || []);
+      if (data.pagination) {
+        setTotalItems(data.pagination.total);
+        setTotalPages(data.pagination.pages);
+      }
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to load enrollments');
     } finally {
@@ -184,6 +193,15 @@ export default function MyCourses() {
           })}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+      />
     </motion.div>
   );
 }

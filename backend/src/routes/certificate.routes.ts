@@ -30,6 +30,31 @@ router.get('/verify/:code', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
+// GET /certificates/ - get current user's certificates
+router.get(
+  '/',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const offset = (page - 1) * limit;
+
+      const certificates = await CertificateModel.getCertificatesByUser(userId, limit, offset);
+      const total = await CertificateModel.countCertificatesByUser(userId);
+
+      res.json({
+        success: true,
+        data: certificates,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /certificates/:userId - get all certificates for a user
 router.get(
   '/:userId',
@@ -41,8 +66,18 @@ router.get(
         return res.status(403).json({ success: false, message: 'Forbidden' });
       }
 
-      const certificates = await CertificateModel.getCertificatesByUser(req.params.userId);
-      res.json({ success: true, data: certificates });
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const offset = (page - 1) * limit;
+
+      const certificates = await CertificateModel.getCertificatesByUser(req.params.userId, limit, offset);
+      const total = await CertificateModel.countCertificatesByUser(req.params.userId);
+
+      res.json({
+        success: true,
+        data: certificates,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      });
     } catch (error) {
       next(error);
     }

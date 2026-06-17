@@ -3,6 +3,7 @@ import { api } from '../../lib/axios';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Pagination } from '../../components/ui/Pagination';
 import { Loader } from '../../components/ui/Loader';
 import CodeEditor from '../../components/student/CodeEditor';
 import { Code, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-react';
@@ -11,16 +12,24 @@ export default function Challenges() {
   const [challenges, setChallenges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     loadChallenges();
-  }, []);
+  }, [page, pageSize]);
 
   const loadChallenges = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/student/challenges');
+      const { data } = await api.get(`/student/challenges?page=${page}&limit=${pageSize}`);
       setChallenges(data.data || []);
+      if (data.pagination) {
+        setTotalItems(data.pagination.total);
+        setTotalPages(data.pagination.pages);
+      }
     } catch {
       setChallenges([]);
     } finally {
@@ -111,6 +120,15 @@ export default function Challenges() {
           })
         )}
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

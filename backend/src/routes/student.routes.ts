@@ -4,38 +4,76 @@ import { query } from '../config/db';
 import { io } from '../config/socket';
 
 const router = Router();
+const analyticsCache = new Map<string, { data: any; expiresAt: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 router.use(authenticate);
 
-function computeBadges(userId: string, stats: any, enrollCount: number, lessonCount: number, completedCourses: number, certCount: number, streak: number) {
+function getCachedOrFetch(key: string, fetcher: () => Promise<any>): Promise<any> {
+  const cached = analyticsCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.data);
+  }
+  return fetcher().then(data => {
+    analyticsCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL });
+    return data;
+  });
+}
+
+function computeBadges(userId: string, stats: any, enrollCount: number, lessonCount: number, completedCourses: number, certCount: number, streak: number, submissionCount?: number, quizPassed?: number, reviewCount?: number) {
   const badges: any[] = [];
 
-  if (enrollCount >= 1) badges.push({ id: 'first-course', name: 'First Course', description: 'Enrolled in your first course', icon: 'book', earned: true, earned_at: new Date().toISOString() });
-  if (lessonCount >= 5) badges.push({ id: 'quick-learner', name: 'Quick Learner', description: 'Completed 5 lessons', icon: 'zap', earned: true, earned_at: new Date().toISOString() });
-  if (lessonCount >= 25) badges.push({ id: 'dedicated', name: 'Dedicated', description: 'Completed 25 lessons', icon: 'target', earned: true, earned_at: new Date().toISOString() });
-  if (lessonCount >= 100) badges.push({ id: 'scholar', name: 'Scholar', description: 'Completed 100 lessons', icon: 'award', earned: true, earned_at: new Date().toISOString() });
-  if (completedCourses >= 1) badges.push({ id: 'graduate', name: 'Course Graduate', description: 'Completed your first course', icon: 'graduation-cap', earned: true, earned_at: new Date().toISOString() });
-  if (completedCourses >= 3) badges.push({ id: 'knowledge-seeker', name: 'Knowledge Seeker', description: 'Completed 3 courses', icon: 'book-open', earned: true, earned_at: new Date().toISOString() });
-  if (certCount >= 1) badges.push({ id: 'certified', name: 'Certified', description: 'Earned your first certificate', icon: 'certificate', earned: true, earned_at: new Date().toISOString() });
-  if (streak >= 7) badges.push({ id: 'week-warrior', name: 'Week Warrior', description: 'Maintained a 7-day streak', icon: 'flame', earned: true, earned_at: new Date().toISOString() });
-  if (streak >= 30) badges.push({ id: 'iron-will', name: 'Iron Will', description: 'Maintained a 30-day streak', icon: 'shield', earned: true, earned_at: new Date().toISOString() });
-  if (enrollCount >= 5) badges.push({ id: 'explorer', name: 'Explorer', description: 'Enrolled in 5 courses', icon: 'compass', earned: true, earned_at: new Date().toISOString() });
+  if (enrollCount >= 1) badges.push({ id: 'first-course', name: 'First Course', description: 'Enrolled in your first course', icon: 'Zap', earned: true, earned_at: new Date().toISOString() });
+  if (lessonCount >= 5) badges.push({ id: 'quick-learner', name: 'Quick Learner', description: 'Completed 5 lessons', icon: 'Zap', earned: true, earned_at: new Date().toISOString() });
+  if (lessonCount >= 25) badges.push({ id: 'dedicated', name: 'Dedicated', description: 'Completed 25 lessons', icon: 'Brain', earned: true, earned_at: new Date().toISOString() });
+  if (lessonCount >= 100) badges.push({ id: 'scholar', name: 'Scholar', description: 'Completed 100 lessons', icon: 'Award', earned: true, earned_at: new Date().toISOString() });
+  if (completedCourses >= 1) badges.push({ id: 'graduate', name: 'Course Graduate', description: 'Completed your first course', icon: 'GraduationCap', earned: true, earned_at: new Date().toISOString() });
+  if (completedCourses >= 3) badges.push({ id: 'knowledge-seeker', name: 'Knowledge Seeker', description: 'Completed 3 courses', icon: 'Brain', earned: true, earned_at: new Date().toISOString() });
+  if (certCount >= 1) badges.push({ id: 'certified', name: 'Certified', description: 'Earned your first certificate', icon: 'Award', earned: true, earned_at: new Date().toISOString() });
+  if (streak >= 7) badges.push({ id: 'week-warrior', name: 'Week Warrior', description: 'Maintained a 7-day streak', icon: 'Flame', earned: true, earned_at: new Date().toISOString() });
+  if (streak >= 30) badges.push({ id: 'iron-will', name: 'Iron Will', description: 'Maintained a 30-day streak', icon: 'Flame', earned: true, earned_at: new Date().toISOString() });
+  if (enrollCount >= 5) badges.push({ id: 'explorer', name: 'Explorer', description: 'Enrolled in 5 courses', icon: 'HeartHandshake', earned: true, earned_at: new Date().toISOString() });
 
-  // Locked badges (not yet earned)
-  if (lessonCount < 5) badges.push({ id: 'quick-learner', name: 'Quick Learner', description: 'Complete 5 lessons', icon: 'zap', earned: false, progress: Math.round((lessonCount / 5) * 100) });
-  if (lessonCount < 25) badges.push({ id: 'dedicated', name: 'Dedicated', description: 'Complete 25 lessons', icon: 'target', earned: false, progress: Math.round((lessonCount / 25) * 100) });
-  if (lessonCount < 100) badges.push({ id: 'scholar', name: 'Scholar', description: 'Complete 100 lessons', icon: 'award', earned: false, progress: Math.round((lessonCount / 100) * 100) });
-  if (completedCourses < 1) badges.push({ id: 'graduate', name: 'Course Graduate', description: 'Complete your first course', icon: 'graduation-cap', earned: false });
-  if (completedCourses < 3) badges.push({ id: 'knowledge-seeker', name: 'Knowledge Seeker', description: 'Complete 3 courses', icon: 'book-open', earned: false, progress: Math.round((completedCourses / 3) * 100) });
-  if (certCount < 1) badges.push({ id: 'certified', name: 'Certified', description: 'Earn your first certificate', icon: 'certificate', earned: false });
-  if (streak < 7) badges.push({ id: 'week-warrior', name: 'Week Warrior', description: 'Maintain a 7-day streak', icon: 'flame', earned: false, progress: Math.round((streak / 7) * 100) });
-  if (streak < 30) badges.push({ id: 'iron-will', name: 'Iron Will', description: 'Maintain a 30-day streak', icon: 'shield', earned: false, progress: Math.round((streak / 30) * 100) });
-  if (enrollCount < 5) badges.push({ id: 'explorer', name: 'Explorer', description: 'Enroll in 5 courses', icon: 'compass', earned: false, progress: Math.round((enrollCount / 5) * 100) });
+  // New badges
+  const subCount = submissionCount || 0;
+  if (subCount >= 1) badges.push({ id: 'first-submission', name: 'First Submission', description: 'Submitted your first assignment', icon: 'Award', earned: true, earned_at: new Date().toISOString() });
+  if (subCount >= 5) badges.push({ id: 'assignment-hero', name: 'Assignment Hero', description: 'Submitted 5 assignments', icon: 'Award', earned: true, earned_at: new Date().toISOString() });
+
+  const qPassed = quizPassed || 0;
+  if (qPassed >= 1) badges.push({ id: 'quiz-taker', name: 'Quiz Taker', description: 'Passed your first quiz', icon: 'Brain', earned: true, earned_at: new Date().toISOString() });
+  if (qPassed >= 5) badges.push({ id: 'quiz-master', name: 'Quiz Master', description: 'Passed 5 quizzes', icon: 'Brain', earned: true, earned_at: new Date().toISOString() });
+
+  const revCount = reviewCount || 0;
+  if (revCount >= 1) badges.push({ id: 'reviewer', name: 'Reviewer', description: 'Left your first course review', icon: 'HeartHandshake', earned: true, earned_at: new Date().toISOString() });
+
+  // Locked badges
+  if (lessonCount < 5) badges.push({ id: 'quick-learner', name: 'Quick Learner', description: 'Complete 5 lessons', icon: 'Zap', earned: false, progress: Math.round((lessonCount / 5) * 100) });
+  if (lessonCount < 25) badges.push({ id: 'dedicated', name: 'Dedicated', description: 'Complete 25 lessons', icon: 'Brain', earned: false, progress: Math.round((lessonCount / 25) * 100) });
+  if (lessonCount < 100) badges.push({ id: 'scholar', name: 'Scholar', description: 'Complete 100 lessons', icon: 'Award', earned: false, progress: Math.round((lessonCount / 100) * 100) });
+  if (completedCourses < 1) badges.push({ id: 'graduate', name: 'Course Graduate', description: 'Complete your first course', icon: 'GraduationCap', earned: false });
+  if (completedCourses < 3) badges.push({ id: 'knowledge-seeker', name: 'Knowledge Seeker', description: 'Complete 3 courses', icon: 'Brain', earned: false, progress: Math.round((completedCourses / 3) * 100) });
+  if (certCount < 1) badges.push({ id: 'certified', name: 'Certified', description: 'Earn your first certificate', icon: 'Award', earned: false });
+  if (streak < 7) badges.push({ id: 'week-warrior', name: 'Week Warrior', description: 'Maintain a 7-day streak', icon: 'Flame', earned: false, progress: Math.round((streak / 7) * 100) });
+  if (streak < 30) badges.push({ id: 'iron-will', name: 'Iron Will', description: 'Maintain a 30-day streak', icon: 'Flame', earned: false, progress: Math.round((streak / 30) * 100) });
+  if (enrollCount < 5) badges.push({ id: 'explorer', name: 'Explorer', description: 'Enroll in 5 courses', icon: 'HeartHandshake', earned: false, progress: Math.round((enrollCount / 5) * 100) });
+
+  if (subCount < 1) badges.push({ id: 'first-submission', name: 'First Submission', description: 'Submit your first assignment', icon: 'Award', earned: false });
+  if (subCount < 5) badges.push({ id: 'assignment-hero', name: 'Assignment Hero', description: 'Submit 5 assignments', icon: 'Award', earned: false, progress: Math.round((subCount / 5) * 100) });
+  if (qPassed < 1) badges.push({ id: 'quiz-taker', name: 'Quiz Taker', description: 'Pass your first quiz', icon: 'Brain', earned: false });
+  if (qPassed < 5) badges.push({ id: 'quiz-master', name: 'Quiz Master', description: 'Pass 5 quizzes', icon: 'Brain', earned: false, progress: Math.round((qPassed / 5) * 100) });
+  if (revCount < 1) badges.push({ id: 'reviewer', name: 'Reviewer', description: 'Leave your first course review', icon: 'HeartHandshake', earned: false });
 
   return badges;
 }
 
-async function computeAnalytics(userId: string) {
+async function computeAnalytics(userId: string, useCache = true) {
+  const cacheKey = `analytics:${userId}`;
+  if (useCache) {
+    const cached = analyticsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+  }
   // Weekly activity - lessons completed per day of current week
   const weeklyRes = await query(`
     SELECT TO_CHAR(completed_at, 'Dy') as day, COUNT(*)::int as hours
@@ -81,7 +119,9 @@ async function computeAnalytics(userId: string) {
     previous: r.previous,
   }));
 
-  return { weeklyActivity, monthlyLearning, skillGrowth };
+  const result = { weeklyActivity, monthlyLearning, skillGrowth };
+  analyticsCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL });
+  return result;
 }
 
 async function computeStreak(userId: string): Promise<number> {
@@ -138,7 +178,7 @@ router.get('/dashboard', async (req: AuthRequest, res: Response, next: NextFunct
   try {
     const userId = req.user!.userId;
 
-    const [statsRes, coursesRes, activityRes, assignmentsRes, recommendedRes, xpRes] = await Promise.all([
+    const [statsRes, coursesRes, activityRes, assignmentsRes, recommendedRes, xpRes, extraBadgesRes] = await Promise.all([
       query(`
         SELECT
           (SELECT COUNT(*)::int FROM enrollments WHERE user_id = $1) AS enrolled_courses,
@@ -146,6 +186,14 @@ router.get('/dashboard', async (req: AuthRequest, res: Response, next: NextFunct
           COALESCE((SELECT SUM(jsonb_array_length(completed_lessons))::int FROM enrollments WHERE user_id = $1), 0) AS completed_lessons,
           COALESCE((SELECT COUNT(*)::int FROM certificates WHERE user_id = $1), 0) AS certificates,
           COALESCE((SELECT ROUND(AVG(progress))::int FROM enrollments WHERE user_id = $1), 0) AS average_progress
+      `, [userId]),
+
+      // Additional stats for new badges
+      query(`
+        SELECT
+          (SELECT COUNT(*)::int FROM submissions WHERE student_id = $1) AS submissions,
+          (SELECT COUNT(*)::int FROM quiz_attempts WHERE user_id = $1 AND passed = true) AS quizzes_passed,
+          (SELECT COUNT(*)::int FROM reviews WHERE user_id = $1) AS reviews
       `, [userId]),
 
       query(`
@@ -280,8 +328,12 @@ router.get('/dashboard', async (req: AuthRequest, res: Response, next: NextFunct
     const completedLessons = Number(stats.completed_lessons) || 0;
     const completedCourses = Number(stats.completed_courses) || 0;
     const certificatesCount = Number(stats.certificates) || 0;
+    const extraBadgeStats = extraBadgesRes.rows[0] || {};
+    const submissionCount = Number(extraBadgeStats.submissions) || 0;
+    const quizzesPassed = Number(extraBadgeStats.quizzes_passed) || 0;
+    const reviewCount = Number(extraBadgeStats.reviews) || 0;
 
-    const badges = computeBadges(userId, stats, enrolledCourses, completedLessons, completedCourses, certificatesCount, streak);
+    const badges = computeBadges(userId, stats, enrolledCourses, completedLessons, completedCourses, certificatesCount, streak, submissionCount, quizzesPassed, reviewCount);
 
     const totalLearningHours = Math.round(completedLessons * 0.5);
 
@@ -314,7 +366,7 @@ router.get('/dashboard', async (req: AuthRequest, res: Response, next: NextFunct
 // GET /student/analytics
 router.get('/analytics', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const analytics = await computeAnalytics(req.user!.userId);
+    const analytics = await computeAnalytics(req.user!.userId, true);
     res.json({ success: true, data: analytics });
   } catch (error) { next(error); }
 });
@@ -348,23 +400,38 @@ router.get('/leaderboard', async (req: AuthRequest, res: Response, next: NextFun
           COALESCE((SELECT SUM(jsonb_array_length(completed_lessons)) FROM enrollments WHERE user_id = u.id), 0) * 10 +
           COALESCE((SELECT COUNT(*) FROM certificates WHERE user_id = u.id), 0) * 100
         ) as xp_points,
-        (SELECT COUNT(*) FROM user_badges WHERE user_id = u.id) as badges_count
+        (SELECT COUNT(*) FROM user_badges WHERE user_id = u.id) as badges_count,
+        COALESCE((
+          SELECT COUNT(*) FROM lesson_progress lp
+          WHERE lp.user_id = u.id AND lp.completed = true
+            AND lp.completed_at >= NOW() - INTERVAL '7 days'
+        ), 0) as weekly_lessons
       FROM users u
       WHERE u.role = 'student'
       ORDER BY xp_points DESC
       LIMIT 50
     `);
 
-    const leaderboard = rows.map((r: any, i: number) => ({
-      userId: r.id,
-      name: r.name,
-      avatar: r.avatar,
-      xpPoints: Number(r.xp_points) || 0,
-      badges: Number(r.badges_count) || 0,
-      rank: i + 1,
-      rankChange: 0,
-      isCurrentUser: r.id === userId,
-    }));
+    // Compute rank changes based on weekly lesson activity (surrogate for rank movement)
+    const weeklySorted = [...rows].sort((a: any, b: any) => Number(b.weekly_lessons) - Number(a.weekly_lessons));
+    const weeklyRanks = new Map(weeklySorted.map((r: any, i: number) => [r.id, i + 1]));
+    const currentRanks = new Map(rows.map((r: any, i: number) => [r.id, i + 1]));
+
+    const leaderboard = rows.map((r: any, i: number) => {
+      const currentRank = i + 1;
+      const weeklyRank = weeklyRanks.get(r.id) || currentRank;
+      const rankChange = weeklyRank - currentRank;
+      return {
+        userId: r.id,
+        name: r.name,
+        avatar: r.avatar,
+        xpPoints: Number(r.xp_points) || 0,
+        badges: Number(r.badges_count) || 0,
+        rank: currentRank,
+        rankChange: Math.max(-10, Math.min(10, rankChange)),
+        isCurrentUser: r.id === userId,
+      };
+    });
 
     res.json({ success: true, data: leaderboard });
   } catch (error) { next(error); }
@@ -458,6 +525,10 @@ router.get('/recommended', async (req: AuthRequest, res: Response, next: NextFun
 router.get('/assignments', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+
     const { rows } = await query(`
       SELECT a.id, a.title, a.description, a.due_date, a.max_score, a.course_id,
         c.title as course, c.slug as course_slug,
@@ -472,7 +543,15 @@ router.get('/assignments', async (req: AuthRequest, res: Response, next: NextFun
       LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = $1
       WHERE a.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
       ORDER BY a.due_date ASC
+      LIMIT $2 OFFSET $3
+    `, [userId, limit, offset]);
+
+    const countRes = await query(`
+      SELECT COUNT(*)::int as total
+      FROM assignments a
+      WHERE a.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
     `, [userId]);
+    const total = countRes.rows[0]?.total || 0;
 
     const assignments = rows.map((a: any) => ({
       id: a.id,
@@ -487,7 +566,11 @@ router.get('/assignments', async (req: AuthRequest, res: Response, next: NextFun
       max_score: a.max_score,
     }));
 
-    res.json({ success: true, data: assignments });
+    res.json({
+      success: true,
+      data: assignments,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (error) { next(error); }
 });
 
@@ -495,6 +578,10 @@ router.get('/assignments', async (req: AuthRequest, res: Response, next: NextFun
 router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+
     const { rows } = await query(`
       SELECT cc.*, l.title as lesson_title, c.title as course_title, c.slug as course_slug,
         cs.id as submission_id, cs.code as submission_code, cs.passed as submission_passed,
@@ -510,7 +597,8 @@ router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunc
         LIMIT 1
       ) cs ON true
       ORDER BY cc.created_at DESC
-    `, [userId]);
+      LIMIT $2 OFFSET $3
+    `, [userId, limit, offset]);
 
     const challenges = rows.map((r: any) => ({
       id: r.id,
@@ -535,7 +623,20 @@ router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunc
       } : null,
     }));
 
-    res.json({ success: true, data: challenges });
+    const countRes = await query(`
+      SELECT COUNT(*)::int as total
+      FROM coding_challenges cc
+      JOIN lessons l ON cc.lesson_id = l.id
+      JOIN courses c ON l.course_id = c.id
+      JOIN enrollments e ON e.course_id = c.id AND e.user_id = $1
+    `, [userId]);
+    const total = countRes.rows[0]?.total || 0;
+
+    res.json({
+      success: true,
+      data: challenges,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (error) { next(error); }
 });
 

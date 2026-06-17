@@ -1,9 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   BookOpen, ChevronRight, ChevronLeft, Play, Calendar,
-  Clock, AlertCircle, RefreshCw, Target,
+  Clock, AlertCircle, RefreshCw, Target, TrendingUp,
+  Lightbulb, BookMarked, BarChart3, Sparkles, ListChecks,
+  MessageSquare, Trophy,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
@@ -36,10 +38,13 @@ export default function StudentDashboard() {
   const { user } = useAuthStore();
   const {
     stats, recentCourses, recentActivity, upcomingAssignments,
-    isLoading, error, fetchDashboard,
+    weeklyActivity, isLoading, error, fetchDashboard,
   } = useStudentStore();
   const { socket } = useSocket();
   const carouselRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const weeklyGoal = 10;
+  const weeklyHours = weeklyActivity.reduce((sum, d) => sum + d.hours, 0);
 
   useEffect(() => {
     fetchDashboard();
@@ -102,6 +107,31 @@ export default function StudentDashboard() {
 
       {/* Stats Cards */}
       <StatsCards stats={stats} />
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Browse Courses', icon: BookMarked, color: 'text-blue-500', bg: 'bg-blue-500/10', onClick: () => navigate('/courses') },
+          { label: 'Take a Quiz', icon: ListChecks, color: 'text-purple-500', bg: 'bg-purple-500/10', onClick: () => navigate('/student/courses') },
+          { label: 'Leaderboard', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-500/10', onClick: () => navigate('/student/leaderboard') },
+          { label: 'Messages', icon: MessageSquare, color: 'text-emerald-500', bg: 'bg-emerald-500/10', onClick: () => navigate('/student/messages') },
+        ].map((action) => (
+          <motion.button
+            key={action.label}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={action.onClick}
+            className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-primary-200 dark:hover:border-primary-800 transition-all bg-white/50 dark:bg-gray-900/50"
+          >
+            <div className={`w-9 h-9 rounded-lg ${action.bg} flex items-center justify-center flex-shrink-0`}>
+              <action.icon className={`w-4 h-4 ${action.color}`} />
+            </div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{action.label}</span>
+          </motion.button>
+        ))}
+      </div>
 
       {/* Continue Learning */}
       {coursesInProgress.length > 0 && (
@@ -198,16 +228,20 @@ export default function StudentDashboard() {
             </div>
 
             {recentCourses.length === 0 ? (
-              <div className="text-center py-10">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <BookOpen className="w-8 h-8 text-gray-400" />
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-10"
+              >
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary-500/10 to-accent-500/10 flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-primary-500" />
                 </div>
                 <p className="text-gray-500 mb-1 font-medium">No courses yet</p>
-                <p className="text-sm text-gray-400 mb-5">Enroll in a course to start learning.</p>
+                <p className="text-sm text-gray-400 mb-5">Start your learning journey today!</p>
                 <Link to="/courses">
-                  <Button>Browse Courses</Button>
+                  <Button icon={<BookOpen className="w-4 h-4" />}>Browse Courses</Button>
                 </Link>
-              </div>
+              </motion.div>
             ) : (
               <div className="space-y-3">
                 {recentCourses.map((course) => (
@@ -249,12 +283,19 @@ export default function StudentDashboard() {
             <h2 className="text-lg font-semibold mb-5">Recent Activity</h2>
             <div className="space-y-4">
               {recentActivity.length === 0 ? (
-                <div className="flex items-center gap-3 text-sm text-gray-400 py-4">
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                    <Clock className="w-4 h-4" />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-3 text-sm text-gray-400 py-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-purple-500" />
                   </div>
-                  No activity yet. Start learning!
-                </div>
+                  <div>
+                    <p className="font-medium text-gray-500">No activity yet</p>
+                    <p className="text-xs text-gray-400">Complete a lesson to track your progress!</p>
+                  </div>
+                </motion.div>
               ) : (
                 recentActivity.map((activity, i) => (
                   <div key={i} className="flex items-center gap-3 text-sm">
@@ -302,7 +343,15 @@ export default function StudentDashboard() {
             </div>
             <div className="space-y-3">
               {upcomingAssignments.length === 0 ? (
-                <p className="text-sm text-gray-400 py-2">No upcoming deadlines.</p>
+                <div className="flex items-center gap-3 text-sm text-gray-400 py-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium">All caught up!</p>
+                    <p className="text-xs">No pending deadlines</p>
+                  </div>
+                </div>
               ) : (
                 upcomingAssignments.slice(0, 4).map((assignment) => {
                   const dueDate = new Date(assignment.due_date);
@@ -354,6 +403,31 @@ export default function StudentDashboard() {
                   />
                 </div>
               </div>
+
+              {/* Weekly Goal */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-primary-500/5 to-accent-500/5 border border-primary-500/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-primary-500" />
+                    Weekly Goal
+                  </span>
+                  <span className="text-xs text-gray-500">{weeklyHours}h / {weeklyGoal}h</span>
+                </div>
+                <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min((weeklyHours / weeklyGoal) * 100, 100)}%` }}
+                    transition={{ duration: 1, ease: 'easeOut' }}
+                    className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-500"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {weeklyHours >= weeklyGoal
+                    ? 'Great job, you hit your weekly goal!'
+                    : `${weeklyGoal - weeklyHours}h more to reach your goal`}
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3 text-center">
                 <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
                   <div className="text-lg font-bold text-primary-500">{stats?.enrolledCourses || 0}</div>

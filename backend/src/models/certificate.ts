@@ -26,17 +26,28 @@ export async function createCertificate(input: CreateCertificateInput): Promise<
   return rows[0];
 }
 
-export async function getCertificatesByUser(userId: string): Promise<Certificate[]> {
-  const { rows } = await query<Certificate>(
-    `SELECT cert.*, c.title as course_title, c.category, u.name as user_name
+export async function getCertificatesByUser(userId: string, limit?: number, offset?: number): Promise<Certificate[]> {
+  let sql = `SELECT cert.*, c.title as course_title, c.category, u.name as user_name
      FROM certificates cert
      JOIN courses c ON cert.course_id = c.id
      JOIN users u ON cert.user_id = u.id
      WHERE cert.user_id = $1
-     ORDER BY cert.issued_at DESC`,
+     ORDER BY cert.issued_at DESC`;
+  const params: any[] = [userId];
+  if (limit !== undefined && offset !== undefined) {
+    sql += ` LIMIT $2 OFFSET $3`;
+    params.push(limit, offset);
+  }
+  const { rows } = await query<Certificate>(sql, params);
+  return rows;
+}
+
+export async function countCertificatesByUser(userId: string): Promise<number> {
+  const { rows } = await query(
+    'SELECT COUNT(*)::int as total FROM certificates WHERE user_id = $1',
     [userId]
   );
-  return rows;
+  return rows[0]?.total || 0;
 }
 
 export async function getCertificateByVerificationCode(code: string): Promise<Certificate | null> {

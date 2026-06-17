@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { query } from '../config/db';
-import { uploadFields } from '../middleware/upload';
+import { uploadFields, getFileUrl } from '../middleware/upload';
 
 const router = Router();
 
@@ -33,8 +33,8 @@ router.post(
       } = req.body;
 
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      const resumeUrl = files?.['resume']?.[0]?.filename ? `/uploads/${files['resume'][0].filename}` : null;
-      const profileImageUrl = files?.['profileImage']?.[0]?.filename ? `/uploads/${files['profileImage'][0].filename}` : null;
+      const resumeUrl = getFileUrl(files?.['resume']?.[0]);
+      const profileImageUrl = getFileUrl(files?.['profileImage']?.[0]);
 
       const { rows } = await query(
         `INSERT INTO instructor_applications (

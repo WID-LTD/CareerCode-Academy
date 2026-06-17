@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Loader } from '@/components/ui/Loader';
@@ -87,6 +87,23 @@ const AdminCategories = lazy(() => import('@/pages/admin/Categories'));
 const AdminReports = lazy(() => import('@/pages/admin/Reports'));
 const AdminMessages = lazy(() => import('@/pages/admin/Messages'));
 
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+
+  if (!isAuthenticated) return <>{children}</>;
+
+  const role = user?.role || 'student';
+  const dashboardPath =
+    role === 'admin' || role === 'super_admin'
+      ? '/admin/dashboard'
+      : role === 'instructor'
+        ? '/instructor/dashboard'
+        : '/student/dashboard';
+
+  return <Navigate to={dashboardPath} replace />;
+}
+
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
 
@@ -97,7 +114,7 @@ function App() {
   return (
       <Routes>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<SuspenseWrapper><Home /></SuspenseWrapper>} />
+          <Route path="/" element={<GuestRoute><SuspenseWrapper><Home /></SuspenseWrapper></GuestRoute>} />
           <Route path="/about" element={<SuspenseWrapper><About /></SuspenseWrapper>} />
           <Route path="/courses" element={<SuspenseWrapper><Courses /></SuspenseWrapper>} />
           <Route path="/courses/:slug" element={<SuspenseWrapper><CourseDetails /></SuspenseWrapper>} />

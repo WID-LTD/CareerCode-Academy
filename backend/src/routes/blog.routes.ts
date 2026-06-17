@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as BlogModel from '../models/blog';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { slugify } from '../utils/helpers';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 
@@ -81,7 +81,7 @@ router.post(
         author_id: req.user!.userId,
         category: data.category,
         tags: data.tags || [],
-        image_url: (req as any).file ? `/uploads/${(req as any).file.filename}` : data.imageUrl,
+        image_url: (req as any).file ? getFileUrl((req as any).file) : data.imageUrl,
         slug,
       });
 
@@ -114,8 +114,8 @@ router.put(
       if (data.title) {
         data.slug = slugify(data.title);
       }
-      if ((req as any).file?.filename) {
-        data.image_url = `/uploads/${(req as any).file.filename}`;
+      if ((req as any).file) {
+        data.image_url = getFileUrl((req as any).file);
       }
 
       const updated = await BlogModel.updateBlog(req.params.id, data);

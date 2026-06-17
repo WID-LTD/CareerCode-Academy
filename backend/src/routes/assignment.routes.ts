@@ -6,7 +6,7 @@ import * as AssignmentModel from '../models/assignment';
 import * as SubmissionModel from '../models/submission';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
 
 const router = Router();
@@ -191,7 +191,7 @@ router.post(
       const submission = await SubmissionModel.createSubmission({
         assignment_id: assignmentId,
         student_id: studentId,
-        file_url: (req as any).file ? `/uploads/${(req as any).file.filename}` : req.body.fileUrl,
+        file_url: (req as any).file ? getFileUrl((req as any).file) : req.body.fileUrl,
       });
 
       res.status(201).json({ success: true, data: submission });

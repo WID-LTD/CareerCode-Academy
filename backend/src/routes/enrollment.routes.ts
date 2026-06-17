@@ -12,8 +12,19 @@ router.get(
   authenticate,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const enrollments = await EnrollmentModel.getEnrollmentsByUser(req.user!.userId);
-      res.json({ success: true, data: enrollments });
+      const userId = req.user!.userId;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const offset = (page - 1) * limit;
+
+      const enrollments = await EnrollmentModel.getEnrollmentsByUser(userId, limit, offset);
+      const total = await EnrollmentModel.countEnrollmentsByUser(userId);
+
+      res.json({
+        success: true,
+        data: enrollments,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      });
     } catch (error) {
       next(error);
     }

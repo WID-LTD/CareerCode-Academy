@@ -7,7 +7,7 @@ import * as LessonModel from '../models/lesson';
 import * as EnrollmentModel from '../models/enrollment';
 import * as PaymentModel from '../models/payment';
 import * as ReviewModel from '../models/review';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { emitDashboardUpdate, emitStudentUpdate } from '../config/socket';
 import { slugify } from '../utils/helpers';
 import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
@@ -167,7 +167,7 @@ router.post(
       const course = await CourseModel.createCourse({
         ...data,
         instructor_id: req.user!.userId,
-        thumbnail: (req as any).file ? `/uploads/${(req as any).file.filename}` : data.thumbnail,
+        thumbnail: (req as any).file ? getFileUrl((req as any).file) : data.thumbnail,
         slug,
       });
 
@@ -200,8 +200,8 @@ router.put(
       if (data.title) {
         data.slug = slugify(data.title);
       }
-      if ((req as any).file?.filename) {
-        data.thumbnail = `/uploads/${(req as any).file.filename}`;
+      if ((req as any).file) {
+        data.thumbnail = getFileUrl((req as any).file);
       }
 
       const updated = await CourseModel.updateCourse(req.params.id, data);

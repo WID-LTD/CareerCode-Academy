@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { query } from '../config/db';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 
 const router = Router();
@@ -71,7 +71,7 @@ router.post(
       let finalFileUrl = fileUrl || '';
       let finalFileType = fileType || '';
       if ((req as any).file) {
-        finalFileUrl = `/uploads/${(req as any).file.filename}`;
+        finalFileUrl = getFileUrl((req as any).file) || '';
         finalFileType = (req as any).file.mimetype || '';
       }
 

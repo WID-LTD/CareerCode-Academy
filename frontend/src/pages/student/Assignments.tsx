@@ -5,19 +5,22 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
 import { useStudentStore } from '@/store/studentStore';
 
 export default function Assignments() {
-  const { assignments, fetchAssignments, submitAssignment, isLoading } = useStudentStore();
+  const { assignments, assignmentsPagination, fetchAssignments, submitAssignment, isLoading } = useStudentStore();
   const [filter, setFilter] = useState('all');
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
-    fetchAssignments();
-  }, [fetchAssignments]);
+    fetchAssignments({ page, limit: pageSize });
+  }, [fetchAssignments, page, pageSize]);
 
   const filtered = filter === 'all' ? assignments : assignments.filter(a => a.status === filter);
 
@@ -139,6 +142,17 @@ export default function Assignments() {
           </div>
         )}
       </div>
+      )}
+
+      {assignmentsPagination && (
+        <Pagination
+          page={page}
+          totalPages={assignmentsPagination.pages}
+          totalItems={assignmentsPagination.total}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       {/* Submission Modal */}

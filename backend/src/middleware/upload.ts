@@ -37,26 +37,36 @@ const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// Middleware that uploads to Supabase after multer saves locally
-export function uploadToCloud(fieldName: string, folder: string = 'uploads') {
+// Helper to resolve S3 vs Local URL
+export function getFileUrl(file: any): string | null {
+  if (!file) return null;
+  if (file.filename && (file.filename.startsWith('http://') || file.filename.startsWith('https://'))) {
+    return file.filename;
+  }
+  return `/uploads/${file.filename || file.name}`;
+}
+
+// Transparent upload to Cloud (S3/R2) middleware if configured
+export function uploadSingle(fieldName: string, folder: string = 'uploads') {
   return [
     upload.single(fieldName),
     async (req: any, _res: any, next: any) => {
       if (req.file) {
         try {
-          const localPath = req.file.path;
-          const buffer = fs.readFileSync(localPath);
-          const publicUrl = await uploadFile(buffer, req.file.originalname, folder);
-          
-          try {
-            fs.unlinkSync(localPath);
-          } catch (unlinkError) {
-            console.error('Failed to clean up local upload file:', unlinkError);
-          }
+          if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
+            const localPath = req.file.path;
+            const buffer = fs.readFileSync(localPath);
+            const publicUrl = await uploadFile(buffer, req.file.filename, folder);
+            
+            try {
+              fs.unlinkSync(localPath);
+            } catch (unlinkError) {
+              console.error('Failed to clean up local upload file:', unlinkError);
+            }
 
-          req.file.filename = publicUrl;
-          req.file.path = publicUrl;
-          req.body[fieldName] = publicUrl;
+            req.file.filename = publicUrl;
+            req.file.path = publicUrl;
+          }
         } catch (error) {
           console.error('Cloud upload failed, using local file:', error);
         }
@@ -66,7 +76,68 @@ export function uploadToCloud(fieldName: string, folder: string = 'uploads') {
   ];
 }
 
-export const uploadSingle = (fieldName: string) => upload.single(fieldName);
-export const uploadMultiple = (fieldName: string, maxCount: number = 5) =>
-  upload.array(fieldName, maxCount);
-export const uploadFields = (fields: multer.Field[]) => upload.fields(fields);
+export function uploadMultiple(fieldName: string, maxCount: number = 5, folder: string = 'uploads') {
+  return [
+    upload.array(fieldName, maxCount),
+    async (req: any, _res: any, next: any) => {
+      if (req.files && Array.isArray(req.files)) {
+        try {
+          if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
+            for (const file of req.files) {
+              const localPath = file.path;
+              const buffer = fs.readFileSync(localPath);
+              const publicUrl = await uploadFile(buffer, file.filename, folder);
+              
+              try {
+                fs.unlinkSync(localPath);
+              } catch (unlinkError) {
+                console.error('Failed to clean up local upload file:', unlinkError);
+              }
+
+              file.filename = publicUrl;
+              file.path = publicUrl;
+            }
+          }
+        } catch (error) {
+          console.error('Cloud upload failed, using local file:', error);
+        }
+      }
+      next();
+    },
+  ];
+}
+
+export function uploadFields(fields: multer.Field[], folder: string = 'uploads') {
+  return [
+    upload.fields(fields),
+    async (req: any, _res: any, next: any) => {
+      if (req.files) {
+        try {
+          if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+            for (const fieldname of Object.keys(files)) {
+              for (const file of files[fieldname]) {
+                const localPath = file.path;
+                const buffer = fs.readFileSync(localPath);
+                const publicUrl = await uploadFile(buffer, file.filename, folder);
+                
+                try {
+                  fs.unlinkSync(localPath);
+                } catch (unlinkError) {
+                  console.error('Failed to clean up local upload file:', unlinkError);
+                }
+
+                file.filename = publicUrl;
+                file.path = publicUrl;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Cloud upload failed, using local file:', error);
+        }
+      }
+      next();
+    },
+  ];
+}
+

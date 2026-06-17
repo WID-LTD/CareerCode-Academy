@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Flame, Zap, TrendingUp, Play, Award, ChevronRight } from 'lucide-react';
+import { Flame, Zap, TrendingUp, Play, Award, ChevronRight, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
 import { useStudentStore } from '@/store/studentStore';
@@ -13,13 +13,24 @@ const motivationalQuotes = [
   'Education is the most powerful weapon to change the world.',
 ];
 
+const timeEmojis = ['🌅', '☀️', '🌇', '🌙'];
+
 export function HeroSection() {
   const { user } = useAuthStore();
   const { stats, recentCourses } = useStudentStore();
   const hour = new Date().getHours();
+  const timeIdx = hour < 12 ? 0 : hour < 17 ? 1 : hour < 20 ? 2 : 3;
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
   const quote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
   const activeCourse = recentCourses.find(c => c.progress > 0 && c.progress < 100);
+  const name = user?.name?.split(' ')[0] || 'Learner';
+
+  const firstEnrolled = recentCourses.length > 0
+    ? Math.min(...recentCourses.map(c => new Date(c.enrolled_at).getTime()))
+    : null;
+  const daysEnrolled = firstEnrolled
+    ? Math.floor((Date.now() - firstEnrolled) / (1000 * 60 * 60 * 24))
+    : 0;
 
   return (
     <motion.div
@@ -36,7 +47,7 @@ export function HeroSection() {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
-                {greeting}, {user?.name?.split(' ')[0] || 'Learner'} 👋
+                {greeting}, {name} {timeEmojis[timeIdx]}
               </h1>
             </div>
             <p className="text-white/80 text-sm sm:text-base max-w-lg">
@@ -58,7 +69,7 @@ export function HeroSection() {
               </Link>
             </div>
 
-            <div className="flex items-center gap-4 mt-4 text-white/80 text-sm">
+            <div className="flex flex-wrap items-center gap-2 mt-4 text-white/80 text-sm">
               {stats && (
                 <>
                   <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full">
@@ -79,24 +90,40 @@ export function HeroSection() {
                       <span><strong className="text-white">{stats.currentStreak}</strong> day streak</span>
                     </div>
                   )}
+                  {daysEnrolled > 0 && (
+                    <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full">
+                      <CalendarDays className="w-4 h-4 text-sky-300" />
+                      <span><strong className="text-white">{daysEnrolled}</strong> day{daysEnrolled > 1 ? 's' : ''} enrolled</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-2">
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.2 }}
+            className="flex flex-col items-center gap-2"
+          >
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-2xl sm:text-3xl font-bold text-white shadow-lg">
-              {user?.name?.charAt(0) || 'L'}
+              {name.charAt(0)}
             </div>
             <span className="text-[10px] text-white/60 font-medium uppercase tracking-wider">Learner</span>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="mt-4 sm:mt-6 p-3 sm:p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="mt-4 sm:mt-6 p-3 sm:p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10"
+        >
           <p className="text-white/70 text-xs sm:text-sm italic">
             &ldquo;{quote}&rdquo;
           </p>
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   );

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/axios';
+import type { PaginationInfo } from '@/types/pagination';
 
 export interface StudentStats {
   enrolledCourses: number;
@@ -166,12 +167,14 @@ interface StudentState {
   isLoading: boolean;
   error: string | null;
   unreadNotifications: number;
+  assignmentsPagination: PaginationInfo | null;
+  notificationsPagination: PaginationInfo | null;
 
   fetchDashboard: () => Promise<void>;
-  fetchEnrollments: () => Promise<void>;
-  fetchAssignments: () => Promise<void>;
+  fetchEnrollments: (params?: { page?: number; limit?: number }) => Promise<void>;
+  fetchAssignments: (params?: { page?: number; limit?: number }) => Promise<void>;
   submitAssignment: (assignmentId: string, fileUrl: string) => Promise<void>;
-  fetchNotifications: () => Promise<void>;
+  fetchNotifications: (params?: { page?: number; limit?: number }) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
   fetchRecommendedCourses: () => Promise<void>;
@@ -203,6 +206,8 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   isLoading: false,
   error: null,
   unreadNotifications: 0,
+  assignmentsPagination: null,
+  notificationsPagination: null,
 
   fetchDashboard: async () => {
     set({ isLoading: true, error: null });
@@ -261,11 +266,17 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     }
   },
 
-  fetchAssignments: async () => {
+  fetchAssignments: async (params) => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.get('/student/assignments');
-      set({ assignments: data.data || [], isLoading: false });
+      const page = params?.page || 1;
+      const limit = params?.limit || 20;
+      const { data } = await api.get(`/student/assignments?page=${page}&limit=${limit}`);
+      set({
+        assignments: data.data || [],
+        assignmentsPagination: data.pagination || null,
+        isLoading: false,
+      });
     } catch (error: any) {
       set({
         isLoading: false,
@@ -288,12 +299,15 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     }
   },
 
-  fetchNotifications: async () => {
+  fetchNotifications: async (params) => {
     try {
-      const { data } = await api.get('/notifications');
+      const page = params?.page || 1;
+      const limit = params?.limit || 50;
+      const { data } = await api.get(`/notifications?page=${page}&limit=${limit}`);
       set({
         notifications: data.data || [],
-        unreadNotifications: (data.data || []).filter((n: Notification) => !n.read).length,
+        notificationsPagination: data.pagination || null,
+        unreadNotifications: data.unreadCount ?? (data.data || []).filter((n: Notification) => !n.read).length,
       });
     } catch (error: any) {
       console.error('Failed to fetch notifications', error);

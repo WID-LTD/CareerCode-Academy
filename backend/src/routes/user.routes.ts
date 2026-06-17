@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as UserModel from '../models/user';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, getFileUrl } from '../middleware/upload';
 import { NotFoundError } from '../utils/errors';
 
 const router = Router();
@@ -67,8 +67,8 @@ router.put(
       }
 
       const data: any = { ...req.body };
-      if ((req as any).file?.filename) {
-        data.avatar = `/uploads/${(req as any).file.filename}`;
+      if ((req as any).file) {
+        data.avatar = getFileUrl((req as any).file);
       }
 
       const user = await UserModel.updateUser(req.params.id, data);
