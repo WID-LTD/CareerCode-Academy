@@ -93,6 +93,30 @@ export async function getAllExams(limit = 50, offset = 0): Promise<any[]> {
   return rows;
 }
 
+export async function getExamsByInstructor(userId: string, limit = 50, offset = 0): Promise<any[]> {
+  const { rows } = await query(
+    `SELECT e.*, c.title as course_title
+     FROM exams e
+     JOIN courses c ON e.course_id = c.id
+     WHERE c.instructor_id = $1
+     ORDER BY e.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset]
+  );
+  return rows;
+}
+
+export async function countExamsByInstructor(userId: string): Promise<number> {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int as total
+     FROM exams e
+     JOIN courses c ON e.course_id = c.id
+     WHERE c.instructor_id = $1`,
+    [userId]
+  );
+  return rows[0]?.total || 0;
+}
+
 export async function countExams(): Promise<number> {
   const { rows } = await query('SELECT COUNT(*)::int as total FROM exams');
   return rows[0]?.total || 0;
