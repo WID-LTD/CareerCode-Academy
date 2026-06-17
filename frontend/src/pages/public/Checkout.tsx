@@ -57,9 +57,26 @@ export default function Checkout() {
   }, [courseId]);
 
   const loadCourse = async () => {
+    setLoading(true);
     try {
-      const { data } = await api.get(`/courses/${courseId}`);
-      setCourse(data.data);
+      const [courseRes, enrollmentRes] = await Promise.allSettled([
+        api.get(`/courses/${courseId}`),
+        api.get(`/enrollments/${courseId}`),
+      ]);
+
+      if (courseRes.status === 'rejected') {
+        toast.error('Course not found');
+        navigate('/courses');
+        return;
+      }
+
+      setCourse(courseRes.value.data.data);
+
+      if (enrollmentRes.status === 'fulfilled' && enrollmentRes.value.data?.enrolled) {
+        toast.success('You are already enrolled in this course');
+        navigate(`/student/courses/${courseRes.value.data.data.slug}`);
+        return;
+      }
     } catch {
       toast.error('Course not found');
       navigate('/courses');
@@ -83,7 +100,8 @@ export default function Checkout() {
         navigate('/student/dashboard');
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.response?.data?.error || 'Payment failed');
+      const message = error?.response?.data?.message || error?.response?.data?.error || 'Payment failed. Please try again.';
+      toast.error(message);
       setProcessing(false);
     }
   };

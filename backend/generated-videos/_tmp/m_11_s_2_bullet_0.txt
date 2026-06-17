@@ -1,0 +1,1 @@
+•  Define clean media query boundaries for screen classes

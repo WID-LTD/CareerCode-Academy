@@ -1,0 +1,1 @@
+•  Convert traditional functions into streamlined arrow functions

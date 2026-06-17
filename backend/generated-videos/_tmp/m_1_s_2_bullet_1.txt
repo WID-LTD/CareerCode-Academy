@@ -1,0 +1,1 @@
+•  Extract object and array properties using modern ES6 syntax

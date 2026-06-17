@@ -1,0 +1,1 @@
+•  Test cross-browser support and inspect rendering paths

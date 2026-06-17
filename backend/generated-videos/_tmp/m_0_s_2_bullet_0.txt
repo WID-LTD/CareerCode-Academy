@@ -1,0 +1,1 @@
+•  Understand variables, variable scope, and fundamental types

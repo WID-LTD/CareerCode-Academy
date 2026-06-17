@@ -1,0 +1,1 @@
+•  Module 1: Variables, data types, loops, arrays, and functions

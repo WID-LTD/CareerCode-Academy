@@ -1,0 +1,1 @@
+•  Incorporate viewport scaling configurations in HTML

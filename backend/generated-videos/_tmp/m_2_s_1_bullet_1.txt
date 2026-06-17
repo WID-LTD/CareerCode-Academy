@@ -1,0 +1,1 @@
+•  Protect applications from crashing using try/catch blocks

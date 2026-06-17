@@ -1,0 +1,1 @@
+•  Style fluid images that scale within column constraints

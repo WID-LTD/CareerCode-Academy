@@ -1,0 +1,1 @@
+•  Write concise code with arrow functions and destructuring

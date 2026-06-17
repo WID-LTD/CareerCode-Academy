@@ -1,0 +1,1 @@
+•  Structure content hierarchies using h1-h6 tags logically

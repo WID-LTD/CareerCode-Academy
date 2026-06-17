@@ -7,6 +7,10 @@
     @apply border-gray-200 dark:border-gray-800;
   }
 
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary-500;
+  }
+
   body {
     @apply bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased;
     font-family: 'Inter', system-ui, sans-serif;

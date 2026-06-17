@@ -1,0 +1,1 @@
+•  Predict, catch, and handle application errors gracefully

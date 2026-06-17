@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
@@ -73,7 +74,7 @@ router.post(
       const isFlutterwaveConfigured = flutterwaveKey.length > 20 && !flutterwaveKey.includes('xxxx');
 
       if (provider === 'paystack' && isPaystackConfigured) {
-        const response = await fetch('https://api.paystack.co/transaction/initialize', {
+        const response = await fetchWithTimeout('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${paystackKey}`,
@@ -97,7 +98,7 @@ router.post(
         paymentData.authorizationUrl = paystackData.data.authorization_url;
         paymentData.publicKey = process.env.PAYSTACK_PUBLIC_KEY;
       } else if (provider === 'flutterwave' && isFlutterwaveConfigured) {
-        const response = await fetch('https://api.flutterwave.com/v3/payments', {
+        const response = await fetchWithTimeout('https://api.flutterwave.com/v3/payments', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${flutterwaveKey}`,
@@ -148,7 +149,7 @@ async function verifyPaymentByReference(reference: string) {
 
     if (payment.provider === 'paystack' && isPaystackConfigured) {
       try {
-        const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        const response = await fetchWithTimeout(`https://api.paystack.co/transaction/verify/${reference}`, {
           headers: { Authorization: `Bearer ${paystackKey}` }
         });
         const paystackData: any = await response.json();
@@ -158,7 +159,7 @@ async function verifyPaymentByReference(reference: string) {
       } catch { /* fall through to dev mode */ }
     } else if (payment.provider === 'flutterwave' && isFlutterwaveConfigured) {
       try {
-        const response = await fetch(`https://api.flutterwave.com/v3/transactions/${reference}/verify`, {
+        const response = await fetchWithTimeout(`https://api.flutterwave.com/v3/transactions/${reference}/verify`, {
           headers: { Authorization: `Bearer ${flutterwaveKey}` }
         });
         const flwData: any = await response.json();
@@ -248,13 +249,49 @@ router.post(
   }
 );
 
+function verifyPaystackWebhook(req: Request): boolean {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) return false;
+  const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+  const signature = req.headers['x-paystack-signature'] as string;
+  return hash === signature;
+}
+
+function verifyFlutterwaveWebhook(req: Request): boolean {
+  const secret = process.env.FLUTTERWAVE_SECRET_KEY;
+  if (!secret) return false;
+  const hash = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
+  const signature = req.headers['verif-hash'] as string;
+  return hash === signature;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}) {
+  const { timeout = 10000 } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // Webhook endpoint for Paystack/Flutterwave
 router.post(
   '/webhook',
   async (req: Request, res: Response) => {
     try {
-      // Paystack sends data nested under req.body.data
-      // Generic providers send at top level
+      const isPaystack = !!req.headers['x-paystack-signature'];
+      const isFlutterwave = !!req.headers['verif-hash'];
+
+      if (isPaystack && !verifyPaystackWebhook(req)) {
+        return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+      }
+      if (isFlutterwave && !verifyFlutterwaveWebhook(req)) {
+        return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+      }
+
       const payload = req.body.data || req.body;
       const reference = payload.reference || payload.txRef;
       const status = payload.status || payload.data?.status;
@@ -285,7 +322,6 @@ router.post(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('Webhook error:', error);
       res.status(500).json({ success: false, message: 'Webhook processing failed' });
     }
   }

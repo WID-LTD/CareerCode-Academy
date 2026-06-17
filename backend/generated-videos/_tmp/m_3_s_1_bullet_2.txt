@@ -1,0 +1,1 @@
+•  Replicate behavior across entities using class inheritance

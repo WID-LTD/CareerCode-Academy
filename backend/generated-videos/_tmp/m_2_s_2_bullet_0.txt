@@ -1,0 +1,1 @@
+•  Debug applications methodically using inspector consoles

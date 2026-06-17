@@ -1,0 +1,1 @@
+•  Design multi-column templates without template tables

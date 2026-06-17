@@ -1,0 +1,1 @@
+•  Positioning: Static, relative, absolute, fixed, and sticky options

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Code2, Github, Twitter } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
@@ -20,13 +19,12 @@ export default function Login() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <section className="min-h-screen flex items-center justify-center py-20 relative">
+    <section className="min-h-screen flex items-center justify-center py-20 relative">
         <div className="absolute inset-0 gradient-bg-subtle" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(99,102,241,0.08),transparent_50%)]" />
 
         <div className="max-w-md w-full mx-auto px-4 relative">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+          <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-6">
               <div className="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center">
                 <Code2 className="w-6 h-6 text-white" />
@@ -35,7 +33,7 @@ export default function Login() {
             </Link>
             <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
             <p className="text-gray-500">Sign in to continue your learning journey.</p>
-          </motion.div>
+          </div>
 
           <GlassCard className="p-8">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -91,6 +89,5 @@ export default function Login() {
           </p>
         </div>
       </section>
-    </motion.div>
   );
 }
