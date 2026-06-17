@@ -38,6 +38,7 @@ import learningPathRoutes from './routes/learningPath.routes';
 import pageRoutes from './routes/page.routes';
 import videoRoutes from './routes/video.routes';
 import challengeRoutes from './routes/challenge.routes';
+import examRoutes from './routes/exam.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -140,6 +141,7 @@ app.use('/api/v1/learning-paths', learningPathRoutes);
 app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/challenges', challengeRoutes);
+app.use('/api/v1/exams', examRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -152,7 +154,26 @@ app.use(errorHandler);
 // Database initialization
 async function initDatabase() {
   try {
-    console.log('Initializing database schemas and migrations...');
+    // Check if database is already fully initialized to avoid delay and duplication
+    let needsFullInit = process.env.FORCE_INIT_DB === 'true';
+    if (!needsFullInit) {
+      try {
+        const checkResult = await query<{ exists: boolean }>(`
+          SELECT EXISTS (
+            SELECT FROM pg_tables 
+            WHERE schemaname = 'public' 
+              AND tablename = 'exam_answers'
+          )
+        `);
+        needsFullInit = !checkResult.rows[0]?.exists;
+      } catch (e) {
+        console.log('Failed to check database tables status, proceeding with full initialization.');
+        needsFullInit = true;
+      }
+    }
+
+    if (needsFullInit) {
+      console.log('Initializing database schemas and migrations...');
 
     await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
 
@@ -774,19 +795,115 @@ async function initDatabase() {
     await query(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_provider_check`);
     await query(`ALTER TABLE payments ADD CONSTRAINT payments_provider_check CHECK (provider IN ('paystack', 'flutterwave', 'manual'))`);
 
-    // Add indexes for new tables
-    await query('CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_wishlists_course ON wishlists(course_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON lesson_progress(lesson_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_learning_paths_slug ON learning_paths(slug)');
-    await query('CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)');
-    await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
+    // Exam tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS exams (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        duration_minutes INTEGER NOT NULL DEFAULT 60,
+        passing_score INTEGER NOT NULL DEFAULT 70,
+        max_attempts INTEGER NOT NULL DEFAULT 1,
+        shuffle_questions BOOLEAN DEFAULT false,
+        show_results BOOLEAN DEFAULT true,
+        is_published BOOLEAN DEFAULT false,
+        starts_at TIMESTAMPTZ,
+        ends_at TIMESTAMPTZ,
+        instructions TEXT,
+        random_questions_count INTEGER DEFAULT 0,
+        negative_marking BOOLEAN DEFAULT false,
+        negative_percentage NUMERIC DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS exam_questions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+        question TEXT NOT NULL,
+        question_type VARCHAR(20) NOT NULL DEFAULT 'mcq',
+        options JSONB NOT NULL DEFAULT '[]',
+        correct_answer VARCHAR(500) NOT NULL,
+        points INTEGER NOT NULL DEFAULT 1,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS exam_attempts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        submitted_at TIMESTAMPTZ,
+        score INTEGER DEFAULT 0,
+        passed BOOLEAN DEFAULT false,
+        status VARCHAR(20) DEFAULT 'in_progress',
+        flagged_answers JSONB DEFAULT '[]',
+        manual_score INTEGER,
+        reviewed BOOLEAN DEFAULT false
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS exam_answers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        attempt_id UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+        question_id UUID NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
+        answer TEXT,
+        is_correct BOOLEAN DEFAULT false,
+        points_earned INTEGER DEFAULT 0,
+        CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)
+      )
+    `);
 
     console.log('Database tables initialized successfully');
+  } else {
+    console.log('Database tables already initialized (running migrations only).');
+  }
+
+    // Exam table migrations — always run to ensure columns exist for existing installations
+    try {
+      await query(`
+        DELETE FROM exam_answers a USING exam_answers b
+        WHERE a.id < b.id 
+          AND a.attempt_id = b.attempt_id 
+          AND a.question_id = b.question_id
+      `);
+      await query('ALTER TABLE exam_answers ADD CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)');
+    } catch (e) {
+      // Ignore if constraint already exists or fails
+    }
+  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ');
+  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ');
+  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS instructions TEXT');
+  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS random_questions_count INTEGER DEFAULT 0');
+  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN DEFAULT false');
+  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS negative_percentage NUMERIC DEFAULT 0');
+  await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS flagged_answers JSONB DEFAULT \'[]\'');
+  await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS manual_score INTEGER');
+  await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT false');
+
+  await query('CREATE INDEX IF NOT EXISTS idx_exams_course ON exams(course_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_exam_questions_exam ON exam_questions(exam_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam ON exam_attempts(exam_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_user ON exam_attempts(user_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)');
+
+  // Add indexes for new tables
+  await query('CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_wishlists_course ON wishlists(course_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON lesson_progress(lesson_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_learning_paths_slug ON learning_paths(slug)');
+  await query('CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)');
+  await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
+
+  console.log('Database migrations complete');
   } catch (error) {
     console.error('Database initialization error:', error);
     throw error;
