@@ -11,6 +11,12 @@ export interface Exam {
   shuffle_questions: boolean;
   show_results: boolean;
   is_published: boolean;
+  starts_at: Date | null;
+  ends_at: Date | null;
+  instructions: string | null;
+  random_questions_count: number;
+  negative_marking: boolean;
+  negative_percentage: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -36,6 +42,9 @@ export interface ExamAttempt {
   score: number;
   passed: boolean;
   status: string;
+  flagged_answers: string[];
+  manual_score: number | null;
+  reviewed: boolean;
 }
 
 export interface CreateExamInput {
@@ -48,14 +57,26 @@ export interface CreateExamInput {
   shuffle_questions?: boolean;
   show_results?: boolean;
   is_published?: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  instructions?: string;
+  random_questions_count?: number;
+  negative_marking?: boolean;
+  negative_percentage?: number;
 }
 
 export async function createExam(input: CreateExamInput): Promise<Exam> {
   const { rows } = await query<Exam>(
-    `INSERT INTO exams (course_id, title, description, duration_minutes, passing_score, max_attempts, shuffle_questions, show_results, is_published)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO exams (course_id, title, description, duration_minutes, passing_score, max_attempts, shuffle_questions, show_results, is_published, starts_at, ends_at, instructions, random_questions_count, negative_marking, negative_percentage)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING *`,
-    [input.course_id, input.title, input.description || null, input.duration_minutes || 60, input.passing_score || 70, input.max_attempts || 1, input.shuffle_questions || false, input.show_results !== false, input.is_published || false]
+    [
+      input.course_id, input.title, input.description || null,
+      input.duration_minutes || 60, input.passing_score || 70, input.max_attempts || 1,
+      input.shuffle_questions || false, input.show_results !== false, input.is_published || false,
+      input.starts_at || null, input.ends_at || null, input.instructions || null,
+      input.random_questions_count || 0, input.negative_marking || false, input.negative_percentage || 0,
+    ]
   );
   return rows[0];
 }
@@ -103,6 +124,12 @@ export async function updateExam(id: string, input: Partial<CreateExamInput>): P
     shuffle_questions: 'shuffle_questions',
     show_results: 'show_results',
     is_published: 'is_published',
+    starts_at: 'starts_at',
+    ends_at: 'ends_at',
+    instructions: 'instructions',
+    random_questions_count: 'random_questions_count',
+    negative_marking: 'negative_marking',
+    negative_percentage: 'negative_percentage',
   };
 
   for (const [key, value] of Object.entries(input)) {
@@ -147,6 +174,7 @@ export async function getPublishedExamsByCourse(courseId: string): Promise<Exam[
 }
 
 export async function getAvailableExamsForUser(userId: string): Promise<any[]> {
+  const now = new Date().toISOString();
   const { rows } = await query(
     `SELECT e.*, c.title as course_title,
       (SELECT COUNT(*)::int FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1) as attempt_count,
@@ -240,6 +268,14 @@ export async function getQuestionsByExam(examId: string): Promise<ExamQuestion[]
   return rows;
 }
 
+export async function getRandomQuestions(examId: string, count: number): Promise<ExamQuestion[]> {
+  const { rows } = await query<ExamQuestion>(
+    'SELECT * FROM exam_questions WHERE exam_id = $1 ORDER BY RANDOM() LIMIT $2',
+    [examId, count]
+  );
+  return rows;
+}
+
 export async function createQuestion(input: {
   exam_id: string;
   question: string;
@@ -305,4 +341,81 @@ export async function countAttempts(examId: string, userId: string): Promise<num
     [examId, userId]
   );
   return rows[0]?.total || 0;
+}
+
+export async function getAttemptsByExam(examId: string): Promise<any[]> {
+  const { rows } = await query(
+    `SELECT ea.*, u.name as user_name, u.email as user_email
+     FROM exam_attempts ea
+     JOIN users u ON ea.user_id = u.id
+     WHERE ea.exam_id = $1
+     ORDER BY ea.started_at DESC`,
+    [examId]
+  );
+  return rows;
+}
+
+export async function updateAttemptManualGrade(attemptId: string, manualScore: number, reviewed: boolean = true): Promise<ExamAttempt | null> {
+  const { rows } = await query<ExamAttempt>(
+    `UPDATE exam_attempts SET manual_score = $2, reviewed = $3, score = $2 WHERE id = $1 RETURNING *`,
+    [attemptId, manualScore, reviewed]
+  );
+  return rows[0] || null;
+}
+
+export async function duplicateExam(examId: string, newTitle: string): Promise<any | null> {
+  const source = await getExamById(examId);
+  if (!source) return null;
+
+  const exam = await createExam({
+    course_id: source.course_id,
+    title: newTitle,
+    description: source.description,
+    duration_minutes: source.duration_minutes,
+    passing_score: source.passing_score,
+    max_attempts: source.max_attempts,
+    shuffle_questions: source.shuffle_questions,
+    show_results: source.show_results,
+    is_published: false,
+    starts_at: null,
+    ends_at: null,
+    instructions: source.instructions,
+    random_questions_count: source.random_questions_count,
+    negative_marking: source.negative_marking,
+    negative_percentage: source.negative_percentage,
+  });
+
+  const questions = await getQuestionsByExam(examId);
+  for (const q of questions) {
+    await createQuestion({
+      exam_id: exam.id,
+      question: q.question,
+      question_type: q.question_type,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      points: q.points,
+      order_index: q.order_index,
+    });
+  }
+
+  return getExamById(exam.id);
+}
+
+export async function updateAttemptFlags(attemptId: string, flaggedQuestions: string[]): Promise<void> {
+  await query(
+    'UPDATE exam_attempts SET flagged_answers = $1 WHERE id = $2',
+    [JSON.stringify(flaggedQuestions), attemptId]
+  );
+}
+
+export async function getAttemptCountsByExam(examId: string): Promise<{ total: number; completed: number; passed: number }> {
+  const { rows } = await query(
+    `SELECT
+      COUNT(*)::int as total,
+      COUNT(*) FILTER (WHERE status = 'completed' OR status = 'timeout')::int as completed,
+      COUNT(*) FILTER (WHERE passed = true)::int as passed
+     FROM exam_attempts WHERE exam_id = $1`,
+    [examId]
+  );
+  return rows[0] || { total: 0, completed: 0, passed: 0 };
 }

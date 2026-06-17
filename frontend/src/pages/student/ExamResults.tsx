@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, Award, Clock, ArrowLeft, Loader2, PartyPopper } from 'lucide-react';
+import { CheckCircle, XCircle, Award, Clock, ArrowLeft, Loader2, PartyPopper, AlertTriangle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -109,6 +109,12 @@ export default function ExamResults() {
             <span className="text-gray-500">Correct</span>
             <p className="font-medium text-emerald-400">{answers?.filter((a: any) => a.is_correct).length || 0}</p>
           </div>
+          {exam?.negative_marking && (
+            <div className="col-span-2">
+              <span className="text-gray-500 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-red-400" />Negative Marking</span>
+              <p className="font-medium text-red-400">{exam.negative_percentage}% deducted per wrong answer</p>
+            </div>
+          )}
         </div>
       </GlassCard>
 

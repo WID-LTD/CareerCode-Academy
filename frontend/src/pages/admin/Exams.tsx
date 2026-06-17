@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Loader2, X, Check, AlertCircle, ClipboardList, Eye, EyeOff, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Loader2, X, Check, AlertCircle, ClipboardList, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, Copy, Download, UserCheck } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,12 @@ interface Exam {
   shuffle_questions: boolean;
   show_results: boolean;
   is_published: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  instructions: string | null;
+  random_questions_count: number;
+  negative_marking: boolean;
+  negative_percentage: number;
   created_at: string;
 }
 
@@ -32,6 +38,20 @@ interface ExamQuestion {
   correct_answer: string;
   points: number;
   order_index: number;
+}
+
+interface AttemptEntry {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  score: number;
+  passed: boolean;
+  status: string;
+  started_at: string;
+  submitted_at: string | null;
+  manual_score: number | null;
+  reviewed: boolean;
 }
 
 export default function AdminExams() {
@@ -52,6 +72,16 @@ export default function AdminExams() {
   const [editingQuestion, setEditingQuestion] = useState<ExamQuestion | null>(null);
   const [savingQuestion, setSavingQuestion] = useState(false);
 
+  // Attempts viewer state
+  const [showAttempts, setShowAttempts] = useState(false);
+  const [attempts, setAttempts] = useState<AttemptEntry[]>([]);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState<AttemptEntry | null>(null);
+  const [attemptAnswers, setAttemptAnswers] = useState<any[]>([]);
+  const [loadingAttemptDetail, setLoadingAttemptDetail] = useState(false);
+  const [gradingScore, setGradingScore] = useState('');
+  const [savingGrade, setSavingGrade] = useState(false);
+
   const [form, setForm] = useState({
     courseId: '',
     title: '',
@@ -62,6 +92,12 @@ export default function AdminExams() {
     shuffleQuestions: false,
     showResults: true,
     isPublished: false,
+    startsAt: '',
+    endsAt: '',
+    instructions: '',
+    randomQuestionsCount: 0,
+    negativeMarking: false,
+    negativePercentage: 0,
   });
 
   const [questionForm, setQuestionForm] = useState({
@@ -101,7 +137,9 @@ export default function AdminExams() {
   const resetForm = () => {
     setForm({
       courseId: '', title: '', description: '', durationMinutes: 60,
-      passingScore: 70, maxAttempts: 1, shuffleQuestions: false, showResults: true, isPublished: false,
+      passingScore: 70, maxAttempts: 1, shuffleQuestions: false, showResults: true,
+      isPublished: false, startsAt: '', endsAt: '', instructions: '',
+      randomQuestionsCount: 0, negativeMarking: false, negativePercentage: 0,
     });
     setEditingExam(null);
     setShowForm(false);
@@ -118,6 +156,12 @@ export default function AdminExams() {
       shuffleQuestions: exam.shuffle_questions,
       showResults: exam.show_results,
       isPublished: exam.is_published,
+      startsAt: exam.starts_at ? exam.starts_at.slice(0, 16) : '',
+      endsAt: exam.ends_at ? exam.ends_at.slice(0, 16) : '',
+      instructions: exam.instructions || '',
+      randomQuestionsCount: exam.random_questions_count,
+      negativeMarking: exam.negative_marking,
+      negativePercentage: exam.negative_percentage,
     });
     setEditingExam(exam);
     setShowForm(true);
@@ -127,17 +171,30 @@ export default function AdminExams() {
     if (!form.title || !form.courseId) return;
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+      };
+
       if (editingExam) {
-        await api.put(`/exams/${editingExam.id}`, form);
+        await api.put(`/exams/${editingExam.id}`, payload);
         toast.success('Exam updated');
       } else {
-        await api.post('/exams', form);
+        await api.post('/exams', payload);
         toast.success('Exam created');
       }
       resetForm();
       fetchExams();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to save exam');
+      const msg = err?.response?.data?.message || 'Failed to save exam';
+      const errors = err?.response?.data?.errors;
+      let fullMsg = msg;
+      if (errors) {
+        fullMsg += ': ' + Object.entries(errors).map(([k, v]) => `${k}=${(v as string[]).join(',')}`).join('; ');
+      }
+      console.error('Exam save error:', err?.response?.data);
+      toast.error(fullMsg);
     } finally {
       setSaving(false);
     }
@@ -165,11 +222,38 @@ export default function AdminExams() {
     }
   };
 
+  const handleDuplicate = async (exam: Exam) => {
+    try {
+      const { data } = await api.post(`/exams/${exam.id}/duplicate`, { title: `${exam.title} (Copy)` });
+      toast.success('Exam duplicated');
+      fetchExams();
+    } catch {
+      toast.error('Failed to duplicate');
+    }
+  };
+
+  const handleExport = async (exam: Exam) => {
+    try {
+      const { data } = await api.get(`/exams/${exam.id}/export`, { responseType: 'blob' });
+      const blob = new Blob([data], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exam.title.replace(/[^a-z0-9]/gi, '_')}-results.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Results exported');
+    } catch {
+      toast.error('Failed to export');
+    }
+  };
+
   const loadQuestions = async (exam: Exam) => {
     setSelectedExam(exam);
     setLoadingQuestions(true);
     setShowQuestionForm(false);
     setEditingQuestion(null);
+    setShowAttempts(false);
     try {
       const { data } = await api.get(`/exams/${exam.id}`);
       setQuestions(data.data?.questions || []);
@@ -177,6 +261,93 @@ export default function AdminExams() {
       toast.error('Failed to load questions');
     } finally {
       setLoadingQuestions(false);
+    }
+  };
+
+  const reorderQuestion = async (qId: string, direction: 'up' | 'down') => {
+    if (!selectedExam) return;
+    const idx = questions.findIndex(q => q.id === qId);
+    if (idx === -1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= questions.length) return;
+
+    const updated = [...questions];
+    const temp = { ...updated[idx], order_index: swapIdx };
+    const temp2 = { ...updated[swapIdx], order_index: idx };
+    updated[idx] = temp2;
+    updated[swapIdx] = temp;
+
+    setQuestions(updated);
+
+    try {
+      await api.put(`/exams/${selectedExam.id}/questions/${qId}`, {
+        question: questions[idx].question,
+        questionType: questions[idx].question_type,
+        options: questions[idx].options,
+        correctAnswer: questions[idx].correct_answer,
+        points: questions[idx].points,
+        orderIndex: swapIdx,
+      });
+      await api.put(`/exams/${selectedExam.id}/questions/${updated[idx].id}`, {
+        question: questions[swapIdx].question,
+        questionType: questions[swapIdx].question_type,
+        options: questions[swapIdx].options,
+        correctAnswer: questions[swapIdx].correct_answer,
+        points: questions[swapIdx].points,
+        orderIndex: idx,
+      });
+    } catch {
+      loadQuestions(selectedExam);
+    }
+  };
+
+  const loadAttempts = async (exam: Exam) => {
+    setShowAttempts(true);
+    setSelectedAttempt(null);
+    setAttemptAnswers([]);
+    setLoadingAttempts(true);
+    try {
+      const { data } = await api.get(`/exams/${exam.id}/attempts`);
+      setAttempts(data.data || []);
+    } catch {
+      toast.error('Failed to load attempts');
+    } finally {
+      setLoadingAttempts(false);
+    }
+  };
+
+  const loadAttemptDetail = async (attempt: AttemptEntry) => {
+    if (!selectedExam) return;
+    setSelectedAttempt(attempt);
+    setGradingScore(attempt.manual_score?.toString() || attempt.score?.toString() || '');
+    setLoadingAttemptDetail(true);
+    try {
+      const { data } = await api.get(`/exams/${selectedExam.id}/attempts/${attempt.id}`);
+      setAttemptAnswers(data.data?.answers || []);
+    } catch {
+      toast.error('Failed to load attempt details');
+    } finally {
+      setLoadingAttemptDetail(false);
+    }
+  };
+
+  const handleGrade = async () => {
+    if (!selectedExam || !selectedAttempt) return;
+    const score = parseInt(gradingScore);
+    if (isNaN(score) || score < 0 || score > 100) {
+      toast.error('Score must be 0-100');
+      return;
+    }
+    setSavingGrade(true);
+    try {
+      await api.put(`/exams/${selectedExam.id}/attempts/${selectedAttempt.id}/grade`, { manualScore: score });
+      toast.success('Grade updated');
+      loadAttempts(selectedExam);
+      setSelectedAttempt(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to grade');
+    } finally {
+      setSavingGrade(false);
     }
   };
 
@@ -269,33 +440,33 @@ export default function AdminExams() {
       {/* Exam Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-lg p-6 rounded-2xl max-h-[90vh] overflow-y-auto">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-2xl p-6 rounded-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">{editingExam ? 'Edit Exam' : 'New Exam'}</h3>
               <button onClick={resetForm} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Course *</label>
-                <select value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })}
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30">
-                  <option value="">Select a course...</option>
-                  {courses.map((c: any) => (
-                    <option key={c._id || c.id} value={c._id || c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Title *</label>
-                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30" placeholder="Final Certification Exam" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Description</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30 resize-none" placeholder="Exam description..." />
-              </div>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Course *</label>
+                  <select value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30">
+                    <option value="">Select a course...</option>
+                    {courses.map((c: any) => (
+                      <option key={c._id || c.id} value={c._id || c.id}>{c.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Title *</label>
+                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30" placeholder="Final Certification Exam" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Description</label>
+                  <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30 resize-none" placeholder="Exam description..." />
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Duration (minutes)</label>
                   <input type="number" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: parseInt(e.target.value) || 60 })}
@@ -311,8 +482,28 @@ export default function AdminExams() {
                   <input type="number" value={form.maxAttempts} onChange={(e) => setForm({ ...form, maxAttempts: parseInt(e.target.value) || 1 })}
                     className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30" />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Random Questions (0 = all)</label>
+                  <input type="number" value={form.randomQuestionsCount} onChange={(e) => setForm({ ...form, randomQuestionsCount: parseInt(e.target.value) || 0 })}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Starts At</label>
+                  <input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Ends At</label>
+                  <input type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Instructions</label>
+                  <textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows={3}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30 resize-none" placeholder="Instructions shown to students before starting the exam..." />
+                </div>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-6 flex-wrap">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.shuffleQuestions} onChange={(e) => setForm({ ...form, shuffleQuestions: e.target.checked })}
                     className="rounded border-gray-300 dark:border-gray-600" />
@@ -328,6 +519,19 @@ export default function AdminExams() {
                     className="rounded border-gray-300 dark:border-gray-600" />
                   Published
                 </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.negativeMarking} onChange={(e) => setForm({ ...form, negativeMarking: e.target.checked })}
+                    className="rounded border-gray-300 dark:border-gray-600" />
+                  Negative Marking
+                </label>
+                {form.negativeMarking && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Deduct</span>
+                    <input type="number" value={form.negativePercentage} onChange={(e) => setForm({ ...form, negativePercentage: parseInt(e.target.value) || 0 })}
+                      className="w-16 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-primary-500/30 text-center" />
+                    <span className="text-xs text-gray-500">% per wrong answer</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
@@ -337,6 +541,87 @@ export default function AdminExams() {
                 {editingExam ? 'Update' : 'Create'}
               </Button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Attempts Modal */}
+      {showAttempts && selectedExam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-4xl p-6 rounded-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">Attempts — {selectedExam.title}</h3>
+              <button onClick={() => setShowAttempts(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="w-4 h-4" /></button>
+            </div>
+
+            {selectedAttempt ? (
+              <div>
+                <button onClick={() => { setSelectedAttempt(null); setAttemptAnswers([]); }} className="text-sm text-primary-400 hover:underline mb-3">&larr; Back to attempts list</button>
+                <div className="mb-4">
+                  <p className="font-medium">{selectedAttempt.user_name} ({selectedAttempt.user_email})</p>
+                  <p className="text-xs text-gray-500">Score: {selectedAttempt.score}% | {selectedAttempt.passed ? 'Passed' : 'Failed'} | {selectedAttempt.status}</p>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  {loadingAttemptDetail ? (
+                    <div className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+                  ) : (
+                    attemptAnswers.map((ans, i) => (
+                      <div key={ans.id} className={`p-3 rounded-xl ${ans.is_correct ? 'bg-emerald-500/5 border border-emerald-500/10' : 'bg-red-500/5 border border-red-500/10'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-primary-400">Q{i + 1}</span>
+                          <Badge className="text-[10px]">{ans.question_type}</Badge>
+                          <span className="text-[10px] text-gray-500">{ans.points}pt</span>
+                        </div>
+                        <p className="text-sm mb-1">{ans.question}</p>
+                        <p className="text-xs">Answer: <span className={ans.is_correct ? 'text-emerald-400' : 'text-red-400'}>{ans.answer || '(none)'}</span></p>
+                        {!ans.is_correct && <p className="text-xs text-emerald-400">Correct: {ans.correct_answer}</p>}
+                        <p className="text-xs text-gray-500">Points earned: {ans.points_earned}/{ans.points}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="border-t border-gray-700 pt-4">
+                  <h4 className="text-sm font-medium mb-2">Manual Grading</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Override score (0-100):</span>
+                    <input type="number" value={gradingScore} onChange={(e) => setGradingScore(e.target.value)}
+                      className="w-20 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/30 text-center" />
+                    <span className="text-xs text-gray-500">%</span>
+                    <Button size="sm" onClick={handleGrade} disabled={savingGrade}>
+                      {savingGrade ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                      Save Grade
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {loadingAttempts ? (
+                  <div className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+                ) : attempts.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No attempts yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {attempts.map((a) => (
+                      <div key={a.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors" onClick={() => loadAttemptDetail(a)}>
+                        <div>
+                          <p className="text-sm font-medium">{a.user_name}</p>
+                          <p className="text-xs text-gray-500">{a.user_email}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant={a.passed ? 'success' : 'danger'}>{a.passed ? 'Passed' : 'Failed'}</Badge>
+                          <span className="text-sm font-bold">{a.score}%</span>
+                          <Badge variant={a.status === 'completed' ? 'success' : a.status === 'timeout' ? 'warning' : 'default'}>{a.status}</Badge>
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         </div>
       )}
@@ -353,27 +638,37 @@ export default function AdminExams() {
             exams.map((exam) => (
               <motion.div key={exam.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                 <div className={`cursor-pointer transition-all ${selectedExam?.id === exam.id ? 'ring-2 ring-primary-500 rounded-2xl' : ''}`} onClick={() => loadQuestions(exam)}>
-                  <GlassCard className={`p-4 ${selectedExam?.id === exam.id ? '' : ''}`} hover>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm truncate">{exam.title}</h3>
-                      <p className="text-xs text-gray-500 truncate">{exam.course_title}</p>
+                  <GlassCard className="p-4" hover>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{exam.title}</h3>
+                        <p className="text-xs text-gray-500 truncate">{exam.course_title}</p>
+                      </div>
+                      <Badge variant={exam.is_published ? 'success' : 'default'}>{exam.is_published ? 'Published' : 'Draft'}</Badge>
                     </div>
-                    <Badge variant={exam.is_published ? 'success' : 'default'}>{exam.is_published ? 'Published' : 'Draft'}</Badge>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
-                    <span>{exam.duration_minutes}min</span>
-                    <span>Pass: {exam.passing_score}%</span>
-                    <span>{exam.max_attempts} attempt(s)</span>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); togglePublished(exam); }} title={exam.is_published ? 'Unpublish' : 'Publish'}>
-                      {exam.is_published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEdit(exam); }}>Edit</Button>
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }} className="text-danger-500"><Trash2 className="w-3.5 h-3.5" /></Button>
-                  </div>
-                </GlassCard>
+                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-2 flex-wrap">
+                      <span>{exam.duration_minutes}min</span>
+                      <span>Pass: {exam.passing_score}%</span>
+                      <span>{exam.max_attempts} attempt(s)</span>
+                      {exam.random_questions_count > 0 && <span>Random: {exam.random_questions_count}</span>}
+                      {exam.negative_marking && <span className="text-red-400">-{exam.negative_percentage}%</span>}
+                    </div>
+                    {exam.starts_at && (
+                      <p className="text-[10px] text-gray-600 mb-2">
+                        Schedule: {new Date(exam.starts_at).toLocaleString()}{exam.ends_at ? ` — ${new Date(exam.ends_at).toLocaleString()}` : ''}
+                      </p>
+                    )}
+                    <div className="flex gap-1.5">
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); togglePublished(exam); }} title={exam.is_published ? 'Unpublish' : 'Publish'}>
+                        {exam.is_published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDuplicate(exam); }} title="Duplicate"><Copy className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); loadAttempts(exam); }} title="View Attempts"><UserCheck className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleExport(exam); }} title="Export CSV"><Download className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEdit(exam); }}>Edit</Button>
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }} className="text-danger-500"><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </div>
+                  </GlassCard>
                 </div>
               </motion.div>
             ))
@@ -499,9 +794,15 @@ export default function AdminExams() {
                           <p className="text-sm">{q.question}</p>
                           <p className="text-xs text-gray-500 mt-1">Answer: <span className="text-emerald-400">{q.correct_answer}</span></p>
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button size="sm" variant="ghost" onClick={() => handleEditQuestion(q)}>Edit</Button>
-                          <Button size="sm" variant="ghost" onClick={() => handleDeleteQuestion(q.id)} className="text-danger-500"><Trash2 className="w-3.5 h-3.5" /></Button>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <div className="flex gap-0.5">
+                            <Button size="sm" variant="ghost" onClick={() => reorderQuestion(q.id, 'up')} disabled={i === 0} className="p-1"><ChevronUp className="w-3 h-3" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => reorderQuestion(q.id, 'down')} disabled={i === questions.length - 1} className="p-1"><ChevronDown className="w-3 h-3" /></Button>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => handleEditQuestion(q)} className="text-xs">Edit</Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleDeleteQuestion(q.id)} className="text-danger-500"><Trash2 className="w-3.5 h-3.5" /></Button>
+                          </div>
                         </div>
                       </div>
                     </GlassCard>

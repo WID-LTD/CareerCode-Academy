@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
+import { Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight, Flag, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +14,7 @@ export default function ExamTake() {
   const [exam, setExam] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [flaggedQuestions, setFlaggedQuestions] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -21,6 +22,7 @@ export default function ExamTake() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const timerRef = useRef<any>(null);
   const [warnTime, setWarnTime] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
     loadExam();
@@ -31,20 +33,16 @@ export default function ExamTake() {
     if (!examId) return;
     setLoading(true);
     try {
-      // Start attempt
       const startRes = await api.post(`/exams/student/${examId}/start`);
       setAttemptId(startRes.data.data.attempt.id);
 
-      // Load exam questions
       const { data } = await api.get(`/exams/student/${examId}`);
       setExam(data.data);
       setQuestions(data.data.questions || []);
 
-      // Initialize timer
       const durationMs = (data.data.duration_minutes || 60) * 60;
       setTimeLeft(durationMs);
 
-      // If resuming, calculate remaining time
       if (startRes.data.data.resumed && data.data.activeAttemptStartedAt) {
         const startedAt = new Date(data.data.activeAttemptStartedAt).getTime();
         const elapsed = Math.floor((Date.now() - startedAt) / 1000);
@@ -59,7 +57,6 @@ export default function ExamTake() {
     }
   };
 
-  // Timer countdown
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0 || submitting) return;
 
@@ -103,7 +100,10 @@ export default function ExamTake() {
     }));
 
     try {
-      const { data } = await api.post(`/exams/student/${examId}/submit`, { answers: answerArray });
+      const { data } = await api.post(`/exams/student/${examId}/submit`, {
+        answers: answerArray,
+        flaggedQuestions,
+      });
       toast.success(data.data.passed ? 'Congratulations! You passed!' : 'You did not pass this time.');
       navigate(`/student/exams/${examId}/results/${data.data.attemptId}`);
     } catch (err: any) {
@@ -114,11 +114,19 @@ export default function ExamTake() {
 
   const currentQuestion = questions[currentIndex];
   const answeredCount = Object.keys(answers).length;
+  const flaggedCount = flaggedQuestions.length;
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h > 0 ? `${h}:` : ''}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const toggleFlag = (qId: string) => {
+    setFlaggedQuestions(prev =>
+      prev.includes(qId) ? prev.filter(id => id !== qId) : [...prev, qId]
+    );
   };
 
   if (loading) {
@@ -131,18 +139,91 @@ export default function ExamTake() {
 
   if (!exam) return null;
 
+  // Review screen
+  if (showReview) {
+    return (
+      <div className="min-h-[80vh] flex flex-col">
+        <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
+          <h1 className="text-white font-semibold text-sm">Review Your Answers</h1>
+          <Button size="sm" variant="outline" onClick={() => setShowReview(false)}>Back to Exam</Button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
+          {questions.map((q, i) => {
+            const ans = answers[q.id];
+            return (
+              <GlassCard key={q.id} className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-primary-400">Q{i + 1}</span>
+                    <Badge className="text-[10px]">{q.question_type}</Badge>
+                    {flaggedQuestions.includes(q.id) && <Flag className="w-3.5 h-3.5 text-yellow-400" />}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {ans ? (
+                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-gray-500" />
+                    )}
+                    <span className={`text-xs ${ans ? 'text-emerald-400' : 'text-gray-500'}`}>
+                      {ans ? 'Answered' : 'Unanswered'}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm mb-2">{q.question}</p>
+                {q.question_type === 'essay' ? (
+                  <div className="p-3 rounded-lg bg-gray-800/50">
+                    <p className="text-xs text-gray-500 mb-1">Your answer:</p>
+                    <p className="text-sm text-gray-200 whitespace-pre-wrap">{ans || '(no answer)'}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm">Selected: <span className={ans ? 'text-emerald-400' : 'text-gray-500'}>{ans || '(none)'}</span></p>
+                )}
+                <Button size="sm" variant="ghost" className="mt-2" onClick={() => { setCurrentIndex(i); setShowReview(false); }}>
+                  Edit Answer
+                </Button>
+              </GlassCard>
+            );
+          })}
+
+          <div className="flex justify-center gap-3 pb-8">
+            <Button variant="outline" onClick={() => setShowReview(false)}>Back to Exam</Button>
+            <Button onClick={handleSubmit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Submit Exam
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[80vh] flex flex-col">
-      {/* Header with timer */}
+      {/* Header with timer and progress */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="min-w-0">
           <h1 className="text-white font-semibold text-sm truncate">{exam.title}</h1>
           <p className="text-gray-500 text-xs">{exam.course_title}</p>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-xs text-gray-500">
-            {answeredCount}/{questions.length} answered
-          </span>
+          {/* Progress bar */}
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="w-32 bg-gray-800 rounded-full h-2">
+              <div className="bg-primary-500 h-2 rounded-full transition-all" style={{ width: `${(answeredCount / questions.length) * 100}%` }} />
+            </div>
+            <span className="text-xs text-gray-500">{answeredCount}/{questions.length}</span>
+          </div>
+
+          {flaggedCount > 0 && (
+            <span className="text-xs text-yellow-400 flex items-center gap-1">
+              <Flag className="w-3 h-3" /> {flaggedCount}
+            </span>
+          )}
+
+          {exam.negative_marking && (
+            <span className="text-xs text-red-400">-{exam.negative_percentage}%/wrong</span>
+          )}
+
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold ${
             warnTime ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-gray-800 text-gray-200'
           }`}>
@@ -160,7 +241,7 @@ export default function ExamTake() {
               <button
                 key={q.id}
                 onClick={() => setCurrentIndex(i)}
-                className={`w-full aspect-square rounded-lg text-xs font-medium transition-colors ${
+                className={`w-full aspect-square rounded-lg text-xs font-medium transition-colors relative ${
                   i === currentIndex
                     ? 'bg-primary-500 text-white'
                     : answers[q.id]
@@ -169,9 +250,22 @@ export default function ExamTake() {
                 }`}
               >
                 {i + 1}
+                {flaggedQuestions.includes(q.id) && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full" />
+                )}
               </button>
             ))}
           </div>
+
+          {/* Review button */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-3 text-[10px]"
+            onClick={() => setShowReview(true)}
+          >
+            <Eye className="w-3 h-3 mr-1" /> Review
+          </Button>
         </div>
 
         {/* Question Area */}
@@ -179,10 +273,19 @@ export default function ExamTake() {
           <div className="flex-1 overflow-y-auto p-4 lg:p-6">
             {currentQuestion && (
               <motion.div key={currentQuestion.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge>Question {currentIndex + 1} of {questions.length}</Badge>
-                  <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{currentQuestion.question_type}</Badge>
-                  <span className="text-xs text-gray-500">{currentQuestion.points} pt(s)</span>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Badge>Question {currentIndex + 1} of {questions.length}</Badge>
+                    <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{currentQuestion.question_type}</Badge>
+                    <span className="text-xs text-gray-500">{currentQuestion.points} pt(s)</span>
+                  </div>
+                  <button
+                    onClick={() => toggleFlag(currentQuestion.id)}
+                    className={`p-1.5 rounded-lg transition-colors ${flaggedQuestions.includes(currentQuestion.id) ? 'text-yellow-400 bg-yellow-400/10' : 'text-gray-500 hover:text-gray-300'}`}
+                    title={flaggedQuestions.includes(currentQuestion.id) ? 'Unflag question' : 'Flag for review'}
+                  >
+                    <Flag className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <h2 className="text-lg font-medium text-white mb-6">{currentQuestion.question}</h2>
@@ -258,12 +361,9 @@ export default function ExamTake() {
             ) : (
               <Button
                 size="sm"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setShowReview(true)}
               >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                Submit Exam
+                <Eye className="w-4 h-4 mr-1" /> Review & Submit
               </Button>
             )}
           </div>

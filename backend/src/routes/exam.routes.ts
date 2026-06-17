@@ -8,6 +8,9 @@ import { NotFoundError, ForbiddenError } from '../utils/errors';
 
 const router = Router();
 
+const emptyOrNull = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess(v => (v === '' || v === null || v === undefined) ? undefined : v, schema.optional());
+
 const createExamSchema = z.object({
   courseId: z.string().uuid(),
   title: z.string().min(2).max(200),
@@ -18,9 +21,19 @@ const createExamSchema = z.object({
   shuffleQuestions: z.boolean().optional(),
   showResults: z.boolean().optional(),
   isPublished: z.boolean().optional(),
-});
+  startsAt: z.preprocess(v => (v === '' || v === null || v === undefined) ? undefined : v, z.string().datetime().optional()),
+  endsAt: z.preprocess(v => (v === '' || v === null || v === undefined) ? undefined : v, z.string().datetime().optional()),
+  instructions: z.string().optional(),
+  randomQuestionsCount: z.number().min(0).max(200).optional(),
+  negativeMarking: z.boolean().optional(),
+  negativePercentage: z.number().min(0).max(100).optional(),
+}).refine(data => {
+  if (data.startsAt && data.endsAt && data.startsAt > data.endsAt) return false;
+  return true;
+}, { message: 'endsAt must be after startsAt', path: ['endsAt'] });
 
 const updateExamSchema = z.object({
+  courseId: z.string().uuid().optional(),
   title: z.string().min(2).max(200).optional(),
   description: z.string().optional(),
   durationMinutes: z.number().min(1).max(480).optional(),
@@ -29,6 +42,12 @@ const updateExamSchema = z.object({
   shuffleQuestions: z.boolean().optional(),
   showResults: z.boolean().optional(),
   isPublished: z.boolean().optional(),
+  startsAt: z.preprocess(v => (v === '' || v === null || v === undefined) ? undefined : v, z.string().datetime().optional()),
+  endsAt: z.preprocess(v => (v === '' || v === null || v === undefined) ? undefined : v, z.string().datetime().optional()),
+  instructions: z.string().optional(),
+  randomQuestionsCount: z.number().min(0).max(200).optional(),
+  negativeMarking: z.boolean().optional(),
+  negativePercentage: z.number().min(0).max(100).optional(),
 });
 
 const questionSchema = z.object({
@@ -38,11 +57,6 @@ const questionSchema = z.object({
   correctAnswer: z.string().min(1),
   points: z.number().min(1).optional(),
   orderIndex: z.number().min(0).optional(),
-});
-
-const answerSchema = z.object({
-  questionId: z.string().uuid(),
-  answer: z.string(),
 });
 
 // ───────────────────────── Admin / Instructor Routes ─────────────────────────
@@ -105,13 +119,19 @@ router.post(
       const exam = await ExamModel.createExam({
         course_id: data.courseId,
         title: data.title,
-        description: data.description,
+        description: data.description ?? undefined,
         duration_minutes: data.durationMinutes,
         passing_score: data.passingScore,
         max_attempts: data.maxAttempts,
         shuffle_questions: data.shuffleQuestions,
         show_results: data.showResults,
         is_published: data.isPublished,
+        starts_at: data.startsAt ?? null,
+        ends_at: data.endsAt ?? null,
+        instructions: data.instructions ?? undefined,
+        random_questions_count: data.randomQuestionsCount,
+        negative_marking: data.negativeMarking,
+        negative_percentage: data.negativePercentage,
       });
 
       res.status(201).json({ success: true, data: exam });
@@ -134,6 +154,7 @@ router.put(
 
       const data = req.body;
       const updated = await ExamModel.updateExam(req.params.id, {
+        course_id: data.courseId,
         title: data.title,
         description: data.description,
         duration_minutes: data.durationMinutes,
@@ -142,6 +163,12 @@ router.put(
         shuffle_questions: data.shuffleQuestions,
         show_results: data.showResults,
         is_published: data.isPublished,
+        starts_at: data.startsAt !== undefined ? data.startsAt : undefined,
+        ends_at: data.endsAt !== undefined ? data.endsAt : undefined,
+        instructions: data.instructions,
+        random_questions_count: data.randomQuestionsCount,
+        negative_marking: data.negativeMarking,
+        negative_percentage: data.negativePercentage,
       });
 
       res.json({ success: true, data: updated });
@@ -186,7 +213,6 @@ router.post(
       const questions = await ExamModel.getQuestionsByExam(req.params.examId);
       const orderIndex = data.orderIndex ?? questions.length;
 
-      // Parse options for true_false
       let options = data.options || [];
       if (data.questionType === 'true_false' && options.length === 0) {
         options = ['True', 'False'];
@@ -257,7 +283,124 @@ router.delete(
   }
 );
 
+// ───────────────────────── Administrator Attempt Management ─────────────────────────
+
+// GET /exams/:id/attempts — list all attempts for an exam
+router.get(
+  '/:id/attempts',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const exam = await ExamModel.getExamById(req.params.id);
+      if (!exam) throw new NotFoundError('Exam');
+
+      const attempts = await ExamModel.getAttemptsByExam(req.params.id);
+      res.json({ success: true, data: attempts });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /exams/:id/attempts/:attemptId — view attempt detail
+router.get(
+  '/:id/attempts/:attemptId',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const attempt = await ExamModel.getAttemptById(req.params.attemptId);
+      if (!attempt) throw new NotFoundError('Attempt');
+
+      const answers = await ExamModel.getAnswersForAttempt(req.params.attemptId);
+      res.json({ success: true, data: { attempt, answers } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /exams/:id/attempts/:attemptId/grade — manually grade attempt
+router.put(
+  '/:id/attempts/:attemptId/grade',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { manualScore } = req.body;
+      if (manualScore === undefined || manualScore < 0 || manualScore > 100) {
+        return res.status(400).json({ success: false, message: 'manualScore must be 0-100' });
+      }
+
+      const exam = await ExamModel.getExamById(req.params.id);
+      if (!exam) throw new NotFoundError('Exam');
+
+      const passed = manualScore >= exam.passing_score;
+      const updated = await ExamModel.updateAttemptManualGrade(req.params.attemptId, manualScore, true);
+      if (!updated) throw new NotFoundError('Attempt');
+
+      res.json({ success: true, data: { ...updated, passed } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /exams/:id/duplicate — duplicate an exam
+router.post(
+  '/:id/duplicate',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const exam = await ExamModel.getExamById(req.params.id);
+      if (!exam) throw new NotFoundError('Exam');
+
+      const newTitle = req.body.title || `${exam.title} (Copy)`;
+      const duplicated = await ExamModel.duplicateExam(req.params.id, newTitle);
+
+      res.status(201).json({ success: true, data: duplicated });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /exams/:id/export — CSV export of results
+router.get(
+  '/:id/export',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const exam = await ExamModel.getExamById(req.params.id);
+      if (!exam) throw new NotFoundError('Exam');
+
+      const attempts = await ExamModel.getAttemptsByExam(req.params.id);
+
+      const header = 'Student Name,Email,Score,Passed,Status,Started At,Submitted At\n';
+      const rows = attempts.map((a: any) =>
+        `"${a.user_name || ''}","${a.user_email || ''}",${a.score ?? ''},${a.passed ? 'Yes' : 'No'},${a.status},"${a.started_at ? new Date(a.started_at).toLocaleString() : ''}","${a.submitted_at ? new Date(a.submitted_at).toLocaleString() : ''}"`
+      ).join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="exam-${exam.title.replace(/[^a-z0-9]/gi, '_')}-results.csv"`);
+      res.send(header + rows);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // ───────────────────────── Student Routes ─────────────────────────
+
+function getExamScheduleStatus(exam: any): string {
+  const now = new Date();
+  if (exam.starts_at && new Date(exam.starts_at) > now) return 'upcoming';
+  if (exam.ends_at && new Date(exam.ends_at) < now) return 'expired';
+  return 'available';
+}
 
 // GET /exams/student/list — available exams for enrolled courses
 router.get(
@@ -267,7 +410,13 @@ router.get(
     try {
       const userId = req.user!.userId;
       const exams = await ExamModel.getAvailableExamsForUser(userId);
-      res.json({ success: true, data: exams });
+
+      const enriched = exams.map((e: any) => ({
+        ...e,
+        schedule_status: getExamScheduleStatus(e),
+      }));
+
+      res.json({ success: true, data: enriched });
     } catch (error) {
       next(error);
     }
@@ -300,13 +449,16 @@ router.get(
       if (!exam) throw new NotFoundError('Exam');
       if (!exam.is_published) throw new NotFoundError('Exam');
 
-      // Check enrollment
+      const status = getExamScheduleStatus(exam);
+      if (status === 'expired') {
+        return res.status(403).json({ success: false, message: 'This exam has ended' });
+      }
+
       const enrolled = await checkEnrolled(exam.course_id, userId);
       if (!enrolled) {
         return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
       }
 
-      // Check attempt limit
       if (exam.max_attempts > 0) {
         const attemptCount = await ExamModel.countAttempts(req.params.examId, userId);
         if (attemptCount >= exam.max_attempts) {
@@ -314,10 +466,14 @@ router.get(
         }
       }
 
-      const questions = await ExamModel.getQuestionsByExam(req.params.examId);
+      let questions;
+      if (exam.random_questions_count > 0) {
+        questions = await ExamModel.getRandomQuestions(req.params.examId, exam.random_questions_count);
+      } else {
+        questions = await ExamModel.getQuestionsByExam(req.params.examId);
+      }
 
-      // Strip correct answers for the frontend
-      const safeQuestions = questions.map(q => ({
+      const safeQuestions = questions.map((q: any) => ({
         id: q.id,
         question: q.question,
         question_type: q.question_type,
@@ -326,13 +482,13 @@ router.get(
         order_index: q.order_index,
       }));
 
-      // Check for existing in-progress attempt
       const activeAttempt = await ExamModel.getActiveAttempt(req.params.examId, userId);
 
       res.json({
         success: true,
         data: {
           ...exam,
+          schedule_status: status,
           questions: exam.shuffle_questions ? shuffleArray(safeQuestions) : safeQuestions,
           activeAttemptId: activeAttempt?.id || null,
           activeAttemptStartedAt: activeAttempt?.started_at || null,
@@ -354,18 +510,24 @@ router.post(
       const exam = await ExamModel.getExamById(req.params.examId);
       if (!exam) throw new NotFoundError('Exam');
 
+      const status = getExamScheduleStatus(exam);
+      if (status === 'upcoming') {
+        return res.status(403).json({ success: false, message: 'This exam has not started yet' });
+      }
+      if (status === 'expired') {
+        return res.status(403).json({ success: false, message: 'This exam has ended' });
+      }
+
       const enrolled = await checkEnrolled(exam.course_id, userId);
       if (!enrolled) {
         return res.status(403).json({ success: false, message: 'Not enrolled' });
       }
 
-      // Check existing in-progress attempt
       const active = await ExamModel.getActiveAttempt(req.params.examId, userId);
       if (active) {
         return res.json({ success: true, data: { attempt: active, resumed: true } });
       }
 
-      // Check max attempts
       if (exam.max_attempts > 0) {
         const count = await ExamModel.countAttempts(req.params.examId, userId);
         if (count >= exam.max_attempts) {
@@ -388,7 +550,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
-      const { answers } = req.body;
+      const { answers, flaggedQuestions } = req.body;
       if (!Array.isArray(answers)) {
         return res.status(400).json({ success: false, message: 'answers must be an array' });
       }
@@ -404,11 +566,12 @@ router.post(
       const questions = await ExamModel.getQuestionsByExam(req.params.examId);
       const questionMap = new Map(questions.map(q => [q.id, q]));
 
-      let totalScore = 0;
-      let maxScore = 0;
+      let totalPoints = 0;
+      let maxPoints = 0;
+      let wrongCount = 0;
 
       for (const q of questions) {
-        maxScore += q.points;
+        maxPoints += q.points;
       }
 
       for (const ans of answers) {
@@ -417,14 +580,25 @@ router.post(
 
         const isCorrect = question.correct_answer.toLowerCase().trim() === (ans.answer || '').toLowerCase().trim();
         const pointsEarned = isCorrect ? question.points : 0;
-        totalScore += pointsEarned;
+        totalPoints += pointsEarned;
+        if (!isCorrect) wrongCount++;
 
         await ExamModel.saveAnswer(activeAttempt.id, ans.questionId, ans.answer, isCorrect, pointsEarned);
       }
 
-      const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-      const passed = percentage >= exam.passing_score;
+      // Apply negative marking
+      let percentage = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
+      if (exam.negative_marking && exam.negative_percentage > 0 && wrongCount > 0) {
+        const deduction = Math.round(wrongCount * exam.negative_percentage);
+        percentage = Math.max(0, percentage - deduction);
+      }
 
+      // Update flagged answers if provided
+      if (flaggedQuestions && Array.isArray(flaggedQuestions)) {
+        await ExamModel.updateAttemptFlags(activeAttempt.id, flaggedQuestions);
+      }
+
+      const passed = percentage >= exam.passing_score;
       await ExamModel.submitAttempt(activeAttempt.id, percentage, passed);
 
       res.json({
@@ -454,6 +628,7 @@ router.post(
         return res.status(400).json({ success: false, message: 'No active attempt' });
       }
 
+      const exam = await ExamModel.getExamById(req.params.examId);
       const questions = await ExamModel.getQuestionsByExam(req.params.examId);
       let totalScore = 0;
       let maxScore = 0;
@@ -461,13 +636,11 @@ router.post(
         maxScore += q.points;
       }
 
-      // Grade whatever answers were saved
       const answers = await ExamModel.getAnswersForAttempt(activeAttempt.id);
       for (const ans of answers) {
         totalScore += ans.points_earned || 0;
       }
 
-      const exam = await ExamModel.getExamById(req.params.examId);
       const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
       const passed = exam ? percentage >= exam.passing_score : false;
 
@@ -483,7 +656,7 @@ router.post(
   }
 );
 
-// GET /exams/student/:examId/results — view results for an attempt
+// GET /exams/student/:examId/results/:attemptId — view results for an attempt
 router.get(
   '/student/:examId/results/:attemptId',
   authenticate,
@@ -499,14 +672,20 @@ router.get(
       const exam = await ExamModel.getExamById(req.params.examId);
       if (!exam) throw new NotFoundError('Exam');
 
-      const answers = await ExamModel.getAnswersForAttempt(req.params.attemptId);
+      const examAnswers = await ExamModel.getAnswersForAttempt(req.params.attemptId);
 
       res.json({
         success: true,
         data: {
           attempt,
-          exam: { title: exam.title, passing_score: exam.passing_score, show_results: exam.show_results },
-          answers,
+          exam: {
+            title: exam.title,
+            passing_score: exam.passing_score,
+            show_results: exam.show_results,
+            negative_marking: exam.negative_marking,
+            negative_percentage: exam.negative_percentage,
+          },
+          answers: examAnswers,
         },
       });
     } catch (error) {
