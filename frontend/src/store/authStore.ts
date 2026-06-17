@@ -139,6 +139,7 @@ export const useAuthStore = create<AuthState>()(
 
       initialize: async () => {
         if (get().initialized) return;
+        set({ isLoading: true });
         try {
           const { data } = await api.get('/auth/me');
           const userData = data.data;

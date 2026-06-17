@@ -47,6 +47,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Analytics', path: '/instructor/analytics', icon: LayoutDashboard },
     { label: 'Courses', path: '/instructor/courses', icon: BookOpen },
     { label: 'Quizzes', path: '/instructor/quizzes', icon: ClipboardList },
+    { label: 'Exams', path: '/instructor/exams', icon: ClipboardList },
     { label: 'Course Proposals', path: '/instructor/course-proposals', icon: GitBranch },
     { label: 'Students', path: '/instructor/students', icon: Users },
     { label: 'Assignments', path: '/instructor/assignments', icon: ClipboardList },

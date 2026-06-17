@@ -129,7 +129,7 @@ export default function AdminExams() {
 
   const fetchCourses = async () => {
     try {
-      const { data } = await api.get('/admin/courses?limit=200');
+      const { data } = await api.get('/exams/courses');
       setCourses(data.data || []);
     } catch { /* ignore */ }
   };

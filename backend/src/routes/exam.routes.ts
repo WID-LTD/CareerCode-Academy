@@ -61,6 +61,42 @@ const questionSchema = z.object({
 
 // ───────────────────────── Admin / Instructor Routes ─────────────────────────
 
+// Helper: verify the requesting instructor owns the exam's course
+async function verifyExamAccess(req: AuthRequest, examId: string): Promise<void> {
+  if (req.user?.role !== 'instructor') return; // admin/super_admin always allowed
+  const exam = await ExamModel.getExamById(examId);
+  if (!exam) throw new NotFoundError('Exam');
+  const { query: dbQuery } = await import('../config/db');
+  const { rows } = await dbQuery(
+    'SELECT 1 FROM courses WHERE id = $1 AND instructor_id = $2',
+    [exam.course_id, req.user!.userId]
+  );
+  if (rows.length === 0) throw new ForbiddenError('You do not have access to this exam');
+}
+
+// GET /exams/courses — list courses for exam creation dropdown (admin/instructor)
+router.get(
+  '/courses',
+  authenticate,
+  authorize('admin', 'super_admin', 'instructor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { query: dbQuery } = await import('../config/db');
+      let sql = `SELECT id, title FROM courses`;
+      const params: any[] = [];
+      if (req.user?.role === 'instructor') {
+        sql += ` WHERE instructor_id = $1`;
+        params.push(req.user.userId);
+      }
+      sql += ` ORDER BY title`;
+      const { rows } = await dbQuery(sql, params);
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /exams — list all exams (admin/instructor)
 router.get(
   '/',
@@ -72,8 +108,14 @@ router.get(
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
       const offset = (page - 1) * limit;
 
-      const exams = await ExamModel.getAllExams(limit, offset);
-      const total = await ExamModel.countExams();
+      let exams, total;
+      if (req.user?.role === 'instructor') {
+        exams = await ExamModel.getExamsByInstructor(req.user.userId, limit, offset);
+        total = await ExamModel.countExamsByInstructor(req.user.userId);
+      } else {
+        exams = await ExamModel.getAllExams(limit, offset);
+        total = await ExamModel.countExams();
+      }
 
       res.json({
         success: true,
@@ -108,13 +150,18 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(createExamSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const data = req.body;
       const course = await CourseModel.getCourseById(data.courseId);
       if (!course) throw new NotFoundError('Course');
+
+      // Instructors can only create exams for their own courses
+      if (req.user?.role === 'instructor' && course.instructor_id !== req.user.userId) {
+        throw new ForbiddenError('You can only create exams for your own courses');
+      }
 
       const exam = await ExamModel.createExam({
         course_id: data.courseId,
@@ -145,10 +192,11 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(updateExamSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -182,9 +230,10 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -202,10 +251,11 @@ router.delete(
 router.post(
   '/:examId/questions',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(questionSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.examId);
       const exam = await ExamModel.getExamById(req.params.examId);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -239,10 +289,11 @@ router.post(
 router.put(
   '/:examId/questions/:questionId',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(questionSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.examId);
       const data = req.body;
 
       let options = data.options;
@@ -271,9 +322,10 @@ router.put(
 router.delete(
   '/:examId/questions/:questionId',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.examId);
       const deleted = await ExamModel.deleteQuestion(req.params.questionId);
       if (!deleted) throw new NotFoundError('Question');
       res.json({ success: true, message: 'Question deleted' });
@@ -289,9 +341,10 @@ router.delete(
 router.get(
   '/:id/attempts',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -307,9 +360,10 @@ router.get(
 router.get(
   '/:id/attempts/:attemptId',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const attempt = await ExamModel.getAttemptById(req.params.attemptId);
       if (!attempt) throw new NotFoundError('Attempt');
 
@@ -325,9 +379,10 @@ router.get(
 router.put(
   '/:id/attempts/:attemptId/grade',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const { manualScore } = req.body;
       if (manualScore === undefined || manualScore < 0 || manualScore > 100) {
         return res.status(400).json({ success: false, message: 'manualScore must be 0-100' });
@@ -351,9 +406,10 @@ router.put(
 router.post(
   '/:id/duplicate',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -371,9 +427,10 @@ router.post(
 router.get(
   '/:id/export',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 

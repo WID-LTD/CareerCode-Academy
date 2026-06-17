@@ -110,10 +110,19 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
+  const initialized = useAuthStore((s) => s.initialized);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader text="Loading..." />
+      </div>
+    );
+  }
 
   return (
       <Routes>
@@ -178,6 +187,8 @@ function App() {
           <Route path="messages" element={<SuspenseWrapper><InstructorMessages /></SuspenseWrapper>} />
           <Route path="schedule" element={<SuspenseWrapper><InstructorSchedule /></SuspenseWrapper>} />
           <Route path="quizzes" element={<SuspenseWrapper><InstructorQuizzes /></SuspenseWrapper>} />
+          <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
+          <Route path="exams/:examId" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
           <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
         </Route>
 
