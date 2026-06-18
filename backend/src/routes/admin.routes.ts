@@ -7,12 +7,14 @@ import * as EnrollmentModel from '../models/enrollment';
 import * as PaymentModel from '../models/payment';
 import * as NotificationModel from '../models/notification';
 import * as CertificateModel from '../models/certificate';
+import * as CertificateTemplateModel from '../models/certificateTemplate';
 import { query } from '../config/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail } from '../utils/helpers';
 import { logAudit } from '../middleware/audit';
 import { io, emitDashboardUpdate } from '../config/socket';
+import { uploadSingle } from '../middleware/upload';
 
 const router = Router();
 
@@ -1187,7 +1189,92 @@ router.put('/applications/:id/request-changes', async (req: AuthRequest, res: Re
     );
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Application not found' });
     await logAudit({ adminId, action: 'request_changes', resourceType: 'application', resourceId: id, details: notes, ipAddress: req.ip });
-    res.json({ success: true, message: 'Changes requested', data: rows[0] });
+      res.json({ success: true, message: 'Changes requested', data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// ── Certificate Template Routes ──
+
+// GET /admin/certificate-templates — list all templates
+router.get('/certificate-templates', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const templates = await CertificateTemplateModel.getAllTemplates();
+    res.json({ success: true, data: templates });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates — create template
+router.post('/certificate-templates', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const template = await CertificateTemplateModel.createTemplate(req.body);
+    await logAudit({ adminId: req.user!.userId, action: 'create', resourceType: 'certificate_template', resourceId: template.id, ipAddress: req.ip });
+    res.status(201).json({ success: true, data: template });
+  } catch (error) { next(error); }
+});
+
+// PUT /admin/certificate-templates/:id — update template
+router.put('/certificate-templates/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, req.body);
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'update', resourceType: 'certificate_template', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: template });
+  } catch (error) { next(error); }
+});
+
+// DELETE /admin/certificate-templates/:id — delete template
+router.delete('/certificate-templates/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await CertificateTemplateModel.deleteTemplate(req.params.id);
+    if (!deleted) return res.status(404).json({ success: false, message: 'Template not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'certificate_template', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Template deleted' });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates/:id/upload-stamp — upload stamp image
+router.post('/certificate-templates/:id/upload-stamp', uploadSingle('file', 'certificates'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, { stamp_url: url ?? undefined });
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    res.json({ success: true, data: { url, template } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates/:id/upload-signature — upload signature image
+router.post('/certificate-templates/:id/upload-signature', uploadSingle('file', 'certificates'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, { signature_url: url ?? undefined });
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    res.json({ success: true, data: { url, template } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates/:id/upload-logo — upload logo image
+router.post('/certificate-templates/:id/upload-logo', uploadSingle('file', 'certificates'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, { logo_url: url ?? undefined });
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    res.json({ success: true, data: { url, template } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/settings/upload-branding — upload branding image (stamp/signature)
+router.post('/settings/upload-branding', uploadSingle('file', 'branding'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    res.json({ success: true, data: { url } });
   } catch (error) { next(error); }
 });
 

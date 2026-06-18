@@ -17,6 +17,7 @@ export interface Exam {
   random_questions_count: number;
   negative_marking: boolean;
   negative_percentage: number;
+  certificate_template_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -63,12 +64,13 @@ export interface CreateExamInput {
   random_questions_count?: number;
   negative_marking?: boolean;
   negative_percentage?: number;
+  certificate_template_id?: string | null;
 }
 
 export async function createExam(input: CreateExamInput): Promise<Exam> {
   const { rows } = await query<Exam>(
-    `INSERT INTO exams (course_id, title, description, duration_minutes, passing_score, max_attempts, shuffle_questions, show_results, is_published, starts_at, ends_at, instructions, random_questions_count, negative_marking, negative_percentage)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    `INSERT INTO exams (course_id, title, description, duration_minutes, passing_score, max_attempts, shuffle_questions, show_results, is_published, starts_at, ends_at, instructions, random_questions_count, negative_marking, negative_percentage, certificate_template_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING *`,
     [
       input.course_id, input.title, input.description || null,
@@ -76,6 +78,7 @@ export async function createExam(input: CreateExamInput): Promise<Exam> {
       input.shuffle_questions || false, input.show_results !== false, input.is_published || false,
       input.starts_at || null, input.ends_at || null, input.instructions || null,
       input.random_questions_count || 0, input.negative_marking || false, input.negative_percentage || 0,
+      input.certificate_template_id || null,
     ]
   );
   return rows[0];

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Globe, Shield, Mail, CreditCard, Bell, Palette, Lock, Smartphone, Loader2 } from 'lucide-react';
+import { Save, Globe, Shield, Mail, CreditCard, Bell, Palette, Lock, Smartphone, Loader2, Upload, X } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAdminStore } from '@/store/adminStore';
+import api from '@/lib/axios';
 
 const sections = [
   { id: 'general', label: 'General', icon: Globe },
@@ -20,6 +21,7 @@ export default function AdminSettings() {
   const { settings, fetchSettings, updateSetting, isLoading } = useAdminStore();
   const [localSettings, setLocalSettings] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingBranding, setUploadingBranding] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -157,14 +159,133 @@ export default function AdminSettings() {
             </GlassCard>
           )}
 
-          {activeSection !== 'general' && activeSection !== 'security' && (
+          {activeSection === 'branding' && (
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-semibold mb-2">Branding Settings</h3>
+              <p className="text-sm text-gray-500 mb-6">Upload your organization's stamp and signature for certificate generation.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Stamp Upload */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Stamp Image (PNG)</label>
+                  <div className="border-2 border-dashed rounded-xl p-4 text-center">
+                    {getSetting('certificate_default_stamp_url') ? (
+                      <div className="relative inline-block">
+                        <img src={getSetting('certificate_default_stamp_url')} alt="Stamp"
+                          className="h-24 w-24 object-contain mx-auto" />
+                        <button onClick={async () => {
+                          const { data } = await api.put('/admin/settings', { key: 'certificate_default_stamp_url', value: '' });
+                          fetchSettings();
+                        }} className="absolute -top-2 -right-2 p-0.5 bg-red-500 text-white rounded-full">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="py-4">
+                        <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs text-gray-400">No stamp uploaded</p>
+                      </div>
+                    )}
+                    <label className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs cursor-pointer hover:bg-primary-600">
+                      <Upload size={12} /> Upload Stamp
+                      <input type="file" accept="image/png,image/jpeg" className="hidden"
+                        disabled={uploadingBranding === 'stamp'}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingBranding('stamp');
+                          try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const { data: uploadRes } = await api.post('/admin/settings/upload-branding', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' },
+                            });
+                            if (uploadRes.data?.url) {
+                              await api.put('/admin/settings', { key: 'certificate_default_stamp_url', value: uploadRes.data.url });
+                              fetchSettings();
+                            }
+                          } catch { /* ignore */ }
+                          setUploadingBranding(null);
+                        }} />
+                    </label>
+                    {uploadingBranding === 'stamp' && <Loader2 size={14} className="animate-spin inline ml-1" />}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={getSetting('certificate_show_stamp', 'true') === 'true'}
+                      onChange={(e) => handleChange('certificate_show_stamp', e.target.checked ? 'true' : 'false')} />
+                    Show stamp on certificates
+                  </label>
+                </div>
+
+                {/* Signature Upload */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Signature Image (PNG)</label>
+                  <div className="border-2 border-dashed rounded-xl p-4 text-center">
+                    {getSetting('certificate_default_signature_url') ? (
+                      <div className="relative inline-block">
+                        <img src={getSetting('certificate_default_signature_url')} alt="Signature"
+                          className="h-16 w-32 object-contain mx-auto" />
+                        <button onClick={async () => {
+                          await api.put('/admin/settings', { key: 'certificate_default_signature_url', value: '' });
+                          fetchSettings();
+                        }} className="absolute -top-2 -right-2 p-0.5 bg-red-500 text-white rounded-full">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="py-4">
+                        <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs text-gray-400">No signature uploaded</p>
+                      </div>
+                    )}
+                    <label className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs cursor-pointer hover:bg-primary-600">
+                      <Upload size={12} /> Upload Signature
+                      <input type="file" accept="image/png,image/jpeg" className="hidden"
+                        disabled={uploadingBranding === 'signature'}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingBranding('signature');
+                          try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const { data: uploadRes } = await api.post('/admin/settings/upload-branding', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' },
+                            });
+                            if (uploadRes.data?.url) {
+                              await api.put('/admin/settings', { key: 'certificate_default_signature_url', value: uploadRes.data.url });
+                              fetchSettings();
+                            }
+                          } catch { /* ignore */ }
+                          setUploadingBranding(null);
+                        }} />
+                    </label>
+                    {uploadingBranding === 'signature' && <Loader2 size={14} className="animate-spin inline ml-1" />}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={getSetting('certificate_show_signature', 'true') === 'true'}
+                      onChange={(e) => handleChange('certificate_show_signature', e.target.checked ? 'true' : 'false')} />
+                    Show signature on certificates
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <Input label="Organization Name" value={getSetting('certificate_org_name', 'Career Code WID Ltd')}
+                  onChange={(e) => handleChange('certificate_org_name', e.target.value)} />
+                <Input label="Organization RC Number" value={getSetting('certificate_org_rc', 'RC 8824091')}
+                  onChange={(e) => handleChange('certificate_org_rc', e.target.value)} />
+              </div>
+            </GlassCard>
+          )}
+
+          {activeSection !== 'general' && activeSection !== 'security' && activeSection !== 'branding' && (
             <GlassCard className="p-6">
               <div className="text-center py-12">
                 <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
                   {activeSection === 'email' && <Mail className="w-8 h-8 text-primary-500" />}
                   {activeSection === 'payments' && <CreditCard className="w-8 h-8 text-primary-500" />}
                   {activeSection === 'notifications' && <Bell className="w-8 h-8 text-primary-500" />}
-                  {activeSection === 'branding' && <Palette className="w-8 h-8 text-primary-500" />}
                 </div>
                 <h3 className="text-lg font-semibold mb-2 capitalize">{activeSection} Settings</h3>
                 <p className="text-gray-500 text-sm max-w-md mx-auto">

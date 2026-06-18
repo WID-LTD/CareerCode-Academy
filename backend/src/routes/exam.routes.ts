@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as ExamModel from '../models/exam';
 import * as CourseModel from '../models/course';
+import * as EnrollmentModel from '../models/enrollment';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 
 const router = Router();
@@ -27,6 +28,7 @@ const createExamSchema = z.object({
   randomQuestionsCount: z.number().min(0).max(200).optional(),
   negativeMarking: z.boolean().optional(),
   negativePercentage: z.number().min(0).max(100).optional(),
+  certificateTemplateId: z.string().uuid().nullable().optional(),
 }).refine(data => {
   if (data.startsAt && data.endsAt && data.startsAt > data.endsAt) return false;
   return true;
@@ -48,6 +50,7 @@ const updateExamSchema = z.object({
   randomQuestionsCount: z.number().min(0).max(200).optional(),
   negativeMarking: z.boolean().optional(),
   negativePercentage: z.number().min(0).max(100).optional(),
+  certificateTemplateId: z.string().uuid().nullable().optional(),
 });
 
 const questionSchema = z.object({
@@ -179,6 +182,7 @@ router.post(
         random_questions_count: data.randomQuestionsCount,
         negative_marking: data.negativeMarking,
         negative_percentage: data.negativePercentage,
+        certificate_template_id: data.certificateTemplateId ?? null,
       });
 
       res.status(201).json({ success: true, data: exam });
@@ -217,6 +221,7 @@ router.put(
         random_questions_count: data.randomQuestionsCount,
         negative_marking: data.negativeMarking,
         negative_percentage: data.negativePercentage,
+        certificate_template_id: data.certificateTemplateId !== undefined ? data.certificateTemplateId : undefined,
       });
 
       res.json({ success: true, data: updated });
@@ -516,6 +521,21 @@ router.get(
         return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
       }
 
+      // Certificate template qualification check
+      if (exam.certificate_template_id) {
+        const { getTemplateById } = await import('../models/certificateTemplate');
+        const template = await getTemplateById(exam.certificate_template_id);
+        if (template) {
+          const enrollment = await EnrollmentModel.getEnrollment(userId, template.course_id);
+          if (!enrollment || !enrollment.completed) {
+            return res.status(403).json({
+              success: false,
+              message: 'You must complete the linked course before taking this exam',
+            });
+          }
+        }
+      }
+
       if (exam.max_attempts > 0) {
         const attemptCount = await ExamModel.countAttempts(req.params.examId, userId);
         if (attemptCount >= exam.max_attempts) {
@@ -578,6 +598,21 @@ router.post(
       const enrolled = await checkEnrolled(exam.course_id, userId);
       if (!enrolled) {
         return res.status(403).json({ success: false, message: 'Not enrolled' });
+      }
+
+      // Certificate template qualification check
+      if (exam.certificate_template_id) {
+        const { getTemplateById } = await import('../models/certificateTemplate');
+        const template = await getTemplateById(exam.certificate_template_id);
+        if (template) {
+          const enrollment = await EnrollmentModel.getEnrollment(userId, template.course_id);
+          if (!enrollment || !enrollment.completed) {
+            return res.status(403).json({
+              success: false,
+              message: 'You must complete the linked course before starting this exam',
+            });
+          }
+        }
       }
 
       const active = await ExamModel.getActiveAttempt(req.params.examId, userId);

@@ -84,6 +84,7 @@ const AdminCourseProposals = lazy(() => import('@/pages/admin/CourseProposals'))
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'));
 const AdminExams = lazy(() => import('@/pages/admin/Exams'));
 const AdminCertificates = lazy(() => import('@/pages/admin/Certificates'));
+const AdminCertificateTemplates = lazy(() => import('@/pages/admin/CertificateTemplates'));
 const AdminTickets = lazy(() => import('@/pages/admin/Tickets'));
 const AdminBroadcasts = lazy(() => import('@/pages/admin/Broadcasts'));
 const AdminAuditLog = lazy(() => import('@/pages/admin/AuditLog'));
@@ -200,7 +201,8 @@ function App() {
           <Route path="applications" element={<SuspenseWrapper><AdminApplications /></SuspenseWrapper>} />
           <Route path="payments" element={<SuspenseWrapper><AdminPayments /></SuspenseWrapper>} />
           <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
-          <Route path="certificates" element={<SuspenseWrapper><AdminCertificates /></SuspenseWrapper>} />
+            <Route path="certificates" element={<SuspenseWrapper><AdminCertificates /></SuspenseWrapper>} />
+            <Route path="certificate-templates" element={<SuspenseWrapper><AdminCertificateTemplates /></SuspenseWrapper>} />
           <Route path="tickets" element={<SuspenseWrapper><AdminTickets /></SuspenseWrapper>} />
           <Route path="broadcasts" element={<SuspenseWrapper><AdminBroadcasts /></SuspenseWrapper>} />
           <Route path="categories" element={<SuspenseWrapper><AdminCategories /></SuspenseWrapper>} />

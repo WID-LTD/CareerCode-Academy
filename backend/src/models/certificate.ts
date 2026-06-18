@@ -6,6 +6,7 @@ export interface Certificate {
   course_id: string;
   certificate_url: string | null;
   verification_code: string;
+  certificate_template_id: string | null;
   issued_at: Date;
 }
 
@@ -14,14 +15,15 @@ export interface CreateCertificateInput {
   course_id: string;
   certificate_url?: string;
   verification_code: string;
+  certificate_template_id?: string | null;
 }
 
 export async function createCertificate(input: CreateCertificateInput): Promise<Certificate> {
   const { rows } = await query<Certificate>(
-    `INSERT INTO certificates (user_id, course_id, certificate_url, verification_code)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO certificates (user_id, course_id, certificate_url, verification_code, certificate_template_id)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [input.user_id, input.course_id, input.certificate_url || null, input.verification_code]
+    [input.user_id, input.course_id, input.certificate_url || null, input.verification_code, input.certificate_template_id || null]
   );
   return rows[0];
 }

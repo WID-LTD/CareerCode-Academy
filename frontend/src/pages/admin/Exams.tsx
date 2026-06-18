@@ -26,6 +26,7 @@ interface Exam {
   random_questions_count: number;
   negative_marking: boolean;
   negative_percentage: number;
+  certificate_template_id: string | null;
   created_at: string;
 }
 
@@ -65,6 +66,7 @@ export default function AdminExams() {
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<any[]>([]);
+  const [certificateTemplates, setCertificateTemplates] = useState<any[]>([]);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -98,6 +100,7 @@ export default function AdminExams() {
     randomQuestionsCount: 0,
     negativeMarking: false,
     negativePercentage: 0,
+    certificateTemplateId: '',
   });
 
   const [questionForm, setQuestionForm] = useState({
@@ -109,7 +112,7 @@ export default function AdminExams() {
   });
 
   useEffect(() => { fetchExams(); }, [page, pageSize]);
-  useEffect(() => { fetchCourses(); }, []);
+  useEffect(() => { fetchCourses(); fetchCertTemplates(); }, []);
 
   const fetchExams = async () => {
     setLoading(true);
@@ -134,12 +137,20 @@ export default function AdminExams() {
     } catch { /* ignore */ }
   };
 
+  const fetchCertTemplates = async () => {
+    try {
+      const { data } = await api.get('/admin/certificate-templates');
+      setCertificateTemplates(data.data || []);
+    } catch { /* ignore */ }
+  };
+
   const resetForm = () => {
     setForm({
       courseId: '', title: '', description: '', durationMinutes: 60,
       passingScore: 70, maxAttempts: 1, shuffleQuestions: false, showResults: true,
       isPublished: false, startsAt: '', endsAt: '', instructions: '',
       randomQuestionsCount: 0, negativeMarking: false, negativePercentage: 0,
+      certificateTemplateId: '',
     });
     setEditingExam(null);
     setShowForm(false);
@@ -162,6 +173,7 @@ export default function AdminExams() {
       randomQuestionsCount: exam.random_questions_count,
       negativeMarking: exam.negative_marking,
       negativePercentage: exam.negative_percentage,
+      certificateTemplateId: exam.certificate_template_id || '',
     });
     setEditingExam(exam);
     setShowForm(true);
@@ -175,6 +187,7 @@ export default function AdminExams() {
         ...form,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+        certificateTemplateId: form.certificateTemplateId || null,
       };
 
       if (editingExam) {
@@ -456,6 +469,17 @@ export default function AdminExams() {
                       <option key={c._id || c.id} value={c._id || c.id}>{c.title}</option>
                     ))}
                   </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Certificate Template (optional)</label>
+                  <select value={form.certificateTemplateId} onChange={(e) => setForm({ ...form, certificateTemplateId: e.target.value })}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500/30">
+                    <option value="">No certificate requirement</option>
+                    {certificateTemplates.map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.name} — {t.course_title}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1">When linked, students must complete the course to take this exam.</p>
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Title *</label>
