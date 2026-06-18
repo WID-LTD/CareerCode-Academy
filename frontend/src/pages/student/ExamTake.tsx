@@ -48,7 +48,7 @@ export default function ExamTake() {
   useEffect(() => { violationsRef.current = violations; }, [violations]);
 
   // Face detection — pre-init when rules screen shows (not only after accept)
-  const { faceDetectedRef, hasCamera, cameraError, cameraReady } = useFaceDetection(showRules || rulesAccepted);
+  const { faceDetectedRef, hasCamera, cameraError, cameraReady, videoRef: cameraVideoRef } = useFaceDetection(showRules || rulesAccepted);
   const [faceMissingCountdown, setFaceMissingCountdown] = useState(0);
   const faceTimerRef = useRef<any>(null);
   const faceBeepRef = useRef<any>(null);

@@ -6,6 +6,7 @@ interface FaceDetectionResult {
   hasCamera: boolean;
   cameraError: string | null;
   cameraReady: boolean;
+  videoRef: React.MutableRefObject<HTMLVideoElement | null>;
 }
 
 export function useFaceDetection(enabled: boolean): FaceDetectionResult {
@@ -32,20 +33,28 @@ export function useFaceDetection(enabled: boolean): FaceDetectionResult {
 
     const videoEl = document.createElement('video');
     videoEl.width = 320; videoEl.height = 240;
-    videoEl.style.display = 'none'; videoEl.muted = true; videoEl.playsInline = true;
+    videoEl.muted = true; videoEl.playsInline = true;
+    videoEl.style.position = 'fixed';
+    videoEl.style.bottom = '80px';
+    videoEl.style.right = '16px';
+    videoEl.style.width = '144px';
+    videoEl.style.height = '108px';
+    videoEl.style.borderRadius = '12px';
+    videoEl.style.zIndex = '50';
+    videoEl.style.objectFit = 'cover';
+    videoEl.style.border = '2px solid rgba(99, 102, 241, 0.5)';
+    videoEl.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
     document.body.appendChild(videoEl);
     videoEl.srcObject = stream;
     videoElRef.current = videoEl;
     await videoEl.play();
 
-    const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm/'
-    );
+    const vision = await FilesetResolver.forVisionTasks('/wasm/');
     if (signal.cancelled) return;
 
     faceLandmarkerRef.current = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+        modelAssetPath: '/wasm/face_landmarker.task',
         delegate: 'GPU',
       },
       runningMode: 'VIDEO',
@@ -138,5 +147,5 @@ export function useFaceDetection(enabled: boolean): FaceDetectionResult {
     };
   }, [enabled]);
 
-  return { faceDetectedRef, hasCamera, cameraError, cameraReady };
+  return { faceDetectedRef, hasCamera, cameraError, cameraReady, videoRef: videoElRef };
 }
