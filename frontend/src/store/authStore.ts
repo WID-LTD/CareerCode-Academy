@@ -157,9 +157,10 @@ export const useAuthStore = create<AuthState>()(
             },
             isAuthenticated: true,
             initialized: true,
+            isLoading: false,
           });
         } catch {
-          set({ initialized: true, user: null, isAuthenticated: false });
+          set({ initialized: true, user: null, isAuthenticated: false, isLoading: false });
         }
       },
     }),
