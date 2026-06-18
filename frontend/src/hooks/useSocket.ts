@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
+  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState<{ id: string; name?: string; role?: string }[]>([]);
   const { user } = useAuthStore();
@@ -13,6 +14,7 @@ export function useSocket() {
     const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     socketRef.current = socket;
+    setSocketInstance(socket);
 
     socket.on('connect', () => {
       socket.emit('join_room', user.id, user.name, user.role);
@@ -26,8 +28,9 @@ export function useSocket() {
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setSocketInstance(null);
     };
   }, [user?.id]);
 
-  return { socket: socketRef.current, onlineCount, onlineUsers };
+  return { socket: socketInstance, onlineCount, onlineUsers };
 }

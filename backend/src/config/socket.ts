@@ -47,11 +47,27 @@ export function createSocketServer(server: http.Server) {
       io.to(data.receiverId).emit('user_typing', { senderId: data.senderId, typing: false });
     });
 
+    // Exam monitoring: admin subscribes to live exam frames
+    socket.on('exam:monitor:join', () => {
+      socket.join('exam_monitor_room');
+    });
+
+    socket.on('exam:monitor:leave', () => {
+      socket.leave('exam_monitor_room');
+    });
+
+    // Exam monitoring: student sends frame (screen + camera)
+    socket.on('exam:frame', (data: { screen?: string; camera?: string; userId: string; examId: string; faceDetected: boolean; violations: number }) => {
+      // Broadcast to all admins monitoring exams
+      io.to('exam_monitor_room').emit('exam:frame', data);
+    });
+
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
       for (const [userId, data] of onlineUsers.entries()) {
         if (data.socketId === socket.id) {
           onlineUsers.delete(userId);
+          io.to('exam_monitor_room').emit('exam:monitor:user:leave', { userId });
           break;
         }
       }

@@ -446,3 +446,28 @@ export async function getAttemptCountsByExam(examId: string): Promise<{ total: n
   );
   return rows[0] || { total: 0, completed: 0, passed: 0 };
 }
+
+export async function getPassingAttemptForCourse(userId: string, courseId: string): Promise<any | null> {
+  const { rows } = await query(
+    `SELECT ea.* FROM exam_attempts ea
+     JOIN exams e ON ea.exam_id = e.id
+     WHERE e.course_id = $1 AND ea.user_id = $2 AND ea.passed = true AND ea.status = 'completed'
+     LIMIT 1`,
+    [courseId, userId]
+  );
+  return rows[0] || null;
+}
+
+export async function getAllActiveAttempts(): Promise<any[]> {
+  const { rows } = await query(
+    `SELECT ea.*, e.title as exam_title, e.duration_minutes, e.course_id,
+            c.title as course_title, u.name as user_name, u.email as user_email, u.avatar as user_avatar
+     FROM exam_attempts ea
+     JOIN exams e ON ea.exam_id = e.id
+     JOIN courses c ON e.course_id = c.id
+     JOIN users u ON ea.user_id = u.id
+     WHERE ea.status = 'in_progress'
+     ORDER BY ea.started_at DESC`
+  );
+  return rows;
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -16,9 +16,12 @@ import {
   GraduationCap,
   LogOut,
   Hash,
+  Monitor,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/axios';
+import { useSocket } from '@/hooks/useSocket';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -66,6 +69,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Applications', path: '/admin/applications', icon: ClipboardList },
     { label: 'Payments', path: '/admin/payments', icon: LayoutDashboard },
     { label: 'Exams', path: '/admin/exams', icon: ClipboardList },
+    { label: 'Exam Monitor', path: '/admin/exams/monitor', icon: Monitor },
     { label: 'Certificates', path: '/admin/certificates', icon: Award },
     { label: 'Cert. Templates', path: '/admin/certificate-templates', icon: Award },
     { label: 'Support Tickets', path: '/admin/tickets', icon: Users },
@@ -84,6 +88,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Applications', path: '/admin/applications', icon: ClipboardList },
     { label: 'Payments', path: '/admin/payments', icon: LayoutDashboard },
     { label: 'Exams', path: '/admin/exams', icon: ClipboardList },
+    { label: 'Exam Monitor', path: '/admin/exams/monitor', icon: Monitor },
     { label: 'Certificates', path: '/admin/certificates', icon: Award },
     { label: 'Cert. Templates', path: '/admin/certificate-templates', icon: Award },
     { label: 'Support Tickets', path: '/admin/tickets', icon: Users },
@@ -100,8 +105,32 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
+  const [newCertCount, setNewCertCount] = useState(0);
+  const { socket } = useSocket();
   const role = user?.role || 'student';
   const links = roleSidebarLinks[role] || roleSidebarLinks.student;
+
+  useEffect(() => {
+    if (role !== 'student') return;
+    let cancelled = false;
+    api.get('/certificates?limit=100').then(res => {
+      if (cancelled) return;
+      const certs = res.data?.data || [];
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      setNewCertCount(certs.filter((c: any) => {
+        const t = c.issued_at ? new Date(c.issued_at).getTime() : 0;
+        return t >= cutoff;
+      }).length);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== 'student' || !socket) return;
+    const onCertIssued = () => setNewCertCount(prev => prev + 1);
+    socket.on('certificate_issued', onCertIssued);
+    return () => { socket.off('certificate_issued', onCertIssued); };
+  }, [socket, role]);
 
   return (
     <>
@@ -153,15 +182,18 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             <nav className="space-y-1" role="navigation">
               {links.map((link) => {
                 const isActive = location.pathname === link.path;
+                const showBadge = link.label === 'Certificates' && newCertCount > 0;
                 return (
                   <Link
                     key={link.path}
                     to={link.path}
                     onClick={() => {
                       if (window.innerWidth < 1024) onToggle();
+                      if (showBadge) setNewCertCount(0);
                     }}
                     className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group',
+                      collapsed && showBadge && 'relative',
                       isActive
                         ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
@@ -171,6 +203,14 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     <link.icon className={cn('w-4 h-4 flex-shrink-0', isActive && 'text-primary-500')} />
                     {!collapsed && (
                       <span className="truncate">{link.label}</span>
+                    )}
+                    {!collapsed && showBadge && (
+                      <span className="ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary-500 text-white text-xs font-bold leading-none">
+                        {newCertCount > 99 ? '99+' : newCertCount}
+                      </span>
+                    )}
+                    {collapsed && showBadge && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary-500" />
                     )}
                   </Link>
                 );

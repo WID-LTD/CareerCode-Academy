@@ -13,6 +13,7 @@ export interface CertificateTemplate {
   instructor_name: string;
   org_name: string;
   org_rc: string;
+  requires_exam: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -29,12 +30,13 @@ export interface CreateCertificateTemplateInput {
   instructor_name?: string;
   org_name?: string;
   org_rc?: string;
+  requires_exam?: boolean;
 }
 
 export async function createTemplate(input: CreateCertificateTemplateInput): Promise<CertificateTemplate> {
   const { rows } = await query<CertificateTemplate>(
-    `INSERT INTO certificate_templates (name, course_id, layout_style, stamp_url, signature_url, logo_url, show_stamp, show_signature, instructor_name, org_name, org_rc)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO certificate_templates (name, course_id, layout_style, stamp_url, signature_url, logo_url, show_stamp, show_signature, instructor_name, org_name, org_rc, requires_exam)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
       input.name, input.course_id, input.layout_style || 'professional',
@@ -42,6 +44,7 @@ export async function createTemplate(input: CreateCertificateTemplateInput): Pro
       input.show_stamp ?? true, input.show_signature ?? true,
       input.instructor_name || 'Udokamma Emmanuel',
       input.org_name || 'Career Code WID Ltd', input.org_rc || 'RC 8824091',
+      input.requires_exam ?? false,
     ]
   );
   return rows[0];

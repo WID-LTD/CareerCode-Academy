@@ -5,7 +5,49 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as ExamModel from '../models/exam';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
+import * as CertificateModel from '../models/certificate';
+import * as CertificateTemplateModel from '../models/certificateTemplate';
+import * as NotificationModel from '../models/notification';
+import { generateCertificateCode } from '../utils/helpers';
+import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
+import { io } from '../config/socket';
+
+async function autoIssueCertificateAfterExamPass(exam: any, userId: string, courseId: string) {
+  try {
+    if (!exam.certificate_template_id) return;
+    const template = await CertificateTemplateModel.getTemplateById(exam.certificate_template_id);
+    if (!template || !template.requires_exam) return;
+
+    const enrollment = await EnrollmentModel.getEnrollment(userId, courseId);
+    if (!enrollment?.completed) return;
+
+    const existing = await CertificateModel.getCertificateByUserAndCourse(userId, courseId);
+    if (existing) return;
+
+    const verificationCode = generateCertificateCode();
+    const certificate = await CertificateModel.createCertificate({
+      user_id: userId,
+      course_id: courseId,
+      certificate_template_id: template.id,
+      verification_code: verificationCode,
+    });
+
+    const course = await CourseModel.getCourseById(courseId);
+    await NotificationModel.createNotification({
+      user_id: userId,
+      title: 'New Certificate Earned!',
+      message: `Congratulations! You earned a certificate for completing "${course?.title || 'Course'}".`,
+      type: 'certificate' as any,
+    });
+
+    io.to(userId).emit('new_notification', { title: 'Certificate Earned', message: `You earned a certificate for ${course?.title || 'Course'}!` });
+    if (certificate) {
+      io.to(userId).emit('certificate_issued', { certificate });
+    }
+  } catch (e) {
+    console.error('Failed to auto-issue certificate after exam pass:', e);
+  }
+}
 
 const router = Router();
 
@@ -400,6 +442,10 @@ router.put(
       const updated = await ExamModel.updateAttemptManualGrade(req.params.attemptId, manualScore, true);
       if (!updated) throw new NotFoundError('Attempt');
 
+      if (passed) {
+        await autoIssueCertificateAfterExamPass(exam, updated.user_id, exam.course_id);
+      }
+
       res.json({ success: true, data: { ...updated, passed } });
     } catch (error) {
       next(error);
@@ -693,6 +739,10 @@ router.post(
       const passed = percentage >= exam.passing_score;
       await ExamModel.submitAttempt(activeAttempt.id, percentage, passed);
 
+      if (passed) {
+        await autoIssueCertificateAfterExamPass(exam, userId, exam.course_id);
+      }
+
       res.json({
         success: true,
         data: {
@@ -737,6 +787,10 @@ router.post(
       const passed = exam ? percentage >= exam.passing_score : false;
 
       await ExamModel.submitAttempt(activeAttempt.id, percentage, passed);
+
+      if (passed && exam) {
+        await autoIssueCertificateAfterExamPass(exam, userId, exam.course_id);
+      }
 
       res.json({
         success: true,

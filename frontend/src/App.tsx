@@ -1,9 +1,10 @@
-import React, { useEffect, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Loader } from '@/components/ui/Loader';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/axios';
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -89,6 +90,7 @@ const AdminTickets = lazy(() => import('@/pages/admin/Tickets'));
 const AdminBroadcasts = lazy(() => import('@/pages/admin/Broadcasts'));
 const AdminAuditLog = lazy(() => import('@/pages/admin/AuditLog'));
 const AdminCategories = lazy(() => import('@/pages/admin/Categories'));
+const AdminExamMonitor = lazy(() => import('@/pages/admin/ExamMonitor'));
 const AdminReports = lazy(() => import('@/pages/admin/Reports'));
 const AdminMessages = lazy(() => import('@/pages/admin/Messages'));
 
@@ -112,12 +114,25 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
   const initialized = useAuthStore((s) => s.initialized);
+  const [backendReady, setBackendReady] = useState(false);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  if (!initialized) {
+  useEffect(() => {
+    const wakeUp = async () => {
+      try {
+        await fetch('/health', { signal: AbortSignal.timeout(15000) });
+      } catch {
+        // Server may still be cold-booting — that's OK
+      }
+      setBackendReady(true);
+    };
+    wakeUp();
+  }, []);
+
+  if (!initialized || !backendReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader text="Loading..." />
@@ -201,6 +216,7 @@ function App() {
           <Route path="applications" element={<SuspenseWrapper><AdminApplications /></SuspenseWrapper>} />
           <Route path="payments" element={<SuspenseWrapper><AdminPayments /></SuspenseWrapper>} />
           <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
+          <Route path="exams/monitor" element={<SuspenseWrapper><AdminExamMonitor /></SuspenseWrapper>} />
             <Route path="certificates" element={<SuspenseWrapper><AdminCertificates /></SuspenseWrapper>} />
             <Route path="certificate-templates" element={<SuspenseWrapper><AdminCertificateTemplates /></SuspenseWrapper>} />
           <Route path="tickets" element={<SuspenseWrapper><AdminTickets /></SuspenseWrapper>} />

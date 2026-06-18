@@ -8,13 +8,42 @@ import * as PaymentModel from '../models/payment';
 import * as NotificationModel from '../models/notification';
 import * as CertificateModel from '../models/certificate';
 import * as CertificateTemplateModel from '../models/certificateTemplate';
+import * as ExamModel from '../models/exam';
 import { query } from '../config/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail } from '../utils/helpers';
+import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail, slugify } from '../utils/helpers';
+import { z } from 'zod';
+import { validate } from '../middleware/validate';
 import { logAudit } from '../middleware/audit';
 import { io, emitDashboardUpdate } from '../config/socket';
 import { uploadSingle } from '../middleware/upload';
+
+const adminCreateCourseSchema = z.object({
+  title: z.string().min(3).max(200),
+  description: z.string().min(10).max(5000),
+  price: z.number().min(0),
+  category: z.string().min(2),
+  level: z.enum(['beginner', 'intermediate', 'advanced']),
+  duration: z.number().min(1),
+  thumbnail: z.string().url().optional(),
+  status: z.enum(['draft', 'pending_review', 'published', 'rejected', 'archived']).optional(),
+  instructor_id: z.string().uuid(),
+  learning_outcomes: z.array(z.string()).optional(),
+});
+
+const adminUpdateCourseSchema = z.object({
+  title: z.string().min(3).max(200).optional(),
+  description: z.string().min(10).max(5000).optional(),
+  price: z.number().min(0).optional(),
+  category: z.string().min(2).optional(),
+  level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  duration: z.number().min(1).optional(),
+  thumbnail: z.string().url().optional(),
+  status: z.enum(['draft', 'pending_review', 'published', 'rejected', 'archived']).optional(),
+  instructor_id: z.string().uuid().optional(),
+  learning_outcomes: z.array(z.string()).optional(),
+});
 
 const router = Router();
 
@@ -148,6 +177,21 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// GET /admin/users/:userId/completed-courses — courses the user has completed (for cert issuance)
+router.get('/users/:userId/completed-courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const enrollments = await EnrollmentModel.getEnrollmentsByUser(req.params.userId);
+    const completed = enrollments
+      .filter((e: any) => e.completed)
+      .map((e: any) => ({
+        id: e.course_id,
+        title: e.course_title,
+        completed_at: e.completed_at,
+      }));
+    res.json({ success: true, data: completed });
+  } catch (error) { next(error); }
+});
+
 // PUT /admin/users/:id/role
 router.put('/users/:id/role', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -235,6 +279,81 @@ router.delete('/courses/:id', async (req: AuthRequest, res: Response, next: Next
     }
     await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'course', resourceId: id, ipAddress: req.ip });
     res.json({ success: true, message: 'Course deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/courses/:id
+router.get('/courses/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await CourseModel.getCourseById(req.params.id);
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    res.json({ success: true, data: course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /admin/courses
+router.post('/courses', validate(adminCreateCourseSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { title, description, price, category, level, duration, thumbnail, status, instructor_id, learning_outcomes } = req.body;
+    const slug = slugify(title);
+    const course = await CourseModel.createCourse({
+      title, description, price, category, level, duration, instructor_id, slug,
+      thumbnail: thumbnail || undefined,
+      learning_outcomes: learning_outcomes || undefined,
+    });
+
+    // If admin specified a status, update it
+    if (status && status !== 'draft') {
+      await CourseModel.updateCourseStatus(course.id, status, undefined, req.user!.userId);
+    }
+
+    await logAudit({ adminId: req.user!.userId, action: 'create', resourceType: 'course', resourceId: course.id, ipAddress: req.ip });
+    const final = await CourseModel.getCourseById(course.id);
+    res.status(201).json({ success: true, data: final || course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:id
+router.put('/courses/:id', validate(adminUpdateCourseSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await CourseModel.getCourseById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    const { title, description, price, category, level, duration, thumbnail, status, instructor_id, learning_outcomes } = req.body;
+
+    const updateData: Record<string, any> = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = price;
+    if (category !== undefined) updateData.category = category;
+    if (level !== undefined) updateData.level = level;
+    if (duration !== undefined) updateData.duration = duration;
+    if (thumbnail !== undefined) updateData.thumbnail = thumbnail;
+    if (instructor_id !== undefined) updateData.instructor_id = instructor_id;
+    if (learning_outcomes !== undefined) updateData.learning_outcomes = learning_outcomes;
+    if (title !== undefined) updateData.slug = slugify(title);
+
+    if (Object.keys(updateData).length > 0) {
+      await CourseModel.updateCourse(req.params.id, updateData as any);
+    }
+
+    if (status !== undefined) {
+      await CourseModel.updateCourseStatus(req.params.id, status, undefined, req.user!.userId);
+    }
+
+    await logAudit({ adminId: req.user!.userId, action: 'update', resourceType: 'course', resourceId: req.params.id, ipAddress: req.ip });
+    const updated = await CourseModel.getCourseById(req.params.id);
+    res.json({ success: true, data: updated });
   } catch (error) {
     next(error);
   }
@@ -1090,6 +1209,16 @@ router.put('/settings', async (req: AuthRequest, res: Response, next: NextFuncti
       [key, value]
     );
     res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/exams/active-attempts
+router.get('/exams/active-attempts', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const attempts = await ExamModel.getAllActiveAttempts();
+    res.json({ success: true, data: attempts });
   } catch (error) {
     next(error);
   }

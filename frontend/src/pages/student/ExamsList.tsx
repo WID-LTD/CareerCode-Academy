@@ -36,16 +36,8 @@ export default function ExamsList() {
     }
   };
 
-  const startExam = async (examId: string) => {
-    try {
-      const { data } = await api.post(`/exams/student/${examId}/start`);
-      if (data.data?.resumed) {
-        toast('Resuming previous attempt');
-      }
-      navigate(`/student/exams/${examId}`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to start exam');
-    }
+  const startExam = (examId: string) => {
+    navigate(`/student/exams/${examId}`);
   };
 
   const getStatusBadge = (exam: any) => {

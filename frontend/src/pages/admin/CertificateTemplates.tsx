@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Plus, Edit2, Trash2, Upload, Image, Check, X, Loader2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import api from '@/lib/axios';
 
 interface Template {
@@ -19,6 +18,7 @@ interface Template {
   instructor_name: string;
   org_name: string;
   org_rc: string;
+  requires_exam: boolean;
 }
 
 interface Course {
@@ -41,6 +41,7 @@ export default function AdminCertificateTemplates() {
     orgRc: 'RC 8824091',
     showStamp: true,
     showSignature: true,
+    requiresExam: false,
   });
 
   const fetchTemplates = async () => {
@@ -62,7 +63,7 @@ export default function AdminCertificateTemplates() {
   }, []);
 
   const resetForm = () => {
-    setForm({ name: '', courseId: '', instructorName: 'Udokamma Emmanuel', orgName: 'Career Code WID Ltd', orgRc: 'RC 8824091', showStamp: true, showSignature: true });
+    setForm({ name: '', courseId: '', instructorName: 'Udokamma Emmanuel', orgName: 'Career Code WID Ltd', orgRc: 'RC 8824091', showStamp: true, showSignature: true, requiresExam: false });
     setEditingId(null);
     setShowForm(false);
   };
@@ -76,6 +77,7 @@ export default function AdminCertificateTemplates() {
       orgRc: t.org_rc,
       showStamp: t.show_stamp,
       showSignature: t.show_signature,
+      requiresExam: t.requires_exam,
     });
     setEditingId(t.id);
     setShowForm(true);
@@ -83,10 +85,20 @@ export default function AdminCertificateTemplates() {
 
   const handleSave = async () => {
     try {
+      const payload = {
+        name: form.name,
+        course_id: form.courseId,
+        instructor_name: form.instructorName,
+        org_name: form.orgName,
+        org_rc: form.orgRc,
+        show_stamp: form.showStamp,
+        show_signature: form.showSignature,
+        requires_exam: form.requiresExam,
+      };
       if (editingId) {
-        await api.put(`/admin/certificate-templates/${editingId}`, form);
+        await api.put(`/admin/certificate-templates/${editingId}`, payload);
       } else {
-        await api.post('/admin/certificate-templates', form);
+        await api.post('/admin/certificate-templates', payload);
       }
       resetForm();
       await fetchTemplates();
@@ -177,6 +189,13 @@ export default function AdminCertificateTemplates() {
                 <input type="checkbox" checked={form.showSignature} onChange={e => setForm({ ...form, showSignature: e.target.checked })} />
                 Show Signature
               </label>
+            </div>
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={form.requiresExam} onChange={e => setForm({ ...form, requiresExam: e.target.checked })} />
+                Requires passing exam before certificate is issued
+              </label>
+              <p className="text-xs text-gray-400 ml-6 mt-0.5">When enabled, students must pass a linked exam to earn this certificate.</p>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">

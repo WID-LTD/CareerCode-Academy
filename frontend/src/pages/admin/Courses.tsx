@@ -2,19 +2,21 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, CheckCircle, XCircle, Archive, Star, Trash2, Eye, AlertCircle,
-  Loader2, ChevronDown, ChevronUp, Send, Clock, FileText, X,
+  Loader2, ChevronDown, ChevronUp, Send, Clock, FileText, X, Plus, Edit3,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { useAdminStore } from '@/store/adminStore';
 import { optimizeImageUrl } from '@/lib/cloudinary';
+import api from '@/lib/axios';
 
 const TABS = ['all', 'draft', 'pending_review', 'published', 'rejected', 'archived'];
 const CATEGORIES = ['all', 'Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'AI/ML', 'Cloud', 'Cybersecurity'];
 
 export default function AdminCourses() {
-  const { courses, isLoading, error, fetchCourses, approveCourse, rejectCourse, archiveCourse, featureCourse, deleteCourse } = useAdminStore();
+  const { courses, isLoading, error, fetchCourses, createCourse, updateCourse, approveCourse, rejectCourse, archiveCourse, featureCourse, deleteCourse } = useAdminStore();
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -23,6 +25,19 @@ export default function AdminCourses() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [reviewModal, setReviewModal] = useState<{ courseId: string; action: 'approve' | 'reject' } | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+
+  const [courseModal, setCourseModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<any | null>(null);
+  const [savingCourse, setSavingCourse] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '', description: '', price: 0, category: 'Web Development',
+    level: 'beginner' as string, duration: 1, thumbnail: '', status: 'draft' as string,
+    instructor_id: '', learning_outcomes: '',
+  });
+  const [instructorSearch, setInstructorSearch] = useState('');
+  const [instructorResults, setInstructorResults] = useState<any[]>([]);
+  const [searchingInstructors, setSearchingInstructors] = useState(false);
+  const [selectedInstructor, setSelectedInstructor] = useState<any | null>(null);
 
   useEffect(() => {
     fetchCourses();
@@ -113,6 +128,69 @@ export default function AdminCourses() {
     }
   };
 
+  const openCourseModal = (course?: any) => {
+    if (course) {
+      setEditingCourse(course);
+      setFormData({
+        title: course.title || '',
+        description: course.description || '',
+        price: course.price || 0,
+        category: course.category || 'Web Development',
+        level: course.level || 'beginner',
+        duration: course.duration || 1,
+        thumbnail: course.thumbnail || '',
+        status: course.status || 'draft',
+        instructor_id: course.instructor_id || '',
+        learning_outcomes: (course.learning_outcomes || []).join('\n'),
+      });
+      setSelectedInstructor(course.instructor_id ? { id: course.instructor_id, name: course.instructor?.name } : null);
+      setInstructorSearch(course.instructor?.name || '');
+    } else {
+      setEditingCourse(null);
+      setFormData({ title: '', description: '', price: 0, category: 'Web Development', level: 'beginner', duration: 1, thumbnail: '', status: 'draft', instructor_id: '', learning_outcomes: '' });
+      setInstructorSearch('');
+      setSelectedInstructor(null);
+    }
+    setCourseModal(true);
+  };
+
+  const handleSaveCourse = async () => {
+    if (!formData.title.trim() || !formData.description.trim() || !selectedInstructor) return;
+    setSavingCourse(true);
+    try {
+      const payload = {
+        ...formData,
+        price: Number(formData.price),
+        duration: Number(formData.duration),
+        instructor_id: selectedInstructor.id,
+        learning_outcomes: formData.learning_outcomes.split('\n').filter(Boolean),
+      };
+      if (editingCourse) {
+        await updateCourse(editingCourse._id || editingCourse.id, payload);
+      } else {
+        await createCourse(payload);
+      }
+      setCourseModal(false);
+    } catch { /* error shown by store */ }
+    setSavingCourse(false);
+  };
+
+  useEffect(() => {
+    if (!courseModal || !instructorSearch.trim() || selectedInstructor) {
+      setInstructorResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingInstructors(true);
+      try {
+        const { data } = await api.get(`/admin/users?search=${encodeURIComponent(instructorSearch)}&role=instructor&limit=10`);
+        setInstructorResults(data.data || []);
+      } catch { /* ignore */ }
+      setSearchingInstructors(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [instructorSearch, courseModal, selectedInstructor]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex items-center justify-between">
@@ -121,6 +199,9 @@ export default function AdminCourses() {
           <p className="text-gray-500 mt-1">Moderate and manage all courses.</p>
           <p className="text-xs text-gray-400 mt-0.5">Status lifecycle: Draft → Pending Review → Published/Rejected → Archived</p>
         </div>
+        <Button onClick={() => openCourseModal()}>
+          <Plus size={16} className="mr-1" /> Add Course
+        </Button>
       </div>
 
       {error && (
@@ -207,6 +288,9 @@ export default function AdminCourses() {
                   </div>
                 )}
                 <div className="flex gap-1.5 flex-wrap">
+                  <Button size="sm" variant="outline" onClick={() => openCourseModal(course)}>
+                    <Edit3 className="w-3 h-3" />
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => window.open(`/courses/${course._id}`, '_blank')}>
                     <Eye className="w-3 h-3" />
                   </Button>
@@ -304,6 +388,153 @@ export default function AdminCourses() {
                 >
                   {actionLoading === reviewModal.courseId ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   {reviewModal.action === 'approve' ? 'Publish Course' : 'Reject Course'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {courseModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setCourseModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold">{editingCourse ? 'Edit Course' : 'Add Course'}</h2>
+                <button onClick={() => setCourseModal(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <Input label="Title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Course title" />
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Course description..."
+                    rows={4}
+                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Price ($)" type="number" min={0} value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} />
+                  <Input label="Duration (minutes)" type="number" min={1} value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
+                    >
+                      {['Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'AI/ML', 'Cloud', 'Cybersecurity'].map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Level</label>
+                    <select
+                      value={formData.level}
+                      onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
+                    >
+                      {['beginner', 'intermediate', 'advanced'].map((l) => (
+                        <option key={l} value={l} className="capitalize">{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Thumbnail URL" value={formData.thumbnail} onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })} placeholder="https://..." />
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
+                    >
+                      {['draft', 'pending_review', 'published', 'rejected', 'archived'].map((s) => (
+                        <option key={s} value={s} className="capitalize">{s.replace('_', ' ')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Learning Outcomes (one per line)</label>
+                  <textarea
+                    value={formData.learning_outcomes}
+                    onChange={(e) => setFormData({ ...formData, learning_outcomes: e.target.value })}
+                    placeholder="Write each learning outcome on a new line..."
+                    rows={3}
+                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Instructor</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search instructor by name..."
+                      value={instructorSearch}
+                      onChange={(e) => { setInstructorSearch(e.target.value); setSelectedInstructor(null); setFormData({ ...formData, instructor_id: '' }); }}
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
+                    />
+                    {searchingInstructors && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+                    )}
+                  </div>
+                  {instructorResults.length > 0 && !selectedInstructor && (
+                    <div className="mt-1 border rounded-lg max-h-40 overflow-y-auto">
+                      {instructorResults.map((u: any) => (
+                        <button
+                          key={u.id}
+                          onClick={() => { setSelectedInstructor(u); setInstructorSearch(u.name); setFormData({ ...formData, instructor_id: u.id }); setInstructorResults([]); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 border-b last:border-0"
+                        >
+                          <span className="font-medium">{u.name}</span>
+                          <span className="text-gray-400 ml-2">{u.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {selectedInstructor && (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Selected: {selectedInstructor.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => setCourseModal(false)}>Cancel</Button>
+                <Button
+                  onClick={handleSaveCourse}
+                  disabled={savingCourse || !formData.title.trim() || !formData.description.trim() || !selectedInstructor}
+                >
+                  {savingCourse ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  {editingCourse ? 'Update Course' : 'Create Course'}
                 </Button>
               </div>
             </motion.div>

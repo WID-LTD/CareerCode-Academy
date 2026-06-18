@@ -744,39 +744,6 @@ async function initDatabase() {
       )
     `);
 
-    // Certificate templates table (linked to courses, used for exam qualification and PDF generation)
-    await query(`
-      CREATE TABLE IF NOT EXISTS certificate_templates (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(200) NOT NULL,
-        course_id UUID UNIQUE NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-        layout_style VARCHAR(50) DEFAULT 'professional',
-        stamp_url TEXT,
-        signature_url TEXT,
-        logo_url TEXT,
-        show_stamp BOOLEAN DEFAULT true,
-        show_signature BOOLEAN DEFAULT true,
-        instructor_name VARCHAR(200) DEFAULT 'Udokamma Emmanuel',
-        org_name VARCHAR(200) DEFAULT 'Career Code WID Ltd',
-        org_rc VARCHAR(100) DEFAULT 'RC 8824091',
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-
-    // Add suspended column to users
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
-
-    // Add revoked column to certificates
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
-
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
-    await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
-
     // New lesson_progress table
     await query(`
       CREATE TABLE IF NOT EXISTS lesson_progress (
@@ -887,6 +854,43 @@ async function initDatabase() {
   } else {
     console.log('Database tables already initialized (running migrations only).');
   }
+
+    // Certificate templates table — always run for existing installations
+    await query(`
+      CREATE TABLE IF NOT EXISTS certificate_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(200) NOT NULL,
+        course_id UUID UNIQUE NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        layout_style VARCHAR(50) DEFAULT 'professional',
+        stamp_url TEXT,
+        signature_url TEXT,
+        logo_url TEXT,
+        show_stamp BOOLEAN DEFAULT true,
+        show_signature BOOLEAN DEFAULT true,
+        instructor_name VARCHAR(200) DEFAULT 'Udokamma Emmanuel',
+        org_name VARCHAR(200) DEFAULT 'Career Code WID Ltd',
+        org_rc VARCHAR(100) DEFAULT 'RC 8824091',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Add suspended column to users (safe for re-runs)
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
+
+    // Add revoked columns to certificates (safe for re-runs)
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
+
+    // Add certificate_template_id FK to certificates and exams (safe for re-runs)
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
+    await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
+
+    // Add requires_exam to certificate_templates (safe for re-runs)
+    await query(`ALTER TABLE certificate_templates ADD COLUMN IF NOT EXISTS requires_exam BOOLEAN DEFAULT false`);
 
     // Exam table migrations — always run to ensure columns exist for existing installations
     try {

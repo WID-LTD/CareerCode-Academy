@@ -31,6 +31,21 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  // Handle uninitialized database errors (table/column missing after cold boot)
+  function isUninitializedDb(e: any): boolean {
+    const msg = (e?.message || '').toLowerCase();
+    return msg.includes('relation') || msg.includes('does not exist') || msg.includes('column');
+  }
+
+  if (isUninitializedDb(err)) {
+    console.error('Database schema error — tables may not be initialized:', err.message);
+    res.status(503).json({
+      success: false,
+      message: 'Service temporarily unavailable — database is still initializing. Please try again in a moment.',
+    });
+    return;
+  }
+
   // Handle AggregateError (e.g. pool connection failures)
   if (typeof AggregateError !== 'undefined' && err instanceof AggregateError) {
     const aggMsg = err.errors?.some((e: any) => isDbError(e));

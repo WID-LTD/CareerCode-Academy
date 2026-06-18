@@ -172,7 +172,7 @@ export default function AdminExams() {
       instructions: exam.instructions || '',
       randomQuestionsCount: exam.random_questions_count,
       negativeMarking: exam.negative_marking,
-      negativePercentage: exam.negative_percentage,
+      negativePercentage: Number(exam.negative_percentage) || 0,
       certificateTemplateId: exam.certificate_template_id || '',
     });
     setEditingExam(exam);
