@@ -204,7 +204,7 @@ export async function getAvailableExamsForUser(userId: string): Promise<any[]> {
   const now = new Date().toISOString();
   const { rows } = await query(
     `SELECT e.*, c.title as course_title,
-      (SELECT COUNT(*)::int FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1) as attempt_count,
+      (SELECT COUNT(*)::int FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1 AND ea.status != 'abandoned') as attempt_count,
       (SELECT status FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1 AND ea.status = 'in_progress' ORDER BY ea.started_at DESC LIMIT 1) as active_attempt_status
      FROM exams e
      JOIN courses c ON e.course_id = c.id
@@ -235,6 +235,14 @@ export async function getAttemptById(attemptId: string): Promise<any | null> {
      FROM exam_attempts ea
      JOIN exams e ON ea.exam_id = e.id
      WHERE ea.id = $1`,
+    [attemptId]
+  );
+  return rows[0] || null;
+}
+
+export async function abandonAttempt(attemptId: string): Promise<ExamAttempt | null> {
+  const { rows } = await query<ExamAttempt>(
+    `UPDATE exam_attempts SET submitted_at = NOW(), status = 'abandoned' WHERE id = $1 AND status = 'in_progress' RETURNING *`,
     [attemptId]
   );
   return rows[0] || null;
@@ -364,7 +372,7 @@ export async function getActiveAttempt(examId: string, userId: string): Promise<
 
 export async function countAttempts(examId: string, userId: string): Promise<number> {
   const { rows } = await query(
-    'SELECT COUNT(*)::int as total FROM exam_attempts WHERE exam_id = $1 AND user_id = $2',
+    "SELECT COUNT(*)::int as total FROM exam_attempts WHERE exam_id = $1 AND user_id = $2 AND status != 'abandoned'",
     [examId, userId]
   );
   return rows[0]?.total || 0;

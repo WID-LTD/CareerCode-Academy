@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as ExamModel from '../models/exam';
+import * as ExamProctoringModel from '../models/examProctoring';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
 import * as CertificateModel from '../models/certificate';
@@ -11,6 +13,15 @@ import * as NotificationModel from '../models/notification';
 import { generateCertificateCode } from '../utils/helpers';
 import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
 import { io } from '../config/socket';
+
+const recordingUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1024 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('video/webm')) cb(null, true);
+    else cb(new Error('Only WEBM files are accepted'));
+  },
+});
 
 async function autoIssueCertificateAfterExamPass(exam: any, userId: string, courseId: string) {
   try {
@@ -606,12 +617,14 @@ router.get(
       }));
 
       const activeAttempt = await ExamModel.getActiveAttempt(req.params.examId, userId);
+      const attemptCount = await ExamModel.countAttempts(req.params.examId, userId);
 
       res.json({
         success: true,
         data: {
           ...exam,
           schedule_status: status,
+          attempt_count: attemptCount,
           questions: exam.shuffle_questions ? shuffleArray(safeQuestions) : safeQuestions,
           activeAttemptId: activeAttempt?.id || null,
           activeAttemptStartedAt: activeAttempt?.started_at || null,
@@ -661,9 +674,10 @@ router.post(
         }
       }
 
+      // Abandon any existing active attempt — every exam is a fresh start
       const active = await ExamModel.getActiveAttempt(req.params.examId, userId);
       if (active) {
-        return res.json({ success: true, data: { attempt: active, resumed: true } });
+        await ExamModel.abandonAttempt(active.id);
       }
 
       if (exam.max_attempts > 0) {
@@ -862,5 +876,37 @@ function shuffleArray<T>(arr: T[]): T[] {
   }
   return shuffled;
 }
+
+// POST /exams/student/:examId/upload-recording — upload WEBM recording to S3
+router.post(
+  '/student/:examId/upload-recording',
+  authenticate,
+  recordingUpload.single('recording'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No recording file provided' });
+      }
+
+      const activeAttempt = await ExamModel.getActiveAttempt(req.params.examId, userId);
+      if (!activeAttempt) {
+        return res.status(400).json({ success: false, message: 'No active attempt found' });
+      }
+
+      const durationSeconds = Math.floor((Date.now() - new Date(activeAttempt.started_at).getTime()) / 1000);
+      const recording = await ExamProctoringModel.saveRecording(
+        activeAttempt.id,
+        req.file.buffer,
+        `exam-${req.params.examId}-${activeAttempt.id}.webm`,
+        durationSeconds
+      );
+
+      res.json({ success: true, data: recording });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;

@@ -39,6 +39,7 @@ import pageRoutes from './routes/page.routes';
 import videoRoutes from './routes/video.routes';
 import challengeRoutes from './routes/challenge.routes';
 import examRoutes from './routes/exam.routes';
+import testRoutes from './routes/test.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -50,7 +51,9 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://localhost:3000',
+    'https://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://127.0.0.1:3000',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'https://career-code-academy.vercel.app',
@@ -142,6 +145,12 @@ app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/challenges', challengeRoutes);
 app.use('/api/v1/exams', examRoutes);
+
+// E2E test helper routes (dev only)
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/v1/test', testRoutes);
+  console.log('✓ E2E test routes registered (development mode)');
+}
 
 // 404 handler
 app.use((_req, res) => {
@@ -932,6 +941,20 @@ async function initDatabase() {
   await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
   await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
 
+  // Exam proctoring recordings table
+  await query(`
+    CREATE TABLE IF NOT EXISTS exam_proctoring_recordings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      attempt_id UUID UNIQUE NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+      s3_url TEXT NOT NULL,
+      duration_seconds INTEGER DEFAULT 0,
+      file_size_bytes BIGINT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+  await query('CREATE INDEX IF NOT EXISTS idx_proctoring_recording_attempt ON exam_proctoring_recordings(attempt_id)');
+
   console.log('Database migrations complete');
   } catch (error) {
     console.error('Database initialization error:', error);
@@ -1008,6 +1031,8 @@ async function start() {
   // Start background workers
   const { startBroadcastWorker } = await import('./workers/broadcastWorker');
   startBroadcastWorker(io);
+  const { startProctoringCleanupWorker } = await import('./workers/proctoringCleanupWorker');
+  startProctoringCleanupWorker();
 }
 
 start();

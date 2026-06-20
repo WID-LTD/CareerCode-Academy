@@ -9,6 +9,7 @@ import * as NotificationModel from '../models/notification';
 import * as CertificateModel from '../models/certificate';
 import * as CertificateTemplateModel from '../models/certificateTemplate';
 import * as ExamModel from '../models/exam';
+import * as ExamProctoringModel from '../models/examProctoring';
 import { query } from '../config/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -1219,6 +1220,45 @@ router.get('/exams/active-attempts', async (_req: AuthRequest, res: Response, ne
   try {
     const attempts = await ExamModel.getAllActiveAttempts();
     res.json({ success: true, data: attempts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/exams/proctoring-history — paginated history of past attempts with recordings
+router.get('/exams/proctoring-history', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const limit = Math.min(Math.abs(parseInt(req.query.limit as string) || 20), 100);
+    const offset = Math.abs(parseInt(req.query.offset as string) || 0);
+    const search = req.query.search as string || undefined;
+    const result = await ExamProctoringModel.getRecordingsHistory(limit, offset, search);
+    res.json({ success: true, data: result.recordings, total: result.total });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/exams/proctoring-recording/:attemptId — get recording for a specific attempt
+router.get('/exams/proctoring-recording/:attemptId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const recording = await ExamProctoringModel.getRecordingByAttemptId(req.params.attemptId);
+    if (!recording) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+    res.json({ success: true, data: recording });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /admin/exams/proctoring-recording/:recordingId — manually delete a recording
+router.delete('/exams/proctoring-recording/:recordingId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await ExamProctoringModel.deleteRecordingById(req.params.recordingId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+    res.json({ success: true, message: 'Recording deleted' });
   } catch (error) {
     next(error);
   }

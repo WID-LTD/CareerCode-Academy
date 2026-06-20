@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight, Flag, CheckCircle, XCircle, Eye, Monitor, Camera, Ban, FileText, Shield, Loader } from 'lucide-react';
+import { Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight, Flag, CheckCircle, XCircle, Eye, Monitor, Camera, Ban, FileText, Shield, Loader, Play } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,7 @@ import { api } from '@/lib/axios';
 import toast from 'react-hot-toast';
 import { useFaceDetection } from '@/hooks/useFaceDetection';
 import { useSocket } from '@/hooks/useSocket';
+import { useAuthStore } from '@/store/authStore';
 
 export default function ExamTake() {
   const { examId } = useParams<{ examId: string }>();
@@ -25,19 +26,26 @@ export default function ExamTake() {
   const timerRef = useRef<any>(null);
   const [warnTime, setWarnTime] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const [isResumed, setIsResumed] = useState(false);
+
+  // Wizard state (3-step exam startup)
+  const [wizardStep, setWizardStep] = useState(0);
+  const [cameraConsent, setCameraConsent] = useState(false);
+  const [screenShared, setScreenShared] = useState(false);
+  const [fullscreenActive, setFullscreenActive] = useState(false);
 
   // Proctoring state
-  const [showRules, setShowRules] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [violations, setViolations] = useState(0);
   const violationLimit = 3;
   const [proctorWarn, setProctorWarn] = useState('');
 
+  const [recordingActive, setRecordingActive] = useState(false);
+
   // Refs for stale closure prevention
   const proctoringActiveRef = useRef(false);
   const submittingRef = useRef(false);
   const cleanupRef = useRef(false);
+  const rulesAcceptedRef = useRef(false);
   const answersRef = useRef(answers);
   const flaggedQuestionsRef = useRef(flaggedQuestions);
   const violationsRef = useRef(violations);
@@ -46,14 +54,22 @@ export default function ExamTake() {
   useEffect(() => { answersRef.current = answers; }, [answers]);
   useEffect(() => { flaggedQuestionsRef.current = flaggedQuestions; }, [flaggedQuestions]);
   useEffect(() => { violationsRef.current = violations; }, [violations]);
+  useEffect(() => { rulesAcceptedRef.current = rulesAccepted; }, [rulesAccepted]);
 
   // Face detection — pre-init when rules screen shows (not only after accept)
-  const { faceDetectedRef, hasCamera, cameraError, cameraReady, videoRef: cameraVideoRef } = useFaceDetection(showRules || rulesAccepted);
+  const { faceDetectedRef, hasCamera, cameraError, cameraReady, cameraStarting, videoRef: cameraVideoRef, streamRef: cameraStreamRef, enableCamera } = useFaceDetection(wizardStep >= 1 || rulesAccepted);
+  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    if (cameraPreviewRef.current && cameraStreamRef.current) {
+      cameraPreviewRef.current.srcObject = cameraStreamRef.current;
+      cameraPreviewRef.current.play().catch(() => {});
+    }
+  }, [cameraReady, cameraStreamRef.current]);
   const [faceMissingCountdown, setFaceMissingCountdown] = useState(0);
   const faceTimerRef = useRef<any>(null);
   const faceBeepRef = useRef<any>(null);
   const faceMissingStartRef = useRef(0);
-  const FACE_MISSING_TIMEOUT = 60;
+  const FACE_MISSING_TIMEOUT = 9;
 
   // Screen sharing + socket streaming
   const { socket } = useSocket();
@@ -63,6 +79,11 @@ export default function ExamTake() {
 
   // Audio context singleton (no more AudioContext leak)
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Compositing canvas + MediaRecorder for WEBM recording
+  const compositingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +111,9 @@ export default function ExamTake() {
       if (frameIntervalRef.current) clearInterval(frameIntervalRef.current);
       if (faceBeepRef.current) clearInterval(faceBeepRef.current);
       if (audioCtxRef.current) { audioCtxRef.current.close(); audioCtxRef.current = null; }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch {}
+      }
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
@@ -104,6 +128,27 @@ export default function ExamTake() {
     };
   }, [examId]);
 
+  // Stop MediaRecorder + upload WEBM recording to S3 via axios
+  const stopAndUploadRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+    try {
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        if (recordedChunksRef.current.length === 0) return;
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType });
+        const fd = new FormData();
+        fd.append('recording', blob, `exam-${examId}-${Date.now()}.webm`);
+        api.post(`/exams/student/${examId}/upload-recording`, fd)
+          .then(() => console.log('Recording upload complete'))
+          .catch(() => console.warn('Recording upload failed'));
+      };
+      recorder.stop();
+    } catch { /* best-effort */ }
+  }, [examId]);
+
   const autoSubmitViolation = useCallback(async (reason: string) => {
     if (submittingRef.current || !examId || !attemptId) return;
     submittingRef.current = true;
@@ -113,6 +158,7 @@ export default function ExamTake() {
     try {
       const answerArray = Object.entries(answersRef.current).map(([qId, answer]) => ({ questionId: qId, answer }));
       const { data } = await api.post(`/exams/student/${examId}/submit`, { answers: answerArray, flaggedQuestions: flaggedQuestionsRef.current });
+      stopAndUploadRecording();
       navigate(`/student/exams/${examId}/results/${data.data.attemptId}`);
       return;
     } catch (err: any) {
@@ -120,6 +166,7 @@ export default function ExamTake() {
     }
     try {
       const { data } = await api.post(`/exams/student/${examId}/timeout`);
+      stopAndUploadRecording();
       navigate(`/student/exams/${examId}/results/${data.data.attemptId}`);
       return;
     } catch (err: any) {
@@ -128,7 +175,7 @@ export default function ExamTake() {
     }
     submittingRef.current = false;
     setSubmitting(false);
-  }, [examId, attemptId]);
+  }, [examId, attemptId, stopAndUploadRecording]);
 
   const handleViolation = useCallback((reason: string, warning: string) => {
     setViolations(prev => {
@@ -159,17 +206,44 @@ export default function ExamTake() {
     }
   }, [handleViolation]);
 
-  const startScreenShare = useCallback(async () => {
+  const addProctoringListeners = useCallback(() => {
+    proctoringActiveRef.current = true;
+    const visHandler = (e: Event) => onVisibilityChange(e);
+    const blurHandler = (e: Event) => onWindowBlur(e);
+    const fsHandler = (e: Event) => onFullscreenChange(e);
+    boundVisibilityRef.current = visHandler;
+    boundBlurRef.current = blurHandler;
+    boundFullscreenRef.current = fsHandler;
+    document.addEventListener('visibilitychange', visHandler);
+    window.addEventListener('blur', blurHandler);
+    document.addEventListener('fullscreenchange', fsHandler);
+  }, [onVisibilityChange, onWindowBlur, onFullscreenChange]);
+
+  const handleStartExam = useCallback(async () => {
+    if (!examId) return;
+    try {
+      const startRes = await api.post(`/exams/student/${examId}/start`);
+      setAttemptId(startRes.data.data.attempt.id);
+      addProctoringListeners();
+      rulesAcceptedRef.current = true;
+      setRulesAccepted(true);
+      setWizardStep(0);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to start exam');
+    }
+  }, [examId, addProctoringListeners]);
+
+  const handleShareScreen = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: 'monitor' },
         audio: false,
       });
       screenStreamRef.current = stream;
+      setScreenShared(true);
 
-      // Auto-reprompt if user stops sharing — up to 3 retries
       const handler = async () => {
-        if (cleanupRef.current) return;
+        if (cleanupRef.current || !rulesAcceptedRef.current) return;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const newStream = await navigator.mediaDevices.getDisplayMedia({
@@ -177,56 +251,46 @@ export default function ExamTake() {
               audio: false,
             });
             screenStreamRef.current = newStream;
+            setScreenShared(true);
             newStream.getVideoTracks()[0]?.addEventListener('ended', handler);
             return;
           } catch {
             await new Promise(r => setTimeout(r, 1000));
           }
         }
+        setScreenShared(false);
         handleViolation('Screen sharing could not be restored', 'Warning: Screen sharing lost');
       };
       stream.getVideoTracks()[0]?.addEventListener('ended', handler);
     } catch {
-      handleViolation('Screen sharing was denied', 'Warning: Screen sharing was denied');
+      setScreenShared(false);
+      toast.error('Screen sharing was denied — you must share your screen to take this exam.');
     }
   }, [handleViolation]);
 
-  const startProctoring = useCallback(async () => {
-    proctoringActiveRef.current = true;
-
-    const visHandler = (e: Event) => onVisibilityChange(e);
-    const blurHandler = (e: Event) => onWindowBlur(e);
-    const fsHandler = (e: Event) => onFullscreenChange(e);
-
-    boundVisibilityRef.current = visHandler;
-    boundBlurRef.current = blurHandler;
-    boundFullscreenRef.current = fsHandler;
-
-    document.addEventListener('visibilitychange', visHandler);
-    window.addEventListener('blur', blurHandler);
-    document.addEventListener('fullscreenchange', fsHandler);
-
-    const el = document.documentElement;
-    if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {
-        handleViolation('Failed to enter fullscreen', 'Warning: Fullscreen was denied');
-      });
+  const handleEnterFullscreen = useCallback(async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+      setFullscreenActive(true);
+    } catch {
+      setFullscreenActive(false);
+      toast.error('Fullscreen was denied — you must enter fullscreen to take this exam.');
     }
+  }, []);
 
-    await startScreenShare();
-
-    setRulesAccepted(true);
-    setShowRules(false);
-  }, [onVisibilityChange, onWindowBlur, onFullscreenChange, startScreenShare, handleViolation]);
+  // Track fullscreen state during Step 3
+  useEffect(() => {
+    if (wizardStep !== 3) return;
+    setFullscreenActive(!!document.fullscreenElement);
+    const handler = () => setFullscreenActive(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, [wizardStep]);
 
   const loadExam = async () => {
     if (!examId) return;
     setLoading(true);
     try {
-      const startRes = await api.post(`/exams/student/${examId}/start`);
-      setAttemptId(startRes.data.data.attempt.id);
-      setIsResumed(!!startRes.data.data.resumed);
-
       const { data } = await api.get(`/exams/student/${examId}`);
       setExam(data.data);
       setQuestions(data.data.questions || []);
@@ -234,18 +298,7 @@ export default function ExamTake() {
       const durationMs = (data.data.duration_minutes || 60) * 60;
       setTimeLeft(durationMs);
 
-      if (startRes.data.data.resumed && data.data.activeAttemptStartedAt) {
-        const startedAt = new Date(data.data.activeAttemptStartedAt).getTime();
-        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-        const remaining = Math.max(0, durationMs - elapsed);
-        setTimeLeft(remaining);
-      }
-
-      if (!startRes.data.data.resumed) {
-        setShowRules(true);
-      } else {
-        setRulesAccepted(true);
-      }
+      setWizardStep(1);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load exam');
       navigate('/student/exams');
@@ -278,13 +331,14 @@ export default function ExamTake() {
     } catch { /* audio not available */ }
   }, [getAudioCtx]);
 
-  // Frame streaming to admin monitoring — persistent video element, connected check
+  // Compositing canvas + PiP live streaming + WEBM recording
   useEffect(() => {
     if (!rulesAccepted || !socket || !examId) return;
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    const SCREEN_FPS = 3000;
+    compositingCanvasRef.current = canvas;
+    const SCREEN_FPS = 500;
 
     if (!screenCaptureVideoRef.current) {
       const vid = document.createElement('video');
@@ -295,6 +349,31 @@ export default function ExamTake() {
       screenCaptureVideoRef.current = vid;
     }
     const screenVideo = screenCaptureVideoRef.current;
+
+    // Start MediaRecorder on the compositing canvas for WEBM recording
+    let mediaRecorder: MediaRecorder | null = null;
+    (async () => {
+      try {
+        const canvasStream = canvas.captureStream(5);
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9'
+          : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+            ? 'video/webm;codecs=vp8'
+            : 'video/webm';
+        mediaRecorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 1_000_000 });
+        recordedChunksRef.current = [];
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+        };
+        mediaRecorder.onstop = () => setRecordingActive(false);
+        mediaRecorder.start();
+        mediaRecorderRef.current = mediaRecorder;
+        setRecordingActive(true);
+      } catch (err) {
+        setRecordingActive(false);
+        console.warn('Exam recording not available, proceeding without recording:', err);
+      }
+    })();
 
     frameIntervalRef.current = setInterval(() => {
       const screenTrack = screenStreamRef.current?.getVideoTracks()[0];
@@ -310,13 +389,54 @@ export default function ExamTake() {
           screenVideo.play().catch(() => {});
         }
 
+        // Draw screen as full background
         ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
-        const screenBase64 = canvas.toDataURL('image/jpeg', 0.3);
+
+        // Draw camera PiP in top-right corner (160x120)
+        const cameraVideo = cameraVideoRef?.current;
+        if (cameraVideo && cameraVideo.readyState >= 2) {
+          const pipW = 160, pipH = 120;
+          const pipX = canvas.width - pipW - 12;
+          const pipY = 12;
+          ctx.save();
+          const r = 8;
+          ctx.beginPath();
+          ctx.moveTo(pipX - 3 + r, pipY - 3);
+          ctx.lineTo(pipX - 3 + pipW + 6 - r, pipY - 3);
+          ctx.quadraticCurveTo(pipX - 3 + pipW + 6, pipY - 3, pipX - 3 + pipW + 6, pipY - 3 + r);
+          ctx.lineTo(pipX - 3 + pipW + 6, pipY - 3 + pipH + 6 - r);
+          ctx.quadraticCurveTo(pipX - 3 + pipW + 6, pipY - 3 + pipH + 6, pipX - 3 + pipW + 6 - r, pipY - 3 + pipH + 6);
+          ctx.lineTo(pipX - 3 + r, pipY - 3 + pipH + 6);
+          ctx.quadraticCurveTo(pipX - 3, pipY - 3 + pipH + 6, pipX - 3, pipY - 3 + pipH + 6 - r);
+          ctx.lineTo(pipX - 3, pipY - 3 + r);
+          ctx.quadraticCurveTo(pipX - 3, pipY - 3, pipX - 3 + r, pipY - 3);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          ctx.fill();
+          ctx.restore();
+          ctx.drawImage(cameraVideo, pipX, pipY, pipW, pipH);
+        }
+
+        const compositeBase64 = canvas.toDataURL('image/jpeg', 0.3);
+
+        let cameraBase64: string | undefined;
+        const camVideo = cameraVideoRef?.current;
+        if (camVideo && camVideo.readyState >= 2) {
+          const camCanvas = document.createElement('canvas');
+          camCanvas.width = 160;
+          camCanvas.height = 120;
+          const camCtx = camCanvas.getContext('2d');
+          if (camCtx) {
+            camCtx.drawImage(camVideo, 0, 0, 160, 120);
+            cameraBase64 = camCanvas.toDataURL('image/jpeg', 0.3);
+          }
+        }
 
         if (!socket.connected) return;
         socket.emit('exam:frame', {
-          screen: screenBase64,
-          userId: socket.id,
+          screen: compositeBase64,
+          camera: cameraBase64,
+          userId: useAuthStore.getState().user?.id || '',
           examId,
           faceDetected: faceDetectedRef.current,
           violations: violationsRef.current,
@@ -326,8 +446,12 @@ export default function ExamTake() {
 
     return () => {
       clearInterval(frameIntervalRef.current);
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      compositingCanvasRef.current = null;
     };
-  }, [rulesAccepted, socket, examId]);
+  }, [rulesAccepted, socket, examId, cameraVideoRef]);
 
   // Face detection countdown — faceMissingStart in ref to survive effect re-runs
   useEffect(() => {
@@ -344,19 +468,18 @@ export default function ExamTake() {
         const remaining = Math.max(0, FACE_MISSING_TIMEOUT - elapsed);
         setFaceMissingCountdown(remaining);
 
-        // Start beep countdown at 5 seconds
-        if (remaining <= 5 && remaining > 0 && !beepInterval) {
+        // Start beep countdown immediately when face is missing
+        if (remaining > 0 && !beepInterval) {
           beepInterval = setInterval(() => {
             playBeep(880, 0.3);
           }, 1000);
-          // Immediately play first beep
           playBeep(880, 0.3);
         }
 
         if (elapsed >= FACE_MISSING_TIMEOUT) {
           clearInterval(faceTimerRef.current);
           if (beepInterval) clearInterval(beepInterval);
-          autoSubmitViolation('Face not detected for 60 seconds');
+          autoSubmitViolation('Face not detected for 9 seconds');
         }
       } else {
         faceMissingStartRef.current = 0;
@@ -400,13 +523,14 @@ export default function ExamTake() {
     try {
       const { data } = await api.post(`/exams/student/${examId}/timeout`);
       toast('Time is up! Your exam has been auto-submitted.');
+      stopAndUploadRecording();
       navigate(`/student/exams/${examId}/results/${data.data.attemptId}`);
     } catch {
       toast.error('Failed to submit on timeout');
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [examId, attemptId]);
+  }, [examId, attemptId, stopAndUploadRecording]);
 
   const handleSubmit = async () => {
     if (!examId || !attemptId || !questions.length) return;
@@ -427,6 +551,7 @@ export default function ExamTake() {
         flaggedQuestions,
       });
       toast.success(data.data.passed ? 'Congratulations! You passed!' : 'You did not pass this time.');
+      stopAndUploadRecording();
       navigate(`/student/exams/${examId}/results/${data.data.attemptId}`);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to submit');
@@ -462,98 +587,248 @@ export default function ExamTake() {
 
   if (!exam) return null;
 
-  // Pre-exam Rules Overlay
-  if (showRules && !rulesAccepted) {
-    const deniedCamera = cameraError === 'Camera access denied.';
-    const canStartExam = cameraReady || (cameraError && !deniedCamera);
+  // Pre-exam 3-Step Wizard
+  if (wizardStep >= 1 && !rulesAccepted) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-2xl p-6 sm:p-8 rounded-2xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-primary-500/10 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-primary-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold">{exam.title}</h2>
-              <p className="text-sm text-gray-500">{exam.course_title}</p>
-            </div>
-          </div>
+        <motion.div key={wizardStep} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-2xl p-6 sm:p-8 rounded-2xl">
 
-          <div className="space-y-4 mb-6">
-            <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap">
-              <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {exam.duration_minutes} minutes</span>
-              <span>Pass: {exam.passing_score}%</span>
-              <span>Attempts: {exam.attempt_count}/{exam.max_attempts}</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Camera className="w-4 h-4" />
-              {deniedCamera ? (
-                <span className="text-red-400">Camera access denied — please allow camera access in browser settings</span>
-              ) : cameraReady ? (
-                <span className="text-emerald-400 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Camera ready</span>
-              ) : cameraError ? (
-                <span className="text-amber-400">{cameraError} — you can proceed without face detection</span>
-              ) : (
-                <span className="text-amber-400 flex items-center gap-1"><Loader className="w-3.5 h-3.5 animate-spin" /> Initializing camera...</span>
-              )}
-            </div>
-
-            <div className="p-5 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
-              <h3 className="font-semibold text-sm flex items-center gap-2 text-amber-400">
-                <Shield className="w-4 h-4" /> Exam Rules & Guidelines
-              </h3>
-              <ul className="space-y-2 text-sm text-gray-300">
-                <li className="flex items-start gap-2">
-                  <Monitor className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <span><strong>Fullscreen Required:</strong> This exam must be taken in fullscreen mode. Exiting fullscreen counts as a violation.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Ban className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <span><strong>No Tab Switching:</strong> Switching to another tab or window during the exam will be flagged. After 3 violations, the exam will be auto-submitted.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Ban className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <span><strong>No Copy/Paste:</strong> Copying and pasting content is disabled during the exam.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <span><strong>No Right-Click:</strong> Context menus are disabled during the exam.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Camera className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <span><strong>Proctoring Active:</strong> Your exam session is being monitored for suspicious activity.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Clock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <span><strong>Time Limit:</strong> The exam will auto-submit when the timer reaches zero.</span>
-                </li>
-              </ul>
-            </div>
-
-            {exam.instructions && (
-              <div className="p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
-                <h4 className="text-sm font-medium text-white mb-2">Exam Instructions</h4>
-                <p className="text-sm text-gray-400 whitespace-pre-wrap">{exam.instructions}</p>
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-6">
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="flex items-center gap-2 flex-1">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                  wizardStep === step ? 'bg-primary-500 text-white' : wizardStep > step ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'
+                }`}>
+                  {wizardStep > step ? <CheckCircle className="w-4 h-4" /> : step}
+                </div>
+                <div className="h-0.5 flex-1 bg-gray-800 last:hidden" />
               </div>
-            )}
+            ))}
+          </div>
 
-            {exam.negative_marking && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                <p className="text-sm text-red-400">Warning: {exam.negative_percentage}% will be deducted for each wrong answer.</p>
+          {/* ════════ STEP 1: Rules + Camera Check ════════ */}
+          {wizardStep === 1 && (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-primary-500/10 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-primary-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">{exam.title}</h2>
+                  <p className="text-sm text-gray-500">{exam.course_title}</p>
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => { setShowRules(false); navigate('/student/exams'); }}>
-              Cancel
-            </Button>
-            <Button onClick={startProctoring} disabled={!canStartExam}>
-              <CheckCircle className="w-4 h-4 mr-1.5" /> I Accept &amp; Begin Exam
-            </Button>
-          </div>
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap">
+                  <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {exam.duration_minutes} minutes</span>
+                  <span>Pass: {exam.passing_score}%</span>
+                  <span>Attempts: {exam.attempt_count}/{exam.max_attempts}</span>
+                </div>
+
+                {/* Camera preview */}
+                <div className="relative bg-gray-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-gray-700/50">
+                  {cameraReady ? (
+                    <video ref={cameraPreviewRef} className="w-full h-full object-cover" playsInline muted />
+                  ) : cameraStarting ? (
+                    <div className="text-center text-gray-600">
+                      <Loader className="w-12 h-12 mx-auto mb-2 animate-spin opacity-50" />
+                      <p className="text-sm text-amber-400">Requesting camera access...</p>
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-600 p-6">
+                      <Camera className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm text-gray-400 mb-3">Camera is required for proctoring</p>
+                      {cameraError && (
+                        <p className="text-xs text-red-400 mb-3 break-all max-w-sm mx-auto">{cameraError}</p>
+                      )}
+                      <Button size="sm" onClick={enableCamera}>
+                        <Camera className="w-4 h-4 mr-1.5" /> Enable Camera
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+                  <h3 className="font-semibold text-sm flex items-center gap-2 text-amber-400">
+                    <Shield className="w-4 h-4" /> Exam Rules & Guidelines
+                  </h3>
+                  <ul className="space-y-2 text-sm text-gray-300">
+                    <li className="flex items-start gap-2">
+                      <Monitor className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span><strong>Fullscreen Required:</strong> This exam must be taken in fullscreen mode. Exiting fullscreen counts as a violation.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Ban className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span><strong>No Tab Switching:</strong> Switching to another tab or window during the exam will be flagged. After 3 violations, the exam will be auto-submitted.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Ban className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span><strong>No Copy/Paste:</strong> Copying and pasting content is disabled during the exam.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span><strong>No Right-Click:</strong> Context menus are disabled during the exam.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Camera className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span><strong>Proctoring Active:</strong> Your exam session is being monitored for suspicious activity.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span><strong>Time Limit:</strong> The exam will auto-submit when the timer reaches zero.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {exam.instructions && (
+                  <div className="p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                    <h4 className="text-sm font-medium text-white mb-2">Exam Instructions</h4>
+                    <p className="text-sm text-gray-400 whitespace-pre-wrap">{exam.instructions}</p>
+                  </div>
+                )}
+
+                {exam.negative_marking && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                    <p className="text-sm text-red-400">Warning: {exam.negative_percentage}% will be deducted for each wrong answer.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => { setWizardStep(0); navigate('/student/exams'); }}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setWizardStep(2)} disabled={!cameraReady}>
+                  <Camera className="w-4 h-4 mr-1.5" /> Next — Camera Setup
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* ════════ STEP 2: Camera Consent ════════ */}
+          {wizardStep === 2 && (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-primary-500/10 flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-primary-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Camera & Recording</h2>
+                  <p className="text-sm text-gray-500">{exam.title}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {/* Camera feed preview — same stream the admin sees */}
+                <div className="bg-gray-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-gray-700/50">
+                  <video ref={cameraPreviewRef} className="w-full h-full object-cover" playsInline muted />
+                </div>
+
+                <div className="p-4 rounded-xl bg-primary-500/5 border border-primary-500/20">
+                  <p className="text-sm text-gray-300">
+                    Your camera feed will be recorded during this exam for proctoring purposes. 
+                    This recording is stored securely and auto-deleted after 7 days.
+                    Face detection ensures you remain visible throughout the exam.
+                  </p>
+                </div>
+
+                <label className="flex items-start gap-3 p-3 rounded-xl bg-gray-800/50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cameraConsent}
+                    onChange={(e) => setCameraConsent(e.target.checked)}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-primary-500 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-300">
+                    I consent to camera recording and face detection during this exam session
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => { setWizardStep(0); navigate('/student/exams'); }}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setWizardStep(3)} disabled={!cameraConsent}>
+                  <Monitor className="w-4 h-4 mr-1.5" /> Next — Screen Sharing
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* ════════ STEP 3: Screen Share + Fullscreen ════════ */}
+          {wizardStep === 3 && (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-primary-500/10 flex items-center justify-center">
+                  <Monitor className="w-6 h-6 text-primary-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Screen Sharing & Fullscreen</h2>
+                  <p className="text-sm text-gray-500">{exam.title}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <p className="text-sm text-gray-400">
+                  Share your entire screen and enter fullscreen mode. Your screen will be recorded 
+                  with a camera picture-in-picture overlay for proctoring review.
+                </p>
+
+                {/* Screen share */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                  screenShared ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-gray-800/50 border-gray-700/50'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <Monitor className={`w-5 h-5 ${screenShared ? 'text-emerald-400' : 'text-gray-500'}`} />
+                    <div>
+                      <p className="text-sm font-medium">Screen Sharing</p>
+                      <p className="text-xs text-gray-500">{screenShared ? 'Your screen is being shared' : 'Click to share your entire screen'}</p>
+                    </div>
+                  </div>
+                  {screenShared ? (
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Button size="sm" onClick={handleShareScreen}>
+                      <Monitor className="w-3.5 h-3.5 mr-1" /> Share Screen
+                    </Button>
+                  )}
+                </div>
+
+                {/* Fullscreen */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                  fullscreenActive ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-gray-800/50 border-gray-700/50'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <Monitor className={`w-5 h-5 ${fullscreenActive ? 'text-emerald-400' : 'text-gray-500'}`} />
+                    <div>
+                      <p className="text-sm font-medium">Fullscreen Mode</p>
+                      <p className="text-xs text-gray-500">{fullscreenActive ? 'Fullscreen is active' : 'Click to enter fullscreen'}</p>
+                    </div>
+                  </div>
+                  {fullscreenActive ? (
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Button size="sm" onClick={handleEnterFullscreen}>
+                      <Monitor className="w-3.5 h-3.5 mr-1" /> Enter Fullscreen
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => { setWizardStep(0); navigate('/student/exams'); }}>
+                  Cancel
+                </Button>
+                <Button onClick={handleStartExam} disabled={!screenShared || !fullscreenActive}>
+                  <Play className="w-4 h-4 mr-1.5" /> Start Exam
+                </Button>
+              </div>
+            </>
+          )}
         </motion.div>
       </div>
     );
@@ -641,7 +916,7 @@ export default function ExamTake() {
         </div>
       )}
       {faceMissingCountdown > 0 && (
-        <div className={`px-4 py-2 flex items-center gap-2 text-sm ${faceMissingCountdown <= 5 ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-amber-500/10 text-amber-400'}`}>
+        <div className="px-4 py-2 flex items-center gap-2 text-sm bg-red-500/20 text-red-400 animate-pulse">
           <Camera className="w-4 h-4 shrink-0" />
           <span className="flex-1">
             {cameraError
@@ -681,6 +956,13 @@ export default function ExamTake() {
 
           {exam.negative_marking && (
             <span className="text-xs text-red-400">-{exam.negative_percentage}%/wrong</span>
+          )}
+
+          {recordingActive && (
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs bg-red-500/10 text-red-400">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              REC
+            </span>
           )}
 
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold ${
