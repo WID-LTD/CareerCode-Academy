@@ -1,10 +1,64 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as ExamModel from '../models/exam';
+import * as ExamProctoringModel from '../models/examProctoring';
 import * as CourseModel from '../models/course';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
+import * as EnrollmentModel from '../models/enrollment';
+import * as CertificateModel from '../models/certificate';
+import * as CertificateTemplateModel from '../models/certificateTemplate';
+import * as NotificationModel from '../models/notification';
+import { generateCertificateCode } from '../utils/helpers';
+import { NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
+import { io } from '../config/socket';
+
+const recordingUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1024 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('video/webm')) cb(null, true);
+    else cb(new Error('Only WEBM files are accepted'));
+  },
+});
+
+async function autoIssueCertificateAfterExamPass(exam: any, userId: string, courseId: string) {
+  try {
+    if (!exam.certificate_template_id) return;
+    const template = await CertificateTemplateModel.getTemplateById(exam.certificate_template_id);
+    if (!template || !template.requires_exam) return;
+
+    const enrollment = await EnrollmentModel.getEnrollment(userId, courseId);
+    if (!enrollment?.completed) return;
+
+    const existing = await CertificateModel.getCertificateByUserAndCourse(userId, courseId);
+    if (existing) return;
+
+    const verificationCode = generateCertificateCode();
+    const certificate = await CertificateModel.createCertificate({
+      user_id: userId,
+      course_id: courseId,
+      certificate_template_id: template.id,
+      verification_code: verificationCode,
+    });
+
+    const course = await CourseModel.getCourseById(courseId);
+    await NotificationModel.createNotification({
+      user_id: userId,
+      title: 'New Certificate Earned!',
+      message: `Congratulations! You earned a certificate for completing "${course?.title || 'Course'}".`,
+      type: 'certificate' as any,
+    });
+
+    io.to(userId).emit('new_notification', { title: 'Certificate Earned', message: `You earned a certificate for ${course?.title || 'Course'}!` });
+    if (certificate) {
+      io.to(userId).emit('certificate_issued', { certificate });
+    }
+  } catch (e) {
+    console.error('Failed to auto-issue certificate after exam pass:', e);
+  }
+}
 
 const router = Router();
 
@@ -27,6 +81,7 @@ const createExamSchema = z.object({
   randomQuestionsCount: z.number().min(0).max(200).optional(),
   negativeMarking: z.boolean().optional(),
   negativePercentage: z.number().min(0).max(100).optional(),
+  certificateTemplateId: z.string().uuid().nullable().optional(),
 }).refine(data => {
   if (data.startsAt && data.endsAt && data.startsAt > data.endsAt) return false;
   return true;
@@ -48,6 +103,7 @@ const updateExamSchema = z.object({
   randomQuestionsCount: z.number().min(0).max(200).optional(),
   negativeMarking: z.boolean().optional(),
   negativePercentage: z.number().min(0).max(100).optional(),
+  certificateTemplateId: z.string().uuid().nullable().optional(),
 });
 
 const questionSchema = z.object({
@@ -61,6 +117,42 @@ const questionSchema = z.object({
 
 // ───────────────────────── Admin / Instructor Routes ─────────────────────────
 
+// Helper: verify the requesting instructor owns the exam's course
+async function verifyExamAccess(req: AuthRequest, examId: string): Promise<void> {
+  if (req.user?.role !== 'instructor') return; // admin/super_admin always allowed
+  const exam = await ExamModel.getExamById(examId);
+  if (!exam) throw new NotFoundError('Exam');
+  const { query: dbQuery } = await import('../config/db');
+  const { rows } = await dbQuery(
+    'SELECT 1 FROM courses WHERE id = $1 AND instructor_id = $2',
+    [exam.course_id, req.user!.userId]
+  );
+  if (rows.length === 0) throw new ForbiddenError('You do not have access to this exam');
+}
+
+// GET /exams/courses — list courses for exam creation dropdown (admin/instructor)
+router.get(
+  '/courses',
+  authenticate,
+  authorize('admin', 'super_admin', 'instructor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { query: dbQuery } = await import('../config/db');
+      let sql = `SELECT id, title FROM courses`;
+      const params: any[] = [];
+      if (req.user?.role === 'instructor') {
+        sql += ` WHERE instructor_id = $1`;
+        params.push(req.user.userId);
+      }
+      sql += ` ORDER BY title`;
+      const { rows } = await dbQuery(sql, params);
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /exams — list all exams (admin/instructor)
 router.get(
   '/',
@@ -72,8 +164,14 @@ router.get(
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
       const offset = (page - 1) * limit;
 
-      const exams = await ExamModel.getAllExams(limit, offset);
-      const total = await ExamModel.countExams();
+      let exams, total;
+      if (req.user?.role === 'instructor') {
+        exams = await ExamModel.getExamsByInstructor(req.user.userId, limit, offset);
+        total = await ExamModel.countExamsByInstructor(req.user.userId);
+      } else {
+        exams = await ExamModel.getAllExams(limit, offset);
+        total = await ExamModel.countExams();
+      }
 
       res.json({
         success: true,
@@ -108,13 +206,18 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(createExamSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const data = req.body;
       const course = await CourseModel.getCourseById(data.courseId);
       if (!course) throw new NotFoundError('Course');
+
+      // Instructors can only create exams for their own courses
+      if (req.user?.role === 'instructor' && course.instructor_id !== req.user.userId) {
+        throw new ForbiddenError('You can only create exams for your own courses');
+      }
 
       const exam = await ExamModel.createExam({
         course_id: data.courseId,
@@ -132,6 +235,7 @@ router.post(
         random_questions_count: data.randomQuestionsCount,
         negative_marking: data.negativeMarking,
         negative_percentage: data.negativePercentage,
+        certificate_template_id: data.certificateTemplateId ?? null,
       });
 
       res.status(201).json({ success: true, data: exam });
@@ -145,10 +249,11 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(updateExamSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -169,6 +274,7 @@ router.put(
         random_questions_count: data.randomQuestionsCount,
         negative_marking: data.negativeMarking,
         negative_percentage: data.negativePercentage,
+        certificate_template_id: data.certificateTemplateId !== undefined ? data.certificateTemplateId : undefined,
       });
 
       res.json({ success: true, data: updated });
@@ -182,9 +288,10 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -202,10 +309,11 @@ router.delete(
 router.post(
   '/:examId/questions',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(questionSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.examId);
       const exam = await ExamModel.getExamById(req.params.examId);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -239,10 +347,11 @@ router.post(
 router.put(
   '/:examId/questions/:questionId',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   validate(questionSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.examId);
       const data = req.body;
 
       let options = data.options;
@@ -271,9 +380,10 @@ router.put(
 router.delete(
   '/:examId/questions/:questionId',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.examId);
       const deleted = await ExamModel.deleteQuestion(req.params.questionId);
       if (!deleted) throw new NotFoundError('Question');
       res.json({ success: true, message: 'Question deleted' });
@@ -289,9 +399,10 @@ router.delete(
 router.get(
   '/:id/attempts',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -307,9 +418,10 @@ router.get(
 router.get(
   '/:id/attempts/:attemptId',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const attempt = await ExamModel.getAttemptById(req.params.attemptId);
       if (!attempt) throw new NotFoundError('Attempt');
 
@@ -325,9 +437,10 @@ router.get(
 router.put(
   '/:id/attempts/:attemptId/grade',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const { manualScore } = req.body;
       if (manualScore === undefined || manualScore < 0 || manualScore > 100) {
         return res.status(400).json({ success: false, message: 'manualScore must be 0-100' });
@@ -340,6 +453,10 @@ router.put(
       const updated = await ExamModel.updateAttemptManualGrade(req.params.attemptId, manualScore, true);
       if (!updated) throw new NotFoundError('Attempt');
 
+      if (passed) {
+        await autoIssueCertificateAfterExamPass(exam, updated.user_id, exam.course_id);
+      }
+
       res.json({ success: true, data: { ...updated, passed } });
     } catch (error) {
       next(error);
@@ -351,9 +468,10 @@ router.put(
 router.post(
   '/:id/duplicate',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -371,9 +489,10 @@ router.post(
 router.get(
   '/:id/export',
   authenticate,
-  authorize('admin', 'super_admin'),
+  authorize('admin', 'super_admin', 'instructor'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      await verifyExamAccess(req, req.params.id);
       const exam = await ExamModel.getExamById(req.params.id);
       if (!exam) throw new NotFoundError('Exam');
 
@@ -459,6 +578,21 @@ router.get(
         return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
       }
 
+      // Certificate template qualification check
+      if (exam.certificate_template_id) {
+        const { getTemplateById } = await import('../models/certificateTemplate');
+        const template = await getTemplateById(exam.certificate_template_id);
+        if (template) {
+          const enrollment = await EnrollmentModel.getEnrollment(userId, template.course_id);
+          if (!enrollment || !enrollment.completed) {
+            return res.status(403).json({
+              success: false,
+              message: 'You must complete the linked course before taking this exam',
+            });
+          }
+        }
+      }
+
       if (exam.max_attempts > 0) {
         const attemptCount = await ExamModel.countAttempts(req.params.examId, userId);
         if (attemptCount >= exam.max_attempts) {
@@ -483,12 +617,14 @@ router.get(
       }));
 
       const activeAttempt = await ExamModel.getActiveAttempt(req.params.examId, userId);
+      const attemptCount = await ExamModel.countAttempts(req.params.examId, userId);
 
       res.json({
         success: true,
         data: {
           ...exam,
           schedule_status: status,
+          attempt_count: attemptCount,
           questions: exam.shuffle_questions ? shuffleArray(safeQuestions) : safeQuestions,
           activeAttemptId: activeAttempt?.id || null,
           activeAttemptStartedAt: activeAttempt?.started_at || null,
@@ -523,9 +659,25 @@ router.post(
         return res.status(403).json({ success: false, message: 'Not enrolled' });
       }
 
+      // Certificate template qualification check
+      if (exam.certificate_template_id) {
+        const { getTemplateById } = await import('../models/certificateTemplate');
+        const template = await getTemplateById(exam.certificate_template_id);
+        if (template) {
+          const enrollment = await EnrollmentModel.getEnrollment(userId, template.course_id);
+          if (!enrollment || !enrollment.completed) {
+            return res.status(403).json({
+              success: false,
+              message: 'You must complete the linked course before starting this exam',
+            });
+          }
+        }
+      }
+
+      // Abandon any existing active attempt — every exam is a fresh start
       const active = await ExamModel.getActiveAttempt(req.params.examId, userId);
       if (active) {
-        return res.json({ success: true, data: { attempt: active, resumed: true } });
+        await ExamModel.abandonAttempt(active.id);
       }
 
       if (exam.max_attempts > 0) {
@@ -601,6 +753,10 @@ router.post(
       const passed = percentage >= exam.passing_score;
       await ExamModel.submitAttempt(activeAttempt.id, percentage, passed);
 
+      if (passed) {
+        await autoIssueCertificateAfterExamPass(exam, userId, exam.course_id);
+      }
+
       res.json({
         success: true,
         data: {
@@ -645,6 +801,10 @@ router.post(
       const passed = exam ? percentage >= exam.passing_score : false;
 
       await ExamModel.submitAttempt(activeAttempt.id, percentage, passed);
+
+      if (passed && exam) {
+        await autoIssueCertificateAfterExamPass(exam, userId, exam.course_id);
+      }
 
       res.json({
         success: true,
@@ -716,5 +876,37 @@ function shuffleArray<T>(arr: T[]): T[] {
   }
   return shuffled;
 }
+
+// POST /exams/student/:examId/upload-recording — upload WEBM recording to S3
+router.post(
+  '/student/:examId/upload-recording',
+  authenticate,
+  recordingUpload.single('recording'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No recording file provided' });
+      }
+
+      const activeAttempt = await ExamModel.getActiveAttempt(req.params.examId, userId);
+      if (!activeAttempt) {
+        return res.status(400).json({ success: false, message: 'No active attempt found' });
+      }
+
+      const durationSeconds = Math.floor((Date.now() - new Date(activeAttempt.started_at).getTime()) / 1000);
+      const recording = await ExamProctoringModel.saveRecording(
+        activeAttempt.id,
+        req.file.buffer,
+        `exam-${req.params.examId}-${activeAttempt.id}.webm`,
+        durationSeconds
+      );
+
+      res.json({ success: true, data: recording });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;

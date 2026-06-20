@@ -10,6 +10,7 @@
     "seed": "tsx --require dotenv/config src/seed-courses.ts",
     "seed:admin": "tsx --require dotenv/config src/seed-admin.ts",
     "seed:exam": "tsx --require dotenv/config src/seed-exam-questions.ts",
+    "seed:cert": "tsx --require dotenv/config src/seed-certificate-assets.ts",
     "generate-videos": "tsx --require dotenv/config src/generate-lesson-videos.ts",
     "migrate": "tsx --require dotenv/config src/migrate.ts",
     "migrate:s3": "tsx --require dotenv/config src/migrate-local-to-s3.ts",

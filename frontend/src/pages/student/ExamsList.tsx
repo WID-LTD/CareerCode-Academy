@@ -36,16 +36,8 @@ export default function ExamsList() {
     }
   };
 
-  const startExam = async (examId: string) => {
-    try {
-      const { data } = await api.post(`/exams/student/${examId}/start`);
-      if (data.data?.resumed) {
-        toast('Resuming previous attempt');
-      }
-      navigate(`/student/exams/${examId}`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to start exam');
-    }
+  const startExam = (examId: string) => {
+    navigate(`/student/exams/${examId}`);
   };
 
   const getStatusBadge = (exam: any) => {
@@ -54,9 +46,6 @@ export default function ExamsList() {
     }
     if (exam.schedule_status === 'expired') {
       return <Badge variant="danger">Expired</Badge>;
-    }
-    if (exam.active_attempt_status === 'in_progress') {
-      return <Badge variant="warning">In Progress</Badge>;
     }
     if (exam.attempt_count >= exam.max_attempts) {
       return <Badge variant="default">Exhausted</Badge>;
@@ -69,7 +58,6 @@ export default function ExamsList() {
 
   const canStart = (exam: any) => {
     if (exam.schedule_status === 'upcoming' || exam.schedule_status === 'expired') return false;
-    if (exam.active_attempt_status === 'in_progress') return true;
     if (exam.attempt_count >= exam.max_attempts) return false;
     return true;
   };
@@ -196,9 +184,7 @@ export default function ExamsList() {
                     onClick={() => handleStartClick(exam)}
                     disabled={!canStart(exam)}
                   >
-                    {exam.active_attempt_status === 'in_progress' ? (
-                      <><Play className="w-3.5 h-3.5 mr-1" /> Resume</>
-                    ) : exam.schedule_status === 'upcoming' ? (
+                    {exam.schedule_status === 'upcoming' ? (
                       <><Clock className="w-3.5 h-3.5 mr-1" /> Not Started</>
                     ) : exam.schedule_status === 'expired' ? (
                       'Expired'

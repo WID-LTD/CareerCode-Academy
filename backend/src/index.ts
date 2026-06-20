@@ -39,6 +39,7 @@ import pageRoutes from './routes/page.routes';
 import videoRoutes from './routes/video.routes';
 import challengeRoutes from './routes/challenge.routes';
 import examRoutes from './routes/exam.routes';
+import testRoutes from './routes/test.routes';
 import { query } from './config/db';
 
 const app = express();
@@ -50,7 +51,9 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://localhost:3000',
+    'https://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://127.0.0.1:3000',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'https://career-code-academy.vercel.app',
@@ -142,6 +145,12 @@ app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/challenges', challengeRoutes);
 app.use('/api/v1/exams', examRoutes);
+
+// E2E test helper routes (dev only)
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/v1/test', testRoutes);
+  console.log('✓ E2E test routes registered (development mode)');
+}
 
 // 404 handler
 app.use((_req, res) => {
@@ -316,6 +325,7 @@ async function initDatabase() {
         course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
         certificate_url TEXT,
         verification_code VARCHAR(255) UNIQUE NOT NULL,
+        certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL,
         issued_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(user_id, course_id)
       )
@@ -743,16 +753,6 @@ async function initDatabase() {
       )
     `);
 
-    // Add suspended column to users
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
-
-    // Add revoked column to certificates
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
-
     // New lesson_progress table
     await query(`
       CREATE TABLE IF NOT EXISTS lesson_progress (
@@ -814,6 +814,7 @@ async function initDatabase() {
         random_questions_count INTEGER DEFAULT 0,
         negative_marking BOOLEAN DEFAULT false,
         negative_percentage NUMERIC DEFAULT 0,
+        certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
@@ -863,6 +864,43 @@ async function initDatabase() {
     console.log('Database tables already initialized (running migrations only).');
   }
 
+    // Certificate templates table — always run for existing installations
+    await query(`
+      CREATE TABLE IF NOT EXISTS certificate_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(200) NOT NULL,
+        course_id UUID UNIQUE NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        layout_style VARCHAR(50) DEFAULT 'professional',
+        stamp_url TEXT,
+        signature_url TEXT,
+        logo_url TEXT,
+        show_stamp BOOLEAN DEFAULT true,
+        show_signature BOOLEAN DEFAULT true,
+        instructor_name VARCHAR(200) DEFAULT 'Udokamma Emmanuel',
+        org_name VARCHAR(200) DEFAULT 'Career Code WID Ltd',
+        org_rc VARCHAR(100) DEFAULT 'RC 8824091',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Add suspended column to users (safe for re-runs)
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
+
+    // Add revoked columns to certificates (safe for re-runs)
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
+
+    // Add certificate_template_id FK to certificates and exams (safe for re-runs)
+    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
+    await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
+
+    // Add requires_exam to certificate_templates (safe for re-runs)
+    await query(`ALTER TABLE certificate_templates ADD COLUMN IF NOT EXISTS requires_exam BOOLEAN DEFAULT false`);
+
     // Exam table migrations — always run to ensure columns exist for existing installations
     try {
       await query(`
@@ -902,6 +940,20 @@ async function initDatabase() {
   await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
   await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
   await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
+
+  // Exam proctoring recordings table
+  await query(`
+    CREATE TABLE IF NOT EXISTS exam_proctoring_recordings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      attempt_id UUID UNIQUE NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+      s3_url TEXT NOT NULL,
+      duration_seconds INTEGER DEFAULT 0,
+      file_size_bytes BIGINT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+  await query('CREATE INDEX IF NOT EXISTS idx_proctoring_recording_attempt ON exam_proctoring_recordings(attempt_id)');
 
   console.log('Database migrations complete');
   } catch (error) {
@@ -979,6 +1031,8 @@ async function start() {
   // Start background workers
   const { startBroadcastWorker } = await import('./workers/broadcastWorker');
   startBroadcastWorker(io);
+  const { startProctoringCleanupWorker } = await import('./workers/proctoringCleanupWorker');
+  startProctoringCleanupWorker();
 }
 
 start();

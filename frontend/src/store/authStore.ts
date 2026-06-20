@@ -139,6 +139,7 @@ export const useAuthStore = create<AuthState>()(
 
       initialize: async () => {
         if (get().initialized) return;
+        set({ isLoading: true });
         try {
           const { data } = await api.get('/auth/me');
           const userData = data.data;
@@ -156,9 +157,10 @@ export const useAuthStore = create<AuthState>()(
             },
             isAuthenticated: true,
             initialized: true,
+            isLoading: false,
           });
         } catch {
-          set({ initialized: true, user: null, isAuthenticated: false });
+          set({ initialized: true, user: null, isAuthenticated: false, isLoading: false });
         }
       },
     }),

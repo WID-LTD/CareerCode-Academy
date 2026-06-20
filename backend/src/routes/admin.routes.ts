@@ -7,12 +7,44 @@ import * as EnrollmentModel from '../models/enrollment';
 import * as PaymentModel from '../models/payment';
 import * as NotificationModel from '../models/notification';
 import * as CertificateModel from '../models/certificate';
+import * as CertificateTemplateModel from '../models/certificateTemplate';
+import * as ExamModel from '../models/exam';
+import * as ExamProctoringModel from '../models/examProctoring';
 import { query } from '../config/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail } from '../utils/helpers';
+import { sendInstructorApprovalEmail, sendInstructorUpgradeEmail, slugify } from '../utils/helpers';
+import { z } from 'zod';
+import { validate } from '../middleware/validate';
 import { logAudit } from '../middleware/audit';
 import { io, emitDashboardUpdate } from '../config/socket';
+import { uploadSingle } from '../middleware/upload';
+
+const adminCreateCourseSchema = z.object({
+  title: z.string().min(3).max(200),
+  description: z.string().min(10).max(5000),
+  price: z.number().min(0),
+  category: z.string().min(2),
+  level: z.enum(['beginner', 'intermediate', 'advanced']),
+  duration: z.number().min(1),
+  thumbnail: z.string().url().optional(),
+  status: z.enum(['draft', 'pending_review', 'published', 'rejected', 'archived']).optional(),
+  instructor_id: z.string().uuid(),
+  learning_outcomes: z.array(z.string()).optional(),
+});
+
+const adminUpdateCourseSchema = z.object({
+  title: z.string().min(3).max(200).optional(),
+  description: z.string().min(10).max(5000).optional(),
+  price: z.number().min(0).optional(),
+  category: z.string().min(2).optional(),
+  level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  duration: z.number().min(1).optional(),
+  thumbnail: z.string().url().optional(),
+  status: z.enum(['draft', 'pending_review', 'published', 'rejected', 'archived']).optional(),
+  instructor_id: z.string().uuid().optional(),
+  learning_outcomes: z.array(z.string()).optional(),
+});
 
 const router = Router();
 
@@ -146,6 +178,21 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// GET /admin/users/:userId/completed-courses — courses the user has completed (for cert issuance)
+router.get('/users/:userId/completed-courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const enrollments = await EnrollmentModel.getEnrollmentsByUser(req.params.userId);
+    const completed = enrollments
+      .filter((e: any) => e.completed)
+      .map((e: any) => ({
+        id: e.course_id,
+        title: e.course_title,
+        completed_at: e.completed_at,
+      }));
+    res.json({ success: true, data: completed });
+  } catch (error) { next(error); }
+});
+
 // PUT /admin/users/:id/role
 router.put('/users/:id/role', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -233,6 +280,81 @@ router.delete('/courses/:id', async (req: AuthRequest, res: Response, next: Next
     }
     await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'course', resourceId: id, ipAddress: req.ip });
     res.json({ success: true, message: 'Course deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/courses/:id
+router.get('/courses/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await CourseModel.getCourseById(req.params.id);
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    res.json({ success: true, data: course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /admin/courses
+router.post('/courses', validate(adminCreateCourseSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { title, description, price, category, level, duration, thumbnail, status, instructor_id, learning_outcomes } = req.body;
+    const slug = slugify(title);
+    const course = await CourseModel.createCourse({
+      title, description, price, category, level, duration, instructor_id, slug,
+      thumbnail: thumbnail || undefined,
+      learning_outcomes: learning_outcomes || undefined,
+    });
+
+    // If admin specified a status, update it
+    if (status && status !== 'draft') {
+      await CourseModel.updateCourseStatus(course.id, status, undefined, req.user!.userId);
+    }
+
+    await logAudit({ adminId: req.user!.userId, action: 'create', resourceType: 'course', resourceId: course.id, ipAddress: req.ip });
+    const final = await CourseModel.getCourseById(course.id);
+    res.status(201).json({ success: true, data: final || course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:id
+router.put('/courses/:id', validate(adminUpdateCourseSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await CourseModel.getCourseById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    const { title, description, price, category, level, duration, thumbnail, status, instructor_id, learning_outcomes } = req.body;
+
+    const updateData: Record<string, any> = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = price;
+    if (category !== undefined) updateData.category = category;
+    if (level !== undefined) updateData.level = level;
+    if (duration !== undefined) updateData.duration = duration;
+    if (thumbnail !== undefined) updateData.thumbnail = thumbnail;
+    if (instructor_id !== undefined) updateData.instructor_id = instructor_id;
+    if (learning_outcomes !== undefined) updateData.learning_outcomes = learning_outcomes;
+    if (title !== undefined) updateData.slug = slugify(title);
+
+    if (Object.keys(updateData).length > 0) {
+      await CourseModel.updateCourse(req.params.id, updateData as any);
+    }
+
+    if (status !== undefined) {
+      await CourseModel.updateCourseStatus(req.params.id, status, undefined, req.user!.userId);
+    }
+
+    await logAudit({ adminId: req.user!.userId, action: 'update', resourceType: 'course', resourceId: req.params.id, ipAddress: req.ip });
+    const updated = await CourseModel.getCourseById(req.params.id);
+    res.json({ success: true, data: updated });
   } catch (error) {
     next(error);
   }
@@ -1093,6 +1215,55 @@ router.put('/settings', async (req: AuthRequest, res: Response, next: NextFuncti
   }
 });
 
+// GET /admin/exams/active-attempts
+router.get('/exams/active-attempts', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const attempts = await ExamModel.getAllActiveAttempts();
+    res.json({ success: true, data: attempts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/exams/proctoring-history — paginated history of past attempts with recordings
+router.get('/exams/proctoring-history', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const limit = Math.min(Math.abs(parseInt(req.query.limit as string) || 20), 100);
+    const offset = Math.abs(parseInt(req.query.offset as string) || 0);
+    const search = req.query.search as string || undefined;
+    const result = await ExamProctoringModel.getRecordingsHistory(limit, offset, search);
+    res.json({ success: true, data: result.recordings, total: result.total });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /admin/exams/proctoring-recording/:attemptId — get recording for a specific attempt
+router.get('/exams/proctoring-recording/:attemptId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const recording = await ExamProctoringModel.getRecordingByAttemptId(req.params.attemptId);
+    if (!recording) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+    res.json({ success: true, data: recording });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /admin/exams/proctoring-recording/:recordingId — manually delete a recording
+router.delete('/exams/proctoring-recording/:recordingId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await ExamProctoringModel.deleteRecordingById(req.params.recordingId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+    res.json({ success: true, message: 'Recording deleted' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ══════════════════════════════════════════════════════════════
 // CATEGORIES
 // ══════════════════════════════════════════════════════════════
@@ -1187,7 +1358,92 @@ router.put('/applications/:id/request-changes', async (req: AuthRequest, res: Re
     );
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Application not found' });
     await logAudit({ adminId, action: 'request_changes', resourceType: 'application', resourceId: id, details: notes, ipAddress: req.ip });
-    res.json({ success: true, message: 'Changes requested', data: rows[0] });
+      res.json({ success: true, message: 'Changes requested', data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// ── Certificate Template Routes ──
+
+// GET /admin/certificate-templates — list all templates
+router.get('/certificate-templates', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const templates = await CertificateTemplateModel.getAllTemplates();
+    res.json({ success: true, data: templates });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates — create template
+router.post('/certificate-templates', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const template = await CertificateTemplateModel.createTemplate(req.body);
+    await logAudit({ adminId: req.user!.userId, action: 'create', resourceType: 'certificate_template', resourceId: template.id, ipAddress: req.ip });
+    res.status(201).json({ success: true, data: template });
+  } catch (error) { next(error); }
+});
+
+// PUT /admin/certificate-templates/:id — update template
+router.put('/certificate-templates/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, req.body);
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'update', resourceType: 'certificate_template', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, data: template });
+  } catch (error) { next(error); }
+});
+
+// DELETE /admin/certificate-templates/:id — delete template
+router.delete('/certificate-templates/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await CertificateTemplateModel.deleteTemplate(req.params.id);
+    if (!deleted) return res.status(404).json({ success: false, message: 'Template not found' });
+    await logAudit({ adminId: req.user!.userId, action: 'delete', resourceType: 'certificate_template', resourceId: req.params.id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Template deleted' });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates/:id/upload-stamp — upload stamp image
+router.post('/certificate-templates/:id/upload-stamp', uploadSingle('file', 'certificates'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, { stamp_url: url ?? undefined });
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    res.json({ success: true, data: { url, template } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates/:id/upload-signature — upload signature image
+router.post('/certificate-templates/:id/upload-signature', uploadSingle('file', 'certificates'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, { signature_url: url ?? undefined });
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    res.json({ success: true, data: { url, template } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/certificate-templates/:id/upload-logo — upload logo image
+router.post('/certificate-templates/:id/upload-logo', uploadSingle('file', 'certificates'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    const template = await CertificateTemplateModel.updateTemplate(req.params.id, { logo_url: url ?? undefined });
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+    res.json({ success: true, data: { url, template } });
+  } catch (error) { next(error); }
+});
+
+// POST /admin/settings/upload-branding — upload branding image (stamp/signature)
+router.post('/settings/upload-branding', uploadSingle('file', 'branding'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { getFileUrl } = await import('../middleware/upload');
+    const url = getFileUrl(req.file);
+    res.json({ success: true, data: { url } });
   } catch (error) { next(error); }
 });
 

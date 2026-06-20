@@ -17,6 +17,7 @@ export interface Exam {
   random_questions_count: number;
   negative_marking: boolean;
   negative_percentage: number;
+  certificate_template_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -63,12 +64,13 @@ export interface CreateExamInput {
   random_questions_count?: number;
   negative_marking?: boolean;
   negative_percentage?: number;
+  certificate_template_id?: string | null;
 }
 
 export async function createExam(input: CreateExamInput): Promise<Exam> {
   const { rows } = await query<Exam>(
-    `INSERT INTO exams (course_id, title, description, duration_minutes, passing_score, max_attempts, shuffle_questions, show_results, is_published, starts_at, ends_at, instructions, random_questions_count, negative_marking, negative_percentage)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    `INSERT INTO exams (course_id, title, description, duration_minutes, passing_score, max_attempts, shuffle_questions, show_results, is_published, starts_at, ends_at, instructions, random_questions_count, negative_marking, negative_percentage, certificate_template_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING *`,
     [
       input.course_id, input.title, input.description || null,
@@ -76,6 +78,7 @@ export async function createExam(input: CreateExamInput): Promise<Exam> {
       input.shuffle_questions || false, input.show_results !== false, input.is_published || false,
       input.starts_at || null, input.ends_at || null, input.instructions || null,
       input.random_questions_count || 0, input.negative_marking || false, input.negative_percentage || 0,
+      input.certificate_template_id || null,
     ]
   );
   return rows[0];
@@ -201,7 +204,7 @@ export async function getAvailableExamsForUser(userId: string): Promise<any[]> {
   const now = new Date().toISOString();
   const { rows } = await query(
     `SELECT e.*, c.title as course_title,
-      (SELECT COUNT(*)::int FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1) as attempt_count,
+      (SELECT COUNT(*)::int FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1 AND ea.status != 'abandoned') as attempt_count,
       (SELECT status FROM exam_attempts ea WHERE ea.exam_id = e.id AND ea.user_id = $1 AND ea.status = 'in_progress' ORDER BY ea.started_at DESC LIMIT 1) as active_attempt_status
      FROM exams e
      JOIN courses c ON e.course_id = c.id
@@ -232,6 +235,14 @@ export async function getAttemptById(attemptId: string): Promise<any | null> {
      FROM exam_attempts ea
      JOIN exams e ON ea.exam_id = e.id
      WHERE ea.id = $1`,
+    [attemptId]
+  );
+  return rows[0] || null;
+}
+
+export async function abandonAttempt(attemptId: string): Promise<ExamAttempt | null> {
+  const { rows } = await query<ExamAttempt>(
+    `UPDATE exam_attempts SET submitted_at = NOW(), status = 'abandoned' WHERE id = $1 AND status = 'in_progress' RETURNING *`,
     [attemptId]
   );
   return rows[0] || null;
@@ -361,7 +372,7 @@ export async function getActiveAttempt(examId: string, userId: string): Promise<
 
 export async function countAttempts(examId: string, userId: string): Promise<number> {
   const { rows } = await query(
-    'SELECT COUNT(*)::int as total FROM exam_attempts WHERE exam_id = $1 AND user_id = $2',
+    "SELECT COUNT(*)::int as total FROM exam_attempts WHERE exam_id = $1 AND user_id = $2 AND status != 'abandoned'",
     [examId, userId]
   );
   return rows[0]?.total || 0;
@@ -442,4 +453,29 @@ export async function getAttemptCountsByExam(examId: string): Promise<{ total: n
     [examId]
   );
   return rows[0] || { total: 0, completed: 0, passed: 0 };
+}
+
+export async function getPassingAttemptForCourse(userId: string, courseId: string): Promise<any | null> {
+  const { rows } = await query(
+    `SELECT ea.* FROM exam_attempts ea
+     JOIN exams e ON ea.exam_id = e.id
+     WHERE e.course_id = $1 AND ea.user_id = $2 AND ea.passed = true AND ea.status = 'completed'
+     LIMIT 1`,
+    [courseId, userId]
+  );
+  return rows[0] || null;
+}
+
+export async function getAllActiveAttempts(): Promise<any[]> {
+  const { rows } = await query(
+    `SELECT ea.*, e.title as exam_title, e.duration_minutes, e.course_id,
+            c.title as course_title, u.name as user_name, u.email as user_email, u.avatar as user_avatar
+     FROM exam_attempts ea
+     JOIN exams e ON ea.exam_id = e.id
+     JOIN courses c ON e.course_id = c.id
+     JOIN users u ON ea.user_id = u.id
+     WHERE ea.status = 'in_progress'
+     ORDER BY ea.started_at DESC`
+  );
+  return rows;
 }

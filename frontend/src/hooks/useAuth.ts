@@ -28,14 +28,22 @@ export function useAuth() {
         navigate(from);
       }
     } catch (err: any) {
-      const message = err?.response?.data?.message || '';
-      if (message.includes('unavailable')) {
-        toast.error('Service unavailable — database connection issue');
-      } else if (message.includes('verify your email')) {
-        navigate(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
-        toast.error('Please verify your email address.');
+      if (!err.response) {
+        toast.error('Cannot reach server — please check your connection and try again.');
+      } else if (err.response.status === 503) {
+        toast.error('Service temporarily unavailable — server is starting up. Please try again.');
+      } else if (err.response.status === 500) {
+        toast.error('Server error — please try again later.');
+      } else if (err.response.status === 401) {
+        const msg = err.response.data?.message || '';
+        if (msg.includes('verify your email')) {
+          navigate(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
+          toast.error('Please verify your email address.');
+        } else {
+          toast.error('Invalid email or password.');
+        }
       } else {
-        toast.error('Invalid email or password');
+        toast.error(err.response.data?.message || 'An unexpected error occurred.');
       }
     }
   };
@@ -53,9 +61,14 @@ export function useAuth() {
       toast.success('Account created! Please verify your email.');
       navigate(`/auth/verify-pending?email=${encodeURIComponent(userEmail)}`);
     } catch (err: any) {
-      const message = err?.response?.data?.message || '';
-      if (message.includes('unavailable')) {
-        toast.error('Service unavailable — database connection issue');
+      if (!err.response) {
+        toast.error('Cannot reach server — please check your connection and try again.');
+      } else if (err.response.status === 503) {
+        toast.error('Service temporarily unavailable — server is starting up. Please try again.');
+      } else if (err.response.status === 500) {
+        toast.error('Server error — please try again later.');
+      } else {
+        toast.error(err.response.data?.message || 'Registration failed. Please try again.');
       }
       throw err;
     }

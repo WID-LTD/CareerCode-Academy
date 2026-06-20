@@ -36,7 +36,9 @@ export function generatePasswordResetToken(): string {
 }
 
 export function generateCertificateCode(): string {
-  return 'CERT-' + crypto.randomBytes(12).toString('hex').toUpperCase();
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const rand = (n: number) => Array.from({ length: n }, () => chars[crypto.randomInt(chars.length)]).join('');
+  return `CERT-${rand(8)}-${rand(6)}`;
 }
 
 const COOKIE_OPTIONS = {

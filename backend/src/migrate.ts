@@ -518,6 +518,26 @@ async function migrate() {
     `);
     console.log('✓ system_settings table created');
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS certificate_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(200) NOT NULL,
+        course_id UUID UNIQUE NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        layout_style VARCHAR(50) DEFAULT 'professional',
+        stamp_url TEXT,
+        signature_url TEXT,
+        logo_url TEXT,
+        show_stamp BOOLEAN DEFAULT true,
+        show_signature BOOLEAN DEFAULT true,
+        instructor_name VARCHAR(200) DEFAULT 'Udokamma Emmanuel',
+        org_name VARCHAR(200) DEFAULT 'Career Code WID Ltd',
+        org_rc VARCHAR(100) DEFAULT 'RC 8824091',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✓ certificate_templates table created');
+
     await query('CREATE INDEX IF NOT EXISTS idx_modules_course ON modules(course_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status)');

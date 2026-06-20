@@ -3,17 +3,22 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as CertificateModel from '../models/certificate';
+import * as CertificateTemplateModel from '../models/certificateTemplate';
 import * as CourseModel from '../models/course';
 import * as EnrollmentModel from '../models/enrollment';
+import * as ExamModel from '../models/exam';
+import * as NotificationModel from '../models/notification';
 import { generateCertificateCode } from '../utils/helpers';
-import { generateCertificatePdf } from '../utils/certificatePdf';
+import { generateCertificatePdf, fetchImageBuffer, CertificatePdfData } from '../utils/certificatePdf';
 import { query } from '../config/db';
 import { NotFoundError, ConflictError } from '../utils/errors';
+import { io } from '../config/socket';
 
 const router = Router();
 
 const createCertificateSchema = z.object({
   courseId: z.string().uuid(),
+  userId: z.string().uuid(),
   certificateUrl: z.string().url().optional(),
 });
 
@@ -92,8 +97,7 @@ router.post(
   validate(createCertificateSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { courseId, certificateUrl } = req.body;
-      const userId = req.body.userId || req.user!.userId;
+      const { courseId, userId, certificateUrl } = req.body;
 
       const course = await CourseModel.getCourseById(courseId);
       if (!course) {
@@ -170,12 +174,40 @@ router.post(
         return res.json({ success: true, data: existing });
       }
 
+      // Check if there's a certificate template for this course
+      const template = await CertificateTemplateModel.getTemplateByCourseId(courseId);
+
+      // If template requires exam, check student has a passing exam attempt
+      if (template?.requires_exam) {
+        const passingAttempt = await ExamModel.getPassingAttemptForCourse(userId, courseId);
+        if (!passingAttempt) {
+          return res.json({
+            success: false,
+            message: 'This course requires a passing exam score before a certificate can be issued.',
+            requiresExam: true,
+          });
+        }
+      }
+
       const verificationCode = generateCertificateCode();
+
       const certificate = await CertificateModel.createCertificate({
         user_id: userId,
         course_id: courseId,
+        certificate_template_id: template?.id || null,
         verification_code: verificationCode,
       });
+
+      // Create notification for the student
+      await NotificationModel.createNotification({
+        user_id: userId,
+        title: 'New Certificate Earned!',
+        message: `Congratulations! You earned a certificate for "${course?.title || 'Course'}".`,
+        type: 'certificate' as any,
+      });
+
+      io.to(userId).emit('new_notification', { title: 'Certificate Earned', message: `You earned a certificate for ${course?.title || 'Course'}!` });
+      io.to(userId).emit('certificate_issued', { certificate });
 
       res.status(201).json({ success: true, data: certificate });
     } catch (error) {
@@ -200,20 +232,41 @@ router.get(
       }
 
       const course = await CourseModel.getCourseById(certificate.course_id);
-      const instructorRes = await query(
-        'SELECT u.name FROM courses c JOIN users u ON c.instructor_id = u.id WHERE c.id = $1',
-        [certificate.course_id]
-      );
       const { rows: userRows } = await query('SELECT name FROM users WHERE id = $1', [certificate.user_id]);
 
-      const doc = generateCertificatePdf({
+      // Load template if linked
+      let template = null;
+      if (certificate.certificate_template_id) {
+        template = await CertificateTemplateModel.getTemplateById(certificate.certificate_template_id);
+      } else {
+        // Fallback: look for template by course
+        template = await CertificateTemplateModel.getTemplateByCourseId(certificate.course_id);
+      }
+
+      // Fetch images for the PDF
+      const pdfData: CertificatePdfData = {
         user_name: userRows[0]?.name || 'Student',
         course_title: course?.title || 'Course',
-        course_category: course?.category || '',
         verification_code: certificate.verification_code,
         issued_at: certificate.issued_at,
-        instructor_name: instructorRes.rows[0]?.name,
-      });
+        instructor_name: template?.instructor_name || 'Udokamma Emmanuel',
+        org_name: template?.org_name || 'Career Code WID Ltd',
+        org_rc: template?.org_rc || 'RC 8824091',
+        show_stamp: template?.show_stamp !== false,
+        show_signature: template?.show_signature !== false,
+      };
+
+      // Fetch images in parallel
+      const [logoBuffer, signatureBuffer, stampBuffer] = await Promise.all([
+        template?.logo_url ? fetchImageBuffer(template.logo_url) : Promise.resolve(null),
+        template?.signature_url ? fetchImageBuffer(template.signature_url) : Promise.resolve(null),
+        template?.stamp_url ? fetchImageBuffer(template.stamp_url) : Promise.resolve(null),
+      ]);
+      pdfData.logoBuffer = logoBuffer;
+      pdfData.signatureBuffer = signatureBuffer;
+      pdfData.stampBuffer = stampBuffer;
+
+      const doc = generateCertificatePdf(pdfData);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="certificate-${certificate.verification_code}.pdf"`);

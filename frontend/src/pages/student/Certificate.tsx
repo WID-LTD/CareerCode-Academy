@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/axios';
-import { motion } from 'framer-motion';
-import { Award, Share2, Calendar, Search, ExternalLink } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Award, Share2, Calendar, Search, ExternalLink, X, Sparkles } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { formatDate } from '@/lib/utils';
 import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import toast from 'react-hot-toast';
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isNew(issuedAt: string): boolean {
+  return Date.now() - new Date(issuedAt).getTime() < SEVEN_DAYS_MS;
+}
 
 export default function Certificate() {
   const [certificates, setCertificates] = useState<any[]>([]);
@@ -20,6 +26,8 @@ export default function Certificate() {
   const [pageSize, setPageSize] = useState(12);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [newCertCount, setNewCertCount] = useState(0);
 
   useEffect(() => {
     loadCertificates();
@@ -28,10 +36,19 @@ export default function Certificate() {
   const loadCertificates = async () => {
     try {
       const { data } = await api.get(`/certificates?page=${page}&limit=${pageSize}`);
-      setCertificates(data.data || []);
+      const list = data.data || [];
+      setCertificates(list);
       if (data.pagination) {
         setTotalItems(data.pagination.total);
         setTotalPages(data.pagination.pages);
+      }
+
+      const newCerts = list.filter((c: any) => isNew(c.issued_at || c.certificate?.issued_at));
+      setNewCertCount(newCerts.length);
+
+      if (newCerts.length > 0 && page === 1) {
+        setShowCongrats(true);
+        toast.success(`🎉 You earned ${newCerts.length} new certificate${newCerts.length > 1 ? 's' : ''}!`, { duration: 5000 });
       }
     } catch {
       // ignore
@@ -118,6 +135,7 @@ export default function Certificate() {
           {certificates.map((item: any, i: number) => {
             const cert = item.certificate || item;
             const course = item.course || {};
+            const isNewCert = isNew(cert.issued_at);
             return (
               <motion.div
                 key={cert.id}
@@ -130,6 +148,12 @@ export default function Certificate() {
                   <div className="absolute bottom-0 left-0 w-40 h-40 bg-secondary-500/5 rounded-full blur-3xl" />
 
                   <div className="relative">
+                    {isNewCert && (
+                      <span className="absolute -top-2 right-0 px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center gap-1 shadow-sm">
+                        <Sparkles className="w-3 h-3" /> NEW
+                      </span>
+                    )}
+
                     <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-4">
                       <Award className="w-8 h-8 text-white" />
                     </div>
@@ -177,6 +201,29 @@ export default function Certificate() {
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
       />
+
+      {/* Congratulations Modal */}
+      <AnimatePresence>
+        {showCongrats && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="glass-card w-full max-w-sm p-8 rounded-2xl text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-4">
+                <Award className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-xl font-bold mb-2">Congratulations! 🎉</h2>
+              <p className="text-gray-500 mb-6">
+                You earned {newCertCount} new certificate{newCertCount > 1 ? 's' : ''}! Check them out below.
+              </p>
+              <Button onClick={() => setShowCongrats(false)} className="w-full">View Certificates</Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -279,6 +279,9 @@ interface AdminState {
 
   // Courses
   fetchCourses: (page?: number, limit?: number) => Promise<void>;
+  fetchCourseById: (id: string) => Promise<any>;
+  createCourse: (data: any) => Promise<void>;
+  updateCourse: (id: string, data: any) => Promise<void>;
   approveCourse: (id: string) => Promise<void>;
   rejectCourse: (id: string, reason: string) => Promise<void>;
   archiveCourse: (id: string) => Promise<void>;
@@ -291,6 +294,7 @@ interface AdminState {
 
   // Certificates
   fetchCertificates: (page?: number, limit?: number) => Promise<void>;
+  issueCertificate: (userId: string, courseId: string) => Promise<void>;
   revokeCertificate: (id: string) => Promise<void>;
   reissueCertificate: (id: string) => Promise<void>;
 
@@ -488,6 +492,32 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     await api.delete(`/admin/courses/${id}`);
     set({ courses: get().courses.filter(c => c._id !== id) });
   },
+  fetchCourseById: async (id: string) => {
+    const { data } = await api.get(`/admin/courses/${id}`);
+    return data.data;
+  },
+  createCourse: async (courseData: any) => {
+    set({ isLoading: true, error: null });
+    try {
+      await api.post('/admin/courses', courseData);
+      set({ isLoading: false });
+      get().fetchCourses(get().coursesPagination?.page || 1);
+    } catch (err: any) {
+      set({ isLoading: false, error: err.response?.data?.message || 'Failed to create course' });
+      throw err;
+    }
+  },
+  updateCourse: async (id: string, courseData: any) => {
+    set({ isLoading: true, error: null });
+    try {
+      await api.put(`/admin/courses/${id}`, courseData);
+      set({ isLoading: false });
+      get().fetchCourses(get().coursesPagination?.page || 1);
+    } catch (err: any) {
+      set({ isLoading: false, error: err.response?.data?.message || 'Failed to update course' });
+      throw err;
+    }
+  },
 
   // ═══════════════════════════════════════
   // PAYMENTS
@@ -516,6 +546,17 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       set({ certificates: normalizeList(data.data), certificatesPagination: data.pagination, isLoading: false });
     } catch (error: any) {
       set({ isLoading: false, error: error.response?.data?.message || 'Failed to fetch certificates' });
+    }
+  },
+  issueCertificate: async (userId: string, courseId: string) => {
+    try {
+      await api.post('/certificates', { userId, courseId });
+      set({ error: null });
+      get().fetchCertificates(get().certificatesPagination?.page || 1);
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Failed to issue certificate';
+      set({ error: message });
+      throw new Error(message);
     }
   },
   revokeCertificate: async (id: string) => {

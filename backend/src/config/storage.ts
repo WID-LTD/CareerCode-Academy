@@ -50,6 +50,7 @@ export async function uploadFile(
     else if (ext === '.pdf') contentType = 'application/pdf';
     else if (ext === '.mp4') contentType = 'video/mp4';
     else if (ext === '.mov') contentType = 'video/quicktime';
+    else if (ext === '.webm') contentType = 'video/webm';
 
     const command = new PutObjectCommand({
       Bucket: s3Bucket,

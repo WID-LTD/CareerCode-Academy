@@ -11,11 +11,18 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loginTimeout, setLoginTimeout] = useState(false);
   const { login, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login(email, password);
+    setLoginTimeout(false);
+    const timer = setTimeout(() => setLoginTimeout(true), 30000);
+    try {
+      await login(email, password);
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
   return (
@@ -70,6 +77,11 @@ export default function Login() {
               </div>
 
               <Button type="submit" className="w-full" loading={isLoading}>Sign In</Button>
+              {isLoading && loginTimeout && (
+                <p className="text-xs text-amber-600 text-center">
+                  Still connecting... The server may be starting up.
+                </p>
+              )}
             </form>
 
             <div className="relative my-6">
