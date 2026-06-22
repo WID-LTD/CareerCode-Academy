@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, Award, Clock, ArrowLeft, Loader2, PartyPopper, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Award, Clock, ArrowLeft, PartyPopper, AlertTriangle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import { api } from '@/lib/axios';
 import toast from 'react-hot-toast';
 
@@ -32,11 +33,7 @@ export default function ExamResults() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   if (!result) {

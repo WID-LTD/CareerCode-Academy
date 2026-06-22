@@ -78,7 +78,7 @@ router.get('/dashboard', async (req: Request, res: Response, next: NextFunction)
     ]);
 
     const intervalStr = intervalMap[range] || '6 months';
-    const [enrollTrend, userRegTrend, topC, recentAct, revenueTrend, refundTrend, prevStats] = await Promise.all([
+    const [enrollTrend, userRegTrend, topC, recentAct, revenueTrend, refundTrend, prevStats, payoutSum, completionTrend] = await Promise.all([
       query(`SELECT ${enrollTrunc} as date, ${enrollLabel} as label, COUNT(*) as enrollments FROM enrollments WHERE enrolled_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
       query(`SELECT DATE(created_at) as date, ${userLabel} as label, COUNT(*) as users FROM users WHERE created_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
       query(`SELECT c.title, c.slug, COUNT(e.id) as enrollments FROM courses c LEFT JOIN enrollments e ON c.id = e.course_id GROUP BY c.id, c.title, c.slug ORDER BY enrollments DESC LIMIT 5`),
@@ -91,6 +91,8 @@ router.get('/dashboard', async (req: Request, res: Response, next: NextFunction)
         (SELECT COUNT(*) FROM enrollments WHERE enrolled_at < NOW() - INTERVAL '${intervalStr}') as prev_enrollments,
         (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at < NOW() - INTERVAL '${intervalStr}') as prev_revenue
       `),
+      query(`SELECT COUNT(*)::int as pending_count, COALESCE(SUM(amount), 0)::float as pending_amount FROM payouts WHERE status = 'pending'`),
+      query(`SELECT DATE_TRUNC('month', completed_at)::date as date, to_char(DATE_TRUNC('month', completed_at), 'Mon YYYY') as label, COUNT(*)::int as completions FROM enrollments WHERE completed = true AND completed_at > NOW() - INTERVAL '${intervalStr}' GROUP BY date, label ORDER BY date`),
     ]);
 
     const recentUsers = await UserModel.getAllUsers(10, 0);
@@ -134,6 +136,8 @@ router.get('/dashboard', async (req: Request, res: Response, next: NextFunction)
         userRegistrationTrend: userRegTrend.rows,
         topCourses: topC.rows,
         recentActivities: recentAct.rows,
+        payoutSummary: payoutSum.rows[0] || { pending_count: 0, pending_amount: 0 },
+        completionTrend: completionTrend.rows,
       },
     });
   } catch (error) {
@@ -150,7 +154,10 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
     const role = req.query.role as string | undefined;
     const search = req.query.search as string | undefined;
 
-    let sql = 'SELECT id, name, email, role, avatar, bio, is_verified, is_suspended, created_at FROM users WHERE 1=1';
+    let sql = `SELECT u.id, u.name, u.email, u.role, u.avatar, u.bio, u.is_verified, u.is_suspended, u.created_at, u.last_login,
+      (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id)::int as enrolled_courses_count,
+      (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id AND completed = true)::int as completed_courses_count
+      FROM users u WHERE 1=1`;
     const params: any[] = [];
 
     if (role) {
@@ -1444,6 +1451,66 @@ router.post('/settings/upload-branding', uploadSingle('file', 'branding'), async
     const { getFileUrl } = await import('../middleware/upload');
     const url = getFileUrl(req.file);
     res.json({ success: true, data: { url } });
+  } catch (error) { next(error); }
+});
+
+// ─── Super Admin Only Routes ───────────────────────────────────────────────
+
+// GET /admin/admins — list all admin & super_admin users (super_admin only)
+router.get('/admins', authorize('super_admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { rows } = await query(`
+      SELECT id, name, email, role, avatar, created_at, last_login,
+        (SELECT COUNT(*) FROM courses WHERE creator_id = u.id)::int as course_count
+      FROM users u
+      WHERE role IN ('admin', 'super_admin')
+      ORDER BY role DESC, created_at ASC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// PUT /admin/users/:id/promote-admin — promote user to admin (super_admin only, accepts id or email)
+router.put('/users/:id/promote-admin', authorize('super_admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const isNumeric = /^\d+$/.test(id);
+    const target = await query(
+      isNumeric ? `SELECT id, role FROM users WHERE id = $1` : `SELECT id, role FROM users WHERE email = $1`,
+      [id]
+    );
+    if (target.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (target.rows[0].role === 'super_admin') {
+      return res.status(400).json({ success: false, message: 'Cannot promote a super_admin' });
+    }
+    if (target.rows[0].role === 'admin') {
+      return res.status(400).json({ success: false, message: 'User is already an admin' });
+    }
+    await query(`UPDATE users SET role = 'admin' WHERE id = $1`, [id]);
+    await logAudit({ adminId: req.user!.userId, action: 'promote_admin', resourceType: 'user', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, message: 'User promoted to admin' });
+  } catch (error) { next(error); }
+});
+
+// PUT /admin/users/:id/demote-admin — demote admin to student (super_admin only)
+router.put('/users/:id/demote-admin', authorize('super_admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const target = await query(`SELECT id, role FROM users WHERE id = $1`, [id]);
+    if (target.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (target.rows[0].role !== 'admin') {
+      return res.status(400).json({ success: false, message: 'User is not an admin' });
+    }
+    if (parseInt(id) === req.user!.userId) {
+      return res.status(400).json({ success: false, message: 'Cannot demote yourself' });
+    }
+    await query(`UPDATE users SET role = 'student' WHERE id = $1`, [id]);
+    await logAudit({ adminId: req.user!.userId, action: 'demote_admin', resourceType: 'user', resourceId: id, ipAddress: req.ip });
+    res.json({ success: true, message: 'Admin demoted to student' });
   } catch (error) { next(error); }
 });
 

@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
-import { Flame, Zap, TrendingUp, Play, Award, ChevronRight, CalendarDays } from 'lucide-react';
+import { Flame, Zap, TrendingUp, Play, Award, ChevronRight, CalendarDays, Bell, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
 import { useStudentStore } from '@/store/studentStore';
+import { useSocket } from '@/hooks/useSocket';
 import { Link } from 'react-router-dom';
 
 const motivationalQuotes = [
@@ -32,6 +33,10 @@ export function HeroSection() {
     ? Math.floor((Date.now() - firstEnrolled) / (1000 * 60 * 60 * 24))
     : 0;
 
+  const { socket } = useSocket();
+  const connected = socket?.connected;
+  const { unreadNotifications } = useStudentStore();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -49,6 +54,25 @@ export function HeroSection() {
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
                 {greeting}, {name} {timeEmojis[timeIdx]}
               </h1>
+              <div className="flex items-center gap-2">
+                {connected && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-success-500/20 border border-success-400/30 text-[10px] font-medium text-success-200">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success-400" />
+                    </span>
+                    Live
+                  </span>
+                )}
+                {unreadNotifications > 0 && (
+                  <Link to="/student/notifications" className="relative">
+                    <Bell className="w-5 h-5 text-white/80 hover:text-white transition-colors" />
+                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-danger-500 text-white text-[9px] font-bold leading-none">
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </span>
+                  </Link>
+                )}
+              </div>
             </div>
             <p className="text-white/80 text-sm sm:text-base max-w-lg">
               Welcome back to CareerCode Academy. {activeCourse ? 'Pick up where you left off.' : 'Start your next learning adventure!'}

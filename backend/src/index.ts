@@ -39,6 +39,7 @@ import pageRoutes from './routes/page.routes';
 import videoRoutes from './routes/video.routes';
 import challengeRoutes from './routes/challenge.routes';
 import examRoutes from './routes/exam.routes';
+import payoutRoutes from './routes/payout.routes';
 import testRoutes from './routes/test.routes';
 import { query } from './config/db';
 
@@ -145,6 +146,7 @@ app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/challenges', challengeRoutes);
 app.use('/api/v1/exams', examRoutes);
+app.use('/api/v1/payouts', payoutRoutes);
 
 // E2E test helper routes (dev only)
 if (process.env.NODE_ENV === 'development') {
@@ -200,6 +202,8 @@ async function initDatabase() {
         verification_token_expires TIMESTAMPTZ,
         reset_token VARCHAR(255),
         reset_token_expiry TIMESTAMPTZ,
+        is_suspended BOOLEAN DEFAULT false,
+        last_login TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
@@ -580,6 +584,8 @@ async function initDatabase() {
 
     await query('ALTER TABLE lessons ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id) ON DELETE SET NULL');
     await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires TIMESTAMPTZ');
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false');
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ');
     await query('ALTER TABLE lessons ADD COLUMN IF NOT EXISTS video_thumbnail TEXT');
 
     // Learning paths table
@@ -940,6 +946,55 @@ async function initDatabase() {
   await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
   await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
   await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
+
+  // Learning path enrollments table (per-user progress tracking)
+  await query(`
+    CREATE TABLE IF NOT EXISTS learning_path_enrollments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      path_id UUID NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+      progress INTEGER DEFAULT 0,
+      completed BOOLEAN DEFAULT false,
+      started_at TIMESTAMPTZ DEFAULT NOW(),
+      completed_at TIMESTAMPTZ,
+      UNIQUE(user_id, path_id)
+    )
+  `);
+  await query('CREATE INDEX IF NOT EXISTS idx_lpe_user ON learning_path_enrollments(user_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_lpe_path ON learning_path_enrollments(path_id)');
+
+  // Payouts table
+  await query(`
+    CREATE TABLE IF NOT EXISTS payouts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount DECIMAL(10, 2) NOT NULL,
+      fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      net_amount DECIMAL(10, 2) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
+      payment_method VARCHAR(100),
+      payment_details TEXT,
+      period_start TIMESTAMPTZ,
+      period_end TIMESTAMPTZ,
+      notes TEXT,
+      admin_notes TEXT,
+      reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_at TIMESTAMPTZ,
+      requested_at TIMESTAMPTZ DEFAULT NOW(),
+      processed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await query('CREATE INDEX IF NOT EXISTS idx_payouts_instructor ON payouts(instructor_id)');
+  await query('CREATE INDEX IF NOT EXISTS idx_payouts_status ON payouts(status)');
+
+  // Add commission_rate to system_settings
+  await query(`
+    INSERT INTO system_settings (key, value, category, description)
+    VALUES ('commission_rate', '30', 'payouts', 'Platform commission percentage')
+    ON CONFLICT (key) DO NOTHING
+  `);
 
   // Exam proctoring recordings table
   await query(`

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,6 +17,7 @@ import {
   LogOut,
   Hash,
   Monitor,
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -59,6 +60,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Live Classes', path: '/instructor/live-classes', icon: Calendar },
     { label: 'Messages', path: '/instructor/messages', icon: Users },
     { label: 'Schedule', path: '/instructor/schedule', icon: Calendar },
+    { label: 'Payouts', path: '/instructor/payouts', icon: LayoutDashboard },
   ],
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
@@ -78,6 +80,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Messages', path: '/admin/messages', icon: Users },
     { label: 'Analytics', path: '/admin/analytics', icon: Trophy },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
+    { label: 'Payouts', path: '/admin/payouts', icon: LayoutDashboard },
   ],
   adminNarrow: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
@@ -98,6 +101,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Analytics', path: '/admin/analytics', icon: Trophy },
     { label: 'Audit Log', path: '/admin/audit-log', icon: LayoutDashboard },
     { label: 'Settings', path: '/admin/settings', icon: Settings },
+    { label: 'Payouts', path: '/admin/payouts', icon: LayoutDashboard },
   ],
 };
 
@@ -108,7 +112,20 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [newCertCount, setNewCertCount] = useState(0);
   const { socket } = useSocket();
   const role = user?.role || 'student';
-  const links = roleSidebarLinks[role] || roleSidebarLinks.student;
+  const baseLinks = roleSidebarLinks[role] || roleSidebarLinks.student;
+  const links = useMemo(() => {
+    if (role !== 'admin' && role !== 'super_admin') return baseLinks;
+    const adminManagement = { label: 'Admin Management', path: '/admin/admin-management', icon: ShieldAlert };
+    if (role === 'super_admin') {
+      const idx = baseLinks.findIndex(l => l.path === '/admin/settings');
+      if (idx >= 0) {
+        const copy = [...baseLinks];
+        copy.splice(idx, 0, adminManagement);
+        return copy;
+      }
+    }
+    return baseLinks;
+  }, [role, baseLinks]);
 
   useEffect(() => {
     if (role !== 'student') return;

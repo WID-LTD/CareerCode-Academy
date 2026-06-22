@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Mail, Star, BookOpen, MoreHorizontal, TrendingUp, Users, Loader2 } from 'lucide-react';
+import { Search, Mail, Star, BookOpen, MoreHorizontal, TrendingUp, Users } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import api from '@/lib/axios';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 
 export default function Students() {
   const [students, setStudents] = useState<any[]>([]);
@@ -45,9 +46,7 @@ export default function Students() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center min-h-[40vh]">
-          <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-        </div>
+        <PageSkeleton />
       ) : (
       <div className="overflow-x-auto">
         <table className="w-full">

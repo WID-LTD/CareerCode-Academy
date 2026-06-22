@@ -179,7 +179,7 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
       </div>
 
       {/* Bottom Navigation for Mobile */}
-      {role === 'student' && <BottomNav />}
+      <BottomNav role={role} />
     </div>
   );
 }

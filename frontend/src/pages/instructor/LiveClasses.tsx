@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useInstructorExtendedStore } from '@/store/instructorExtendedStore';
 import { useInstructorStore } from '@/store/instructorStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Video, Plus, Calendar, Clock, Link as LinkIcon } from 'lucide-react';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import toast from 'react-hot-toast';
 
 export default function InstructorLiveClasses() {
-  const { liveClasses, fetchLiveClasses, createLiveClass, isLoading } = useInstructorExtendedStore();
+  const { liveClasses, fetchLiveClasses, createLiveClass, isLoading } = useInstructorStore();
   const { myCourses, fetchMyCourses } = useInstructorStore();
 
   const [showForm, setShowForm] = useState(false);
@@ -50,11 +50,7 @@ export default function InstructorLiveClasses() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

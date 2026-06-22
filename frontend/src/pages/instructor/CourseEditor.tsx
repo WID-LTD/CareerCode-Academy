@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 export default function CourseEditor() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const isNew = slug === 'new';
+  const isNew = !slug || slug === 'new';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

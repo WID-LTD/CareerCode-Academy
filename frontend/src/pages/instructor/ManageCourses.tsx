@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Eye, BookOpen, Users, Star, Clock, Search, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Edit, Trash2, Eye, BookOpen, Users, Star, Clock, Search, Megaphone, Send, X } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import { useInstructorStore } from '@/store/instructorStore';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 export default function ManageCourses() {
   const [search, setSearch] = useState('');
   const { myCourses, isLoading, fetchMyCourses, deleteCourse } = useInstructorStore();
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastTarget, setBroadcastTarget] = useState<any | null>(null);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   React.useEffect(() => {
     fetchMyCourses();
@@ -24,6 +32,39 @@ export default function ManageCourses() {
     }
   };
 
+  const openBroadcast = (target: any | null) => {
+    setBroadcastTarget(target);
+    setBroadcastTitle('');
+    setBroadcastMessage('');
+    setBroadcastOpen(true);
+  };
+
+  const closeBroadcast = () => {
+    setBroadcastOpen(false);
+    setBroadcastTarget(null);
+  };
+
+  const handleBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) return;
+    setSending(true);
+    try {
+      const courseIds = broadcastTarget ? [broadcastTarget.id] : filtered.map(c => c.id);
+      const { data } = await api.post('/instructor/broadcast', {
+        courseIds,
+        title: broadcastTitle,
+        message: broadcastMessage,
+      });
+      if (data.success) {
+        toast.success(data.message);
+        closeBroadcast();
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to send broadcast');
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className="flex items-center justify-between mb-8">
@@ -31,9 +72,16 @@ export default function ManageCourses() {
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">Manage Courses</h1>
           <p className="text-gray-500">Create, edit, and manage your courses.</p>
         </div>
-        <Link to="/instructor/courses/new">
-          <Button icon={<Plus className="w-4 h-4" />}>New Course</Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          {myCourses.length > 0 && (
+            <Button variant="outline" onClick={() => openBroadcast(null)}>
+              <Megaphone className="w-4 h-4 mr-2" /> Broadcast to All
+            </Button>
+          )}
+          <Link to="/instructor/courses/new">
+            <Button icon={<Plus className="w-4 h-4" />}>New Course</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -41,9 +89,7 @@ export default function ManageCourses() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
-        </div>
+        <PageSkeleton />
       ) : (
       <div className="space-y-3">
         {filtered.map((course, i) => (
@@ -78,13 +124,17 @@ export default function ManageCourses() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <Link to={`/courses/${course.slug}`}>
                     <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} />
                   </Link>
                   <Link to={`/instructor/courses/${course.slug}/edit`}>
                     <Button variant="ghost" size="sm" icon={<Edit className="w-4 h-4" />} />
                   </Link>
+                  <Button variant="ghost" size="sm" icon={<Megaphone className="w-4 h-4 text-blue-500" />}
+                    onClick={() => openBroadcast(course)}
+                    title="Send message to enrolled students"
+                  />
                   <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-red-500" />} onClick={() => handleDelete(course.id)} />
                 </div>
               </div>
@@ -93,6 +143,66 @@ export default function ManageCourses() {
         ))}
       </div>
       )}
+
+      {/* Broadcast Modal */}
+      <AnimatePresence>
+        {broadcastOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={closeBroadcast}>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Megaphone className="w-5 h-5 text-blue-500" />
+                  {broadcastTarget ? `Message ${broadcastTarget.title} Students` : 'Broadcast to All Courses'}
+                </h2>
+                <button onClick={closeBroadcast} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">
+                {broadcastTarget
+                  ? `Send a message to all ${broadcastTarget.enrollmentCount || 0} enrolled students in "${broadcastTarget.title}".`
+                  : `Send a message to all students enrolled in your ${myCourses.length} courses.`
+                }
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Title</label>
+                  <Input
+                    placeholder="e.g. Important Update"
+                    value={broadcastTitle}
+                    onChange={(e) => setBroadcastTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Message</label>
+                  <textarea
+                    className="w-full h-32 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none"
+                    placeholder="Write your message to students..."
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={closeBroadcast}>Cancel</Button>
+                <Button variant="primary" onClick={handleBroadcast} disabled={sending || !broadcastTitle.trim() || !broadcastMessage.trim()}>
+                  <Send className="w-4 h-4 mr-2" />
+                  {sending ? 'Sending...' : `Send to ${broadcastTarget ? broadcastTarget.enrollmentCount || 'all' : 'All'} Students`}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

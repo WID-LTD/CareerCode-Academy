@@ -3,6 +3,8 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { query } from '../config/db';
 import { io } from '../config/socket';
 import { createNotification } from '../models/notification';
+import { sendMail } from '../config/mailer';
+import { getEnrollmentsByCourse } from '../models/enrollment';
 
 const router = Router();
 
@@ -47,6 +49,59 @@ router.get('/dashboard/stats', async (req: AuthRequest, res: Response, next: Nex
     `, [instructorId]);
     const averageRating = parseFloat(ratingRes.rows[0].avg).toFixed(1);
 
+    // Pending reviews (submissions not yet graded)
+    const pendingReviewsRes = await query(`
+      SELECT COUNT(*) as count
+      FROM submissions s
+      JOIN assignments a ON s.assignment_id = a.id
+      JOIN courses c ON a.course_id = c.id
+      WHERE c.instructor_id = $1 AND s.score IS NULL
+    `, [instructorId]);
+    const pendingReviews = parseInt(pendingReviewsRes.rows[0].count, 10);
+
+    // Unread messages
+    const unreadMessagesRes = await query(`
+      SELECT COUNT(*) as count
+      FROM direct_messages
+      WHERE receiver_id = $1 AND is_read = false
+    `, [instructorId]);
+    const unreadMessages = parseInt(unreadMessagesRes.rows[0].count, 10);
+
+    // Upcoming live sessions
+    const upcomingLiveSessionsRes = await query(`
+      SELECT COUNT(*) as count
+      FROM live_classes
+      WHERE instructor_id = $1 AND start_time > NOW()
+    `, [instructorId]);
+    const upcomingLiveSessions = parseInt(upcomingLiveSessionsRes.rows[0].count, 10);
+
+    // Assignments to grade (same as pending reviews, alias for clarity)
+    const assignmentsToGrade = pendingReviews;
+
+    // Course-level enrollment trend (last 6 months)
+    const enrollmentTrendRes = await query(`
+      SELECT
+        DATE_TRUNC('month', e.enrolled_at)::date as month,
+        COUNT(*) as enrollments
+      FROM enrollments e
+      JOIN courses c ON e.course_id = c.id
+      WHERE c.instructor_id = $1 AND e.enrolled_at > NOW() - INTERVAL '6 months'
+      GROUP BY DATE_TRUNC('month', e.enrolled_at)
+      ORDER BY month ASC
+    `, [instructorId]);
+
+    // Monthly revenue (last 6 months)
+    const monthlyRevenueRes = await query(`
+      SELECT
+        DATE_TRUNC('month', p.created_at)::date as month,
+        COALESCE(SUM(p.amount), 0) as revenue
+      FROM payments p
+      JOIN courses c ON p.course_id = c.id
+      WHERE c.instructor_id = $1 AND p.status = 'completed' AND p.created_at > NOW() - INTERVAL '6 months'
+      GROUP BY DATE_TRUNC('month', p.created_at)
+      ORDER BY month ASC
+    `, [instructorId]);
+
     // Top courses
     const topCoursesRes = await query(`
       SELECT c.title,
@@ -87,6 +142,10 @@ router.get('/dashboard/stats', async (req: AuthRequest, res: Response, next: Nex
           totalStudents,
           totalRevenue,
           averageRating,
+          pendingReviews,
+          unreadMessages,
+          upcomingLiveSessions,
+          assignmentsToGrade,
         },
         topCourses: topCoursesRes.rows.map(c => ({
           title: c.title,
@@ -95,10 +154,18 @@ router.get('/dashboard/stats', async (req: AuthRequest, res: Response, next: Nex
           revenue: parseFloat(c.revenue),
         })),
         recentActivity: recentActivityRes.rows.map(a => ({
-          action: a.type,
+          action: a.type === 'enrollment' ? 'New enrollment' : a.type === 'submission' ? 'Assignment submitted' : a.type,
           details: a.details,
           time: a.time,
           type: a.type,
+        })),
+        enrollmentTrend: enrollmentTrendRes.rows.map(r => ({
+          month: r.month,
+          enrollments: parseInt(r.enrollments, 10),
+        })),
+        monthlyRevenue: monthlyRevenueRes.rows.map(r => ({
+          month: r.month,
+          revenue: parseFloat(r.revenue),
         })),
       },
     });
@@ -391,7 +458,63 @@ router.post('/announcements', async (req: AuthRequest, res: Response, next: Next
       RETURNING *
     `, [course_id, instructorId, title, content]);
 
-    res.status(201).json({ success: true, data: rows[0] });
+    const announcement = rows[0];
+
+    // Get course title for messaging
+    const courseRes = await query('SELECT title FROM courses WHERE id = $1', [course_id]);
+    const courseTitle = courseRes.rows[0]?.title || 'Your Course';
+
+    // Notify all enrolled students
+    const enrolledStudents = await getEnrollmentsByCourse(course_id);
+    const instructorName = req.user!.name || 'Your Instructor';
+
+    for (const enrollment of enrolledStudents) {
+      // In-app notification
+      try {
+        await createNotification({
+          user_id: enrollment.user_id,
+          title: `New Announcement: ${title}`,
+          message: `${instructorName} posted an announcement in "${courseTitle}": ${content.substring(0, 150)}${content.length > 150 ? '...' : ''}`,
+          type: 'info',
+        });
+        io.to(enrollment.user_id).emit('new_notification', {
+          title: `New Announcement: ${title}`,
+          message: `${instructorName} posted an announcement in "${courseTitle}".`,
+        });
+      } catch { /* notification non-critical */ }
+
+      // Email notification
+      if ((enrollment as any).student_email) {
+        try {
+          await sendMail({
+            to: (enrollment as any).student_email,
+            subject: `📢 ${title} — ${courseTitle}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 24px; border-radius: 12px 12px 0 0;">
+                  <h1 style="color: white; margin: 0; font-size: 24px;">New Announcement</h1>
+                  <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0 0;">${courseTitle}</p>
+                </div>
+                <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
+                  <p style="color: #6b7280; font-size: 14px; margin: 0 0 16px 0;">
+                    ${instructorName} posted a new announcement:
+                  </p>
+                  <h2 style="color: #111827; font-size: 18px; margin: 0 0 12px 0;">${title}</h2>
+                  <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${content.replace(/\n/g, '<br>')}</p>
+                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                  <p style="color: #9ca3af; font-size: 12px;">
+                    You are receiving this because you are enrolled in ${courseTitle}.
+                    <br>CareerCode Academy
+                  </p>
+                </div>
+              </div>
+            `,
+          });
+        } catch { /* email non-critical */ }
+      }
+    }
+
+    res.status(201).json({ success: true, data: announcement, notified: enrolledStudents.length });
   } catch (error) {
     next(error);
   }
@@ -681,6 +804,81 @@ router.get('/students', async (req: AuthRequest, res: Response, next: NextFuncti
     `, [instructorId]);
 
     res.json({ success: true, data: rows, count: rows.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /instructor/broadcast — send bulk message to students in selected courses
+router.post('/broadcast', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { courseIds, title, message } = req.body;
+
+    if (!courseIds?.length || !title || !message) {
+      return res.status(400).json({ success: false, message: 'courseIds, title, and message are required' });
+    }
+
+    // Verify instructor owns these courses
+    const courseCheck = await query(
+      `SELECT id FROM courses WHERE id = ANY($1::int[]) AND instructor_id = $2`,
+      [courseIds, instructorId]
+    );
+    if (courseCheck.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'You do not own any of the specified courses' });
+    }
+    const validIds = courseCheck.rows.map((r: any) => r.id);
+
+    // Get all enrolled students
+    const enrolled = await query(`
+      SELECT DISTINCT e.user_id, u.name, u.email
+      FROM enrollments e
+      JOIN users u ON e.user_id = u.id
+      WHERE e.course_id = ANY($1::int[]) AND e.status = 'active'
+    `, [validIds]);
+
+    const students = enrolled.rows;
+    let sentCount = 0;
+    let emailCount = 0;
+
+    for (const student of students) {
+      try {
+        await createNotification({
+          userId: student.user_id,
+          type: 'broadcast',
+          title,
+          message,
+          relatedId: validIds[0],
+          relatedType: 'course',
+        });
+        io.to(student.user_id.toString()).emit('new_notification', { title, message });
+        sentCount++;
+
+        try {
+          await sendMail({
+            to: student.email,
+            subject: `📢 ${title}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+              <h2 style="color:#1a73e8">${title}</h2>
+              <p style="color:#333;line-height:1.6">${message}</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
+              <p style="color:#999;font-size:12px">You received this message because you are enrolled in a course.</p>
+            </div>`,
+          });
+          emailCount++;
+        } catch {
+          // email failure is non-blocking
+        }
+      } catch {
+        // notification failure is non-blocking
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Sent to ${sentCount} students (${emailCount} emailed)`,
+      data: { sentCount, emailCount, totalStudents: students.length },
+    });
   } catch (error) {
     next(error);
   }

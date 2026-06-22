@@ -4,7 +4,7 @@ import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
-import { Send, User as UserIcon, Search, Loader2, Trash2 } from 'lucide-react';
+import { Send, User as UserIcon, Search, Trash2 } from 'lucide-react';
 
 export default function StudentMessages() {
   const { user } = useAuthStore();
@@ -150,7 +150,7 @@ export default function StudentMessages() {
                     </div>
                   </div>
                 )}
-                {isLoading && <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />}
+                {isLoading && <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mx-4" />}
                 <div ref={messagesEndRef} />
               </div>
 

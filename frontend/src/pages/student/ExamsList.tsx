@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Clock, CheckCircle, AlertCircle, Loader2, Play, RotateCcw, Calendar, Info } from 'lucide-react';
+import { ClipboardList, Clock, CheckCircle, AlertCircle, Play, RotateCcw, Calendar, Info } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import { api } from '@/lib/axios';
 import toast from 'react-hot-toast';
 
@@ -145,7 +146,7 @@ export default function ExamsList() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
+        <PageSkeleton />
       ) : tab === 'available' ? (
         exams.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
