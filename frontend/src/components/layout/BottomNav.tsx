@@ -7,19 +7,46 @@ import {
   ClipboardList,
   Trophy,
   User,
+  Users,
+  Calendar,
+  MessageSquare,
+  GraduationCap,
+  DollarSign,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const links = [
-  { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
-  { label: 'Courses', path: '/student/courses', icon: BookOpen },
-  { label: 'Assignments', path: '/student/assignments', icon: ClipboardList },
-  { label: 'Leaderboard', path: '/student/leaderboard', icon: Trophy },
-  { label: 'Profile', path: '/student/profile', icon: User },
-];
+const roleLinks: Record<string, { label: string; path: string; icon: any }[]> = {
+  student: [
+    { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
+    { label: 'Courses', path: '/student/courses', icon: BookOpen },
+    { label: 'Assignments', path: '/student/assignments', icon: ClipboardList },
+    { label: 'Leaderboard', path: '/student/leaderboard', icon: Trophy },
+    { label: 'Profile', path: '/student/profile', icon: User },
+  ],
+  instructor: [
+    { label: 'Dashboard', path: '/instructor/dashboard', icon: LayoutDashboard },
+    { label: 'Courses', path: '/instructor/courses', icon: BookOpen },
+    { label: 'Students', path: '/instructor/students', icon: Users },
+    { label: 'Schedule', path: '/instructor/schedule', icon: Calendar },
+    { label: 'Messages', path: '/instructor/messages', icon: MessageSquare },
+  ],
+  admin: [
+    { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Users', path: '/admin/users', icon: Users },
+    { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
+    { label: 'Payments', path: '/admin/payments', icon: DollarSign },
+    { label: 'Messages', path: '/admin/messages', icon: MessageSquare },
+  ],
+};
 
-export function BottomNav() {
+interface BottomNavProps {
+  role?: string;
+}
+
+export function BottomNav({ role = 'student' }: BottomNavProps) {
   const location = useLocation();
+  const links = roleLinks[role] || roleLinks.student;
 
   return (
     <nav

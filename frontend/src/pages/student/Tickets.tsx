@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Loader2, AlertCircle, CheckCircle, Ticket, MessageSquare } from 'lucide-react';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -96,7 +97,7 @@ export default function StudentTickets() {
       )}
 
       {loading ? (
-        <div className="text-center py-16 text-gray-400"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />Loading tickets...</div>
+        <PageSkeleton />
       ) : tickets.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Ticket className="w-12 h-12 mx-auto mb-3 opacity-30" />

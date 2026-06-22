@@ -15,9 +15,10 @@ import {
   FileText, Download, Maximize, BookOpen, Clock, Award,
   ChevronDown, ChevronUp, PenLine, HelpCircle, Monitor, Code,
   Bookmark, BookmarkCheck, Gauge, Minimize2, PartyPopper,
+  Megaphone, BarChart3, Brain,
 } from 'lucide-react';
 
-type Tab = 'notes' | 'quiz' | 'resources' | 'challenge';
+type Tab = 'notes' | 'quiz' | 'resources' | 'challenge' | 'announcements' | 'analytics';
 
 export default function CourseView() {
   const { slug } = useParams<{ slug: string }>();
@@ -39,6 +40,9 @@ export default function CourseView() {
   const [resources, setResources] = useState<any[]>([]);
   const [lessonQuiz, setLessonQuiz] = useState<any>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState<any>(null);
   const [bookmarkedLessons, setBookmarkedLessons] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem('bookmarkedLessons');
@@ -116,6 +120,12 @@ export default function CourseView() {
         setLessonProgress(progressMap);
         setWatchPosition(watchMap);
       }
+
+      // Fetch course announcements
+      try {
+        const annRes = await api.get(`/courses/${courseData.id}/announcements`);
+        setAnnouncements(annRes.data.data || []);
+      } catch { setAnnouncements([]); }
 
       setAccessChecked(true);
     } catch (error: any) {
@@ -280,6 +290,23 @@ export default function CourseView() {
       return () => clearTimeout(timer);
     }
   }, [completedCount, totalLessons]);
+
+  // Fetch analytics when tab is activated
+  useEffect(() => {
+    if (activeTab === 'analytics' && !analytics && !loadingAnalytics && slug) {
+      (async () => {
+        setLoadingAnalytics(true);
+        try {
+          const { data } = await api.get(`/student/courses/${slug}/analytics`);
+          if (data.success) setAnalytics(data.data);
+        } catch {
+          // silently fail
+        } finally {
+          setLoadingAnalytics(false);
+        }
+      })();
+    }
+  }, [activeTab, analytics, loadingAnalytics, slug]);
 
   if (loading) {
     return (
@@ -540,6 +567,8 @@ export default function CourseView() {
                 { key: 'quiz', label: 'Quiz', icon: HelpCircle },
                 { key: 'resources', label: 'Resources', icon: Download },
                 { key: 'challenge', label: 'Challenge', icon: Code },
+                { key: 'announcements', label: 'Announcements', icon: Megaphone },
+                { key: 'analytics', label: 'Analytics', icon: BarChart3 },
               ] as const).map(tab => (
                 <button
                   key={tab.key}
@@ -619,6 +648,156 @@ export default function CourseView() {
                     challenges.map((ch: any) => (
                       <ChallengeCard key={ch.id} challenge={ch} />
                     ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'announcements' && (
+                <div className="space-y-3">
+                  <h3 className="text-white text-sm font-medium flex items-center gap-2">
+                    <Megaphone className="w-4 h-4 text-blue-400" />
+                    Course Announcements
+                  </h3>
+                  {announcements.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No announcements for this course yet.</p>
+                  ) : (
+                    announcements.map((ann: any) => (
+                      <div key={ann.id} className="p-4 rounded-xl bg-gray-800/50 border-l-2 border-blue-500">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="text-white text-sm font-medium">{ann.title}</h4>
+                          <span className="text-gray-500 text-xs">{new Date(ann.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-blue-400 mb-2">{ann.instructor_name}</p>
+                        <p className="text-gray-400 text-sm whitespace-pre-wrap">{ann.content}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'analytics' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white text-sm font-medium flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-blue-400" />
+                      Course Analytics
+                    </h3>
+                    <button
+                      onClick={async () => {
+                        setLoadingAnalytics(true);
+                        try {
+                          const { data } = await api.get(`/student/courses/${slug}/analytics`);
+                          if (data.success) setAnalytics(data.data);
+                        } catch {
+                          toast.error('Failed to load analytics');
+                        } finally {
+                          setLoadingAnalytics(false);
+                        }
+                      }}
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {loadingAnalytics && !analytics && <Loader />}
+
+                  {analytics && (
+                    <>
+                      {/* Progress Overview */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <GlassCard className="p-3 text-center">
+                          <p className="text-2xl font-bold text-white">{analytics.lessons.completionRate}%</p>
+                          <p className="text-xs text-gray-500 mt-1">Completion</p>
+                        </GlassCard>
+                        <GlassCard className="p-3 text-center">
+                          <p className="text-2xl font-bold text-white">{analytics.lessons.completed}/{analytics.lessons.total}</p>
+                          <p className="text-xs text-gray-500 mt-1">Lessons</p>
+                        </GlassCard>
+                        <GlassCard className="p-3 text-center">
+                          <p className="text-2xl font-bold text-white">{analytics.timeSpent.totalHours}h</p>
+                          <p className="text-xs text-gray-500 mt-1">Time Spent</p>
+                        </GlassCard>
+                        <GlassCard className="p-3 text-center">
+                          <p className="text-2xl font-bold text-white">{analytics.quizzes.averageScore}%</p>
+                          <p className="text-xs text-gray-500 mt-1">Quiz Avg</p>
+                        </GlassCard>
+                      </div>
+
+                      {/* Weekly Activity */}
+                      <GlassCard className="p-4">
+                        <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-blue-400" />
+                          Weekly Activity
+                        </h4>
+                        <div className="flex items-end gap-1.5 h-24">
+                          {analytics.weeklyActivity.map((day: any) => {
+                            const maxLessons = Math.max(...analytics.weeklyActivity.map((d: any) => d.lessons), 1);
+                            const height = Math.max((day.lessons / maxLessons) * 100, 4);
+                            return (
+                              <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                                <span className="text-[10px] text-gray-500">{day.lessons}</span>
+                                <div
+                                  className="w-full rounded-sm bg-blue-500/40 transition-all"
+                                  style={{ height: `${height}%`, minHeight: '4px' }}
+                                />
+                                <span className="text-[10px] text-gray-600">{day.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </GlassCard>
+
+                      {/* Assessments */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <GlassCard className="p-3">
+                          <h4 className="text-white text-xs font-medium mb-2 flex items-center gap-1.5">
+                            <Brain className="w-3 h-3 text-emerald-400" />
+                            Assignments
+                          </h4>
+                          <p className="text-sm text-gray-400">
+                            Submitted: <span className="text-white font-medium">{analytics.assignments.submitted}</span>
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            Avg Score: <span className="text-white font-medium">{analytics.assignments.averageScore}%</span>
+                          </p>
+                        </GlassCard>
+                        <GlassCard className="p-3">
+                          <h4 className="text-white text-xs font-medium mb-2 flex items-center gap-1.5">
+                            <Code className="w-3 h-3 text-purple-400" />
+                            Challenges
+                          </h4>
+                          <p className="text-sm text-gray-400">
+                            Submitted: <span className="text-white font-medium">{analytics.challenges.submitted}</span>
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            Passed: <span className="text-white font-medium">{analytics.challenges.passed}</span>
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            Avg Score: <span className="text-white font-medium">{analytics.challenges.averageScore}%</span>
+                          </p>
+                        </GlassCard>
+                      </div>
+                    </>
+                  )}
+
+                  {!loadingAnalytics && !analytics && (
+                    <button
+                      onClick={async () => {
+                        setLoadingAnalytics(true);
+                        try {
+                          const { data } = await api.get(`/student/courses/${slug}/analytics`);
+                          if (data.success) setAnalytics(data.data);
+                        } catch {
+                          toast.error('Failed to load analytics');
+                        } finally {
+                          setLoadingAnalytics(false);
+                        }
+                      }}
+                      className="w-full py-8 border-2 border-dashed border-gray-800 rounded-xl text-gray-500 text-sm hover:border-gray-700 hover:text-gray-400 transition-colors"
+                    >
+                      Load Analytics
+                    </button>
                   )}
                 </div>
               )}

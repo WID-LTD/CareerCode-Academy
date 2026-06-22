@@ -1,22 +1,19 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useInstructorExtendedStore } from '@/store/instructorExtendedStore';
+import { useInstructorStore } from '@/store/instructorStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Calendar as CalendarIcon, Video, FileText } from 'lucide-react';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 
 export default function InstructorSchedule() {
-  const { schedule, fetchSchedule, isLoading } = useInstructorExtendedStore();
+  const { schedule, fetchSchedule, isLoading } = useInstructorStore();
 
   useEffect(() => {
     fetchSchedule();
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   // Group by date

@@ -7,6 +7,7 @@ import { FileText, CheckCircle, Clock, Code, ChevronDown, ChevronUp } from 'luci
 import CodeEditor from '@/components/student/CodeEditor';
 import { api } from '@/lib/axios';
 import toast from 'react-hot-toast';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 
 type Tab = 'assignments' | 'challenges';
 
@@ -59,11 +60,7 @@ export default function InstructorSubmissions() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

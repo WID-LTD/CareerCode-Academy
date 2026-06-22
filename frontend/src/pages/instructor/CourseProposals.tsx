@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useInstructorExtendedStore } from '@/store/instructorExtendedStore';
+import { useInstructorStore } from '@/store/instructorStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Plus, CheckCircle, Clock, XCircle, BookOpen } from 'lucide-react';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import toast from 'react-hot-toast';
 
 export default function InstructorCourseProposals() {
-  const { courseProposals, fetchCourseProposals, createCourseProposal, isLoading } = useInstructorExtendedStore();
+  const { courseProposals, fetchCourseProposals, createCourseProposal, isLoading } = useInstructorStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '', category: '', level: 'beginner', description: '', learning_outcomes: '', 
@@ -48,11 +49,7 @@ export default function InstructorCourseProposals() {
   };
 
   if (isLoading && courseProposals.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

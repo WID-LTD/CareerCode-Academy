@@ -338,4 +338,37 @@ router.delete(
   }
 );
 
+// GET /courses/:id/announcements - Get announcements for a course (enrolled students)
+router.get(
+  '/:id/announcements',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const courseId = req.params.id;
+      const userId = req.user!.userId;
+
+      const course = await CourseModel.getCourseById(courseId);
+      if (!course) throw new NotFoundError('Course');
+
+      const enrollment = await EnrollmentModel.getEnrollment(userId, courseId);
+      if (!enrollment && req.user!.role === 'student') {
+        throw new ForbiddenError('You are not enrolled in this course');
+      }
+
+      const { rows } = await query(`
+        SELECT a.*, u.name as instructor_name
+        FROM announcements a
+        JOIN users u ON a.instructor_id = u.id
+        WHERE a.course_id = $1
+        ORDER BY a.created_at DESC
+        LIMIT 50
+      `, [courseId]);
+
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

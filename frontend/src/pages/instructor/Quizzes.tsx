@@ -8,6 +8,7 @@ import {
   Clock, FileQuestion, Users, BarChart3, Save, AlertCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { CardSkeleton } from '@/components/student/SkeletonLoader';
 
 export default function InstructorQuizzes() {
   const {
@@ -147,8 +148,10 @@ export default function InstructorQuizzes() {
 
       {/* Quiz list */}
       {isLoading && !quizzes.length && (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       )}
 
@@ -195,7 +198,11 @@ export default function InstructorQuizzes() {
                 <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="border-t border-gray-100 dark:border-gray-800">
                   <div className="p-5 space-y-4">
                     {isLoading && !currentQuiz && (
-                      <div className="flex justify-center py-4"><div className="w-6 h-6 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+                      <div className="space-y-3 p-4">
+                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+                      </div>
                     )}
 
                     {currentQuiz?.id === quiz.id && (

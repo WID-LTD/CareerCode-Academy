@@ -640,6 +640,142 @@ router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunc
   } catch (error) { next(error); }
 });
 
+// GET /student/courses/:slug/analytics — Per-course analytics
+router.get('/courses/:slug/analytics', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { slug } = req.params;
+
+    // Get course
+    const courseRes = await query(`SELECT id, title, slug FROM courses WHERE slug = $1`, [slug]);
+    if (courseRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    const course = courseRes.rows[0];
+
+    // Verify enrollment
+    const enrollmentRes = await query(
+      `SELECT id, progress, completed, enrolled_at, completed_at FROM enrollments WHERE user_id = $1 AND course_id = $2`,
+      [userId, course.id]
+    );
+    if (enrollmentRes.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Not enrolled in this course' });
+    }
+    const enrollment = enrollmentRes.rows[0];
+
+    // Total lessons
+    const lessonsRes = await query(`SELECT COUNT(*)::int as total FROM lessons WHERE course_id = $1`, [course.id]);
+    const totalLessons = lessonsRes.rows[0].total;
+
+    // Completed lessons
+    const completedRes = await query(
+      `SELECT COUNT(*)::int as count FROM lesson_progress WHERE course_id = $1 AND user_id = $2 AND completed = true`,
+      [course.id, userId]
+    );
+    const completedLessons = completedRes.rows[0].count;
+
+    // Weekly activity (last 7 days)
+    const weeklyRes = await query(`
+      SELECT DATE(lp.completed_at) as date, COUNT(*)::int as count
+      FROM lesson_progress lp
+      WHERE lp.course_id = $1 AND lp.user_id = $2 AND lp.completed = true
+        AND lp.completed_at > NOW() - INTERVAL '7 days'
+      GROUP BY DATE(lp.completed_at)
+      ORDER BY date ASC
+    `, [course.id, userId]);
+
+    // Quiz attempts
+    const quizRes = await query(`
+      SELECT COUNT(*)::int as total_attempts,
+             COALESCE(AVG(qa.score), 0) as avg_score
+      FROM quiz_attempts qa
+      JOIN quizzes q ON qa.quiz_id = q.id
+      WHERE q.course_id = $1 AND qa.user_id = $2
+    `, [course.id, userId]);
+
+    // Assignment submissions
+    const assignmentRes = await query(`
+      SELECT
+        COUNT(*)::int as submitted,
+        COALESCE(AVG(s.score), 0) as avg_score
+      FROM submissions s
+      JOIN assignments a ON s.assignment_id = a.id
+      WHERE a.course_id = $1 AND s.student_id = $2
+    `, [course.id, userId]);
+
+    // Challenge submissions
+    const challengeRes = await query(`
+      SELECT
+        COUNT(*)::int as submitted,
+        COALESCE(AVG(cs.score), 0) as avg_score,
+        COUNT(*) FILTER (WHERE cs.passed = true)::int as passed
+      FROM challenge_submissions cs
+      JOIN coding_challenges cc ON cs.challenge_id = cc.id
+      JOIN lessons l ON cc.lesson_id = l.id
+      WHERE l.course_id = $1 AND cs.user_id = $2
+    `, [course.id, userId]);
+
+    // Time spent (estimated from video watch positions)
+    const watchRes = await query(`
+      SELECT COALESCE(SUM(lp.watch_position), 0)::int as total_seconds
+      FROM lesson_progress lp
+      WHERE lp.course_id = $1 AND lp.user_id = $2
+    `, [course.id, userId]);
+
+    // Build weekly activity array (7 days)
+    const weeklyMap = new Map(weeklyRes.rows.map((r: any) => [r.date.toISOString().slice(0, 10), r.count]));
+    const weeklyActivity = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      weeklyActivity.push({
+        date: key,
+        label: d.toLocaleDateString(undefined, { weekday: 'short' }),
+        lessons: weeklyMap.get(key) || 0,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        course: { id: course.id, title: course.title, slug: course.slug },
+        enrollment: {
+          progress: enrollment.progress,
+          completed: enrollment.completed,
+          enrolledAt: enrollment.enrolled_at,
+          completedAt: enrollment.completed_at,
+        },
+        lessons: {
+          total: totalLessons,
+          completed: completedLessons,
+          completionRate: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+        },
+        weeklyActivity,
+        quizzes: {
+          totalAttempts: quizRes.rows[0].total_attempts,
+          averageScore: Math.round(quizRes.rows[0].avg_score),
+        },
+        assignments: {
+          submitted: assignmentRes.rows[0].submitted,
+          averageScore: Math.round(assignmentRes.rows[0].avg_score),
+        },
+        challenges: {
+          submitted: challengeRes.rows[0].submitted,
+          passed: challengeRes.rows[0].passed,
+          averageScore: Math.round(challengeRes.rows[0].avg_score),
+        },
+        timeSpent: {
+          totalSeconds: watchRes.rows[0].total_seconds,
+          totalHours: Math.round(watchRes.rows[0].total_seconds / 3600 * 10) / 10,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Messages routes
 router.get('/messages/conversations', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

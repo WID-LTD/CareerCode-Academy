@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useQuizStore } from '@/store/quizStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import {
   Clock, AlertCircle, CheckCircle, XCircle, FileQuestion,
   ArrowLeft, ArrowRight, Send, Loader2, BarChart3,
@@ -57,11 +58,7 @@ export default function StudentQuizTake() {
 
   // Loading
   if (isLoading && !currentQuiz) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   // Error

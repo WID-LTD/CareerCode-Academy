@@ -9,6 +9,8 @@ export interface User {
   avatar: string | null;
   bio: string | null;
   is_verified: boolean;
+  is_suspended?: boolean;
+  last_login?: Date | null;
   verification_token: string | null;
   verification_token_expires: Date | null;
   reset_token: string | null;

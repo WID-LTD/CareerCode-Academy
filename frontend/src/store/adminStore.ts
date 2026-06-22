@@ -213,12 +213,16 @@ interface AdminState {
   userRegistrationTrend: any[];
   topCourses: any[];
   recentActivities: any[];
+  payoutSummary: { pendingCount: number; pendingAmount: number } | null;
+  completionTrend: any[];
+  lastFetchedAt: number | null;
 
   // Users
   users: AdminUser[];
   usersPagination: any;
   userSearchQuery: string;
   userRoleFilter: string;
+  userDetail: AdminUser | null;
 
   // Applications
   applications: InstructorApplication[];
@@ -263,6 +267,8 @@ interface AdminState {
 
   // Users
   fetchUsers: (page?: number, limit?: number) => Promise<void>;
+  bulkUpdateUserRole: (ids: string[], role: string) => Promise<void>;
+  setUserDetail: (user: AdminUser | null) => void;
   setUserSearch: (query: string) => void;
   setUserRoleFilter: (role: string) => void;
   suspendUser: (id: string, reason: string) => Promise<void>;
@@ -334,11 +340,15 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   userRegistrationTrend: [],
   topCourses: [],
   recentActivities: [],
+  payoutSummary: null,
+  completionTrend: [],
+  lastFetchedAt: null,
 
   users: [],
   usersPagination: null,
   userSearchQuery: '',
   userRoleFilter: 'all',
+  userDetail: null,
 
   applications: [],
   applicationsPagination: null,
@@ -388,6 +398,9 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         userRegistrationTrend: d.userRegistrationTrend || [],
         topCourses: d.topCourses || [],
         recentActivities: d.recentActivities || [],
+        payoutSummary: d.payoutSummary ? { pendingCount: d.payoutSummary.pending_count, pendingAmount: d.payoutSummary.pending_amount } : null,
+        completionTrend: d.completionTrend || [],
+        lastFetchedAt: Date.now(),
         isLoading: false,
       });
     } catch (error: any) {
@@ -432,6 +445,14 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
   updateUserRole: async (id: string, role: string) => {
     await api.put(`/admin/users/${id}/role`, { role });
+    get().fetchUsers(get().usersPagination?.page || 1);
+    if (get().userDetail?._id === id) {
+      set({ userDetail: { ...get().userDetail!, role } });
+    }
+  },
+  setUserDetail: (user: AdminUser | null) => set({ userDetail: user }),
+  bulkUpdateUserRole: async (ids: string[], role: string) => {
+    await Promise.all(ids.map(id => api.put(`/admin/users/${id}/role`, { role })));
     get().fetchUsers(get().usersPagination?.page || 1);
   },
 

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Pagination } from '@/components/ui/Pagination';
+import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import { cn } from '@/lib/utils';
 import { useStudentStore } from '@/store/studentStore';
 
@@ -67,9 +68,7 @@ export default function Assignments() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-        </div>
+        <PageSkeleton />
       ) : (
       <div className="space-y-4">
         {filtered.map((assignment, i) => (

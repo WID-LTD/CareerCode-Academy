@@ -56,6 +56,7 @@ const StudentAssignments = lazy(() => import('@/pages/student/Assignments'));
 const StudentCertificate = lazy(() => import('@/pages/student/Certificate'));
 const StudentProfile = lazy(() => import('@/pages/student/Profile'));
 const StudentLearningPaths = lazy(() => import('@/pages/student/LearningPaths'));
+const StudentLearningPathDetail = lazy(() => import('@/pages/student/LearningPathDetail'));
 const StudentLeaderboard = lazy(() => import('@/pages/student/Leaderboard'));
 const StudentCalendar = lazy(() => import('@/pages/student/Calendar'));
 const StudentNotifications = lazy(() => import('@/pages/student/Notifications'));
@@ -82,6 +83,7 @@ const InstructorMessages = lazy(() => import('@/pages/instructor/Messages'));
 const InstructorSchedule = lazy(() => import('@/pages/instructor/Schedule'));
 const InstructorCourseProposals = lazy(() => import('@/pages/instructor/CourseProposals'));
 const InstructorQuizzes = lazy(() => import('@/pages/instructor/Quizzes'));
+const InstructorPayouts = lazy(() => import('@/pages/instructor/Payouts'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -102,6 +104,8 @@ const AdminCategories = lazy(() => import('@/pages/admin/Categories'));
 const AdminExamMonitor = lazy(() => import('@/pages/admin/ExamMonitor'));
 const AdminReports = lazy(() => import('@/pages/admin/Reports'));
 const AdminMessages = lazy(() => import('@/pages/admin/Messages'));
+const AdminPayouts = lazy(() => import('@/pages/admin/Payouts'));
+const AdminManagement = lazy(() => import('@/pages/admin/AdminManagement'));
 
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -190,6 +194,7 @@ function App() {
           <Route path="courses" element={<SuspenseWrapper><StudentMyCourses /></SuspenseWrapper>} />
           <Route path="courses/:slug" element={<SuspenseWrapper><StudentCourseView /></SuspenseWrapper>} />
           <Route path="learning-paths" element={<SuspenseWrapper><StudentLearningPaths /></SuspenseWrapper>} />
+          <Route path="learning-paths/:slug" element={<SuspenseWrapper><StudentLearningPathDetail /></SuspenseWrapper>} />
           <Route path="assignments" element={<SuspenseWrapper><StudentAssignments /></SuspenseWrapper>} />
           <Route path="certificates" element={<SuspenseWrapper><StudentCertificate /></SuspenseWrapper>} />
           <Route path="leaderboard" element={<SuspenseWrapper><StudentLeaderboard /></SuspenseWrapper>} />
@@ -221,6 +226,7 @@ function App() {
           <Route path="messages" element={<SuspenseWrapper><InstructorMessages /></SuspenseWrapper>} />
           <Route path="schedule" element={<SuspenseWrapper><InstructorSchedule /></SuspenseWrapper>} />
           <Route path="quizzes" element={<SuspenseWrapper><InstructorQuizzes /></SuspenseWrapper>} />
+          <Route path="payouts" element={<SuspenseWrapper><InstructorPayouts /></SuspenseWrapper>} />
           <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
           <Route path="exams/:examId" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
           <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
@@ -233,6 +239,7 @@ function App() {
           <Route path="course-proposals" element={<SuspenseWrapper><AdminCourseProposals /></SuspenseWrapper>} />
           <Route path="applications" element={<SuspenseWrapper><AdminApplications /></SuspenseWrapper>} />
           <Route path="payments" element={<SuspenseWrapper><AdminPayments /></SuspenseWrapper>} />
+          <Route path="payouts" element={<SuspenseWrapper><AdminPayouts /></SuspenseWrapper>} />
           <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
           <Route path="exams/monitor" element={<SuspenseWrapper><AdminExamMonitor /></SuspenseWrapper>} />
             <Route path="certificates" element={<SuspenseWrapper><AdminCertificates /></SuspenseWrapper>} />
@@ -243,6 +250,7 @@ function App() {
           <Route path="reports" element={<SuspenseWrapper><AdminReports /></SuspenseWrapper>} />
           <Route path="messages" element={<SuspenseWrapper><AdminMessages /></SuspenseWrapper>} />
           <Route path="audit-log" element={<SuspenseWrapper><AdminAuditLog /></SuspenseWrapper>} />
+          <Route path="admin-management" element={<SuspenseWrapper><AdminManagement /></SuspenseWrapper>} />
           <Route path="analytics" element={<SuspenseWrapper><AdminAnalytics /></SuspenseWrapper>} />
           <Route path="settings" element={<SuspenseWrapper><AdminSettings /></SuspenseWrapper>} />
         </Route>

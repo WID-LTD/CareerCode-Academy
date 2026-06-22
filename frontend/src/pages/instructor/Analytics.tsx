@@ -1,14 +1,15 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useInstructorExtendedStore } from '@/store/instructorExtendedStore';
+import { useInstructorStore } from '@/store/instructorStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { DollarSign, Users, BookOpen } from 'lucide-react';
+import { StatsSkeleton, ChartSkeleton } from '@/components/student/SkeletonLoader';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 
 export default function InstructorAnalytics() {
-  const { analytics, fetchAnalytics, isLoading } = useInstructorExtendedStore();
+  const { analytics, fetchAnalytics, isLoading } = useInstructorStore();
 
   useEffect(() => {
     fetchAnalytics();
@@ -16,8 +17,11 @@ export default function InstructorAnalytics() {
 
   if (isLoading || !analytics) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className="h-4 w-72 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <StatsSkeleton />
+        <ChartSkeleton />
       </div>
     );
   }
