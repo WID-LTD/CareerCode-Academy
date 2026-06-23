@@ -1,6 +1,20 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Shield } from 'lucide-react';
+import { Shield, FileText } from 'lucide-react';
+import { GlassCard } from '@/components/ui/GlassCard';
+
+const sections = [
+  { title: '1. Information We Collect', content: 'We collect information you provide directly, including name, email address, payment information, and profile details. We also automatically collect usage data such as pages visited, time spent on courses, and interaction patterns to improve our platform.' },
+  { title: '2. How We Use Your Information', content: 'Your information is used to provide and improve our educational services, process payments, send updates and marketing communications (with consent), personalize your learning experience, and analyze platform usage to enhance our curriculum.' },
+  { title: '3. Data Sharing & Disclosure', content: 'We do not sell your personal information. We may share data with trusted third-party service providers who help us operate the platform (payment processors, cloud hosting, analytics). These providers are contractually bound to protect your data.' },
+  { title: '4. Data Security', content: 'We implement industry-standard security measures including encryption at rest and in transit, regular security audits, and strict access controls. However, no method of transmission over the Internet is 100% secure.' },
+  { title: '5. Your Rights', content: 'You have the right to access, correct, or delete your personal data. You can manage your data through account settings or by contacting us. You may opt out of marketing communications at any time.' },
+  { title: '6. Cookies', content: 'We use cookies and similar technologies to enhance your experience, analyze usage, and deliver relevant content. You can manage cookie preferences through your browser settings. See our Cookie Policy for more details.' },
+  { title: '7. Data Retention', content: 'We retain your account information for as long as your account is active. Course progress and certificates are retained indefinitely to maintain your learning history. Deleted account data is purged within 90 days.' },
+  { title: '8. Children Privacy', content: 'The Platform is not intended for children under 13. We do not knowingly collect data from children. If you believe a child has provided us with personal data, please contact us immediately.' },
+  { title: '9. International Transfers', content: 'Your data may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place through standard contractual clauses and data processing agreements.' },
+  { title: '10. Changes to This Policy', content: 'We may update this Privacy Policy periodically. Material changes will be notified via email or platform notice. Continued use after changes constitutes acceptance of the updated policy.' },
+];
 
 export default function Privacy() {
   return (
@@ -9,64 +23,44 @@ export default function Privacy() {
         <div className="absolute inset-0 gradient-bg-subtle" />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-            <div className="w-14 h-14 rounded-xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-7 h-7 text-primary-500" />
+            <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-6">
+              <Shield className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold mb-4">
               Privacy <span className="gradient-text">Policy</span>
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">Last updated: January 1, 2026</p>
+            <p className="text-gray-600 dark:text-gray-400">
+              Last updated: January 1, 2026
+            </p>
           </motion.div>
 
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">1. Information We Collect</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                We collect information you provide when creating an account, including your name, email address, 
-                and payment information. We also collect usage data such as course progress, quiz results, and 
-                platform interactions to improve your learning experience.
-              </p>
-            </section>
+          <GlassCard className="p-8 mb-8">
+            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+              At CareerCode Academy, we take your privacy seriously. This policy describes how we collect, 
+              use, and protect your personal information when you use our platform.
+            </p>
+          </GlassCard>
 
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">2. How We Use Your Information</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                Your information is used to provide and improve our services, process payments, send course-related 
-                communications, and personalize your learning experience. We do not sell your personal data to third parties.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">3. Data Security</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                We implement industry-standard security measures including encryption at rest and in transit, 
-                regular security audits, and access controls to protect your personal information.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">4. Data Retention</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                We retain your account information for as long as your account is active. You may request deletion 
-                of your account and associated data at any time by contacting our support team.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">5. Your Rights</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                You have the right to access, correct, or delete your personal data. You may also request a copy 
-                of your data in a portable format. Contact us at privacy@careercode.academy to exercise these rights.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">6. Contact</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                For privacy-related inquiries, contact our Data Protection Officer at privacy@careercode.academy 
-                or write to WID LTD, 123 Tech Street, Lagos, Nigeria.
-              </p>
-            </section>
+          <div className="space-y-6">
+            {sections.map((section, i) => (
+              <motion.div
+                key={section.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <GlassCard className="p-6" hover={false}>
+                  <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary-500 flex-shrink-0" />
+                    {section.title}
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                    {section.content}
+                  </p>
+                </GlassCard>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
