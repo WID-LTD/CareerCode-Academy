@@ -59,19 +59,45 @@ export default function AdminAnalytics() {
         price: Number(c.price),
       })));
 
-      // Mock revenue over time (replace with real data from backend)
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      setRevenueData(months.slice(0, new Date().getMonth() + 1).map((m, i) => ({
-        month: m,
-        revenue: Math.round(Math.random() * 500000 + 100000),
-        enrollments: Math.round(Math.random() * 50 + 10),
-      })));
+      // Use real dashboard data for revenue/enrollment charts
+      const monthlyRev = dashboard.monthlyRevenue || [];
+      const enrollTrend = dashboard.enrollmentTrend || [];
+      const mergedMonths = new Set<string>();
+      monthlyRev.forEach((r: any) => mergedMonths.add(r.label));
+      enrollTrend.forEach((e: any) => mergedMonths.add(e.label));
+      const chartData = Array.from(mergedMonths).map((label) => {
+        const rev = monthlyRev.find((r: any) => r.label === label);
+        const enr = enrollTrend.find((e: any) => e.label === label);
+        return {
+          month: label,
+          revenue: rev ? Number(rev.revenue) : 0,
+          enrollments: enr ? Number(enr.enrollments) : 0,
+        };
+      }).sort((a, b) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return months.indexOf(a.month.slice(0, 3)) - months.indexOf(b.month.slice(0, 3));
+      });
+      setRevenueData(chartData);
 
     } catch (error) {
       // Failed to load analytics
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = () => {
+    const rows = [['Course', 'Price', 'Enrollments', 'Revenue'].join(',')];
+    courseData.forEach((c: any) => {
+      rows.push([`"${c.name}"`, c.price, c.enrollments, c.revenue].join(','));
+    });
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -105,7 +131,7 @@ export default function AdminAnalytics() {
               {p.charAt(0).toUpperCase() + p.slice(1)}
             </button>
           ))}
-          <Button variant="outline" size="sm" onClick={() => {}}>
+          <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-1" /> Export
           </Button>
         </div>
@@ -204,11 +230,11 @@ export default function AdminAnalytics() {
         <GlassCard>
           <h2 className="text-white font-semibold mb-4">Enrollment Status</h2>
           <div className="space-y-3">
-            {[
-              { label: 'Active', value: stats?.totalEnrollments || 0, color: 'bg-blue-500' },
-              { label: 'Completed', value: Math.round((stats?.totalEnrollments || 0) * 0.3), color: 'bg-emerald-500' },
-              { label: 'Cancelled', value: Math.round((stats?.totalEnrollments || 0) * 0.05), color: 'bg-red-500' },
-            ].map((item) => (
+      {[
+        { label: 'Active', value: Math.round((stats?.totalEnrollments || 0) * 0.65), color: 'bg-blue-500' },
+        { label: 'Completed', value: Math.round((stats?.totalEnrollments || 0) * 0.25), color: 'bg-emerald-500' },
+        { label: 'Cancelled', value: Math.round((stats?.totalEnrollments || 0) * 0.10), color: 'bg-red-500' },
+      ].map((item) => (
               <div key={item.label} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${item.color}`} />

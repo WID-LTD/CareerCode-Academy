@@ -73,7 +73,7 @@ export default function Assignments() {
       <div className="space-y-4">
         {filtered.map((assignment, i) => (
           <motion.div
-            key={assignment.title}
+            key={assignment.id || assignment.title}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}

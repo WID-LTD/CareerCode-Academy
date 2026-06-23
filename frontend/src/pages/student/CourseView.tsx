@@ -924,12 +924,22 @@ function ChallengeCard({ challenge }: { challenge: any }) {
           starterCode={challenge.starter_code}
           language={challenge.language}
           initialCode={latestSubmission?.code}
+          challengeId={challenge.id}
+          expectedOutput={challenge.expected_output}
+          showExpected={true}
           onSubmit={async (code) => {
             try {
-              const { data } = await api.post(`/challenges/${challenge.id}/submit`, { code, passed: false });
-              return { passed: data.data.passed };
+              const { data } = await api.post(`/challenges/${challenge.id}/submit`, { code });
+              const d = data.data;
+              return {
+                passed: d.passed,
+                score: d.score,
+                output: d.output,
+                expected_output: d.expected_output,
+                testResults: d.testResults || [],
+              };
             } catch {
-              return { passed: false, output: 'Failed to submit' };
+              return { passed: false, score: 0, output: 'Failed to submit' };
             }
           }}
         />

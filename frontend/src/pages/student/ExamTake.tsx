@@ -1043,7 +1043,7 @@ export default function ExamTake() {
                   />
                 ) : (
                   <div className="space-y-3">
-                    {(currentQuestion.options || []).map((opt: string, i: number) => {
+                    {(Array.isArray(currentQuestion.options) ? currentQuestion.options : typeof currentQuestion.options === 'string' ? JSON.parse(currentQuestion.options) : []).map((opt: string, i: number) => {
                       const isSelected = answers[currentQuestion.id] === opt;
                       return (
                         <label

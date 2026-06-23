@@ -333,7 +333,7 @@ export default function CourseDetails() {
                         key={lesson.id || i}
                         className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors"
                       >
-                        {lesson.isFree ? (
+                        {lesson.is_free ? (
                           <PlayCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                         ) : (
                           <FileText className="w-4 h-4 text-blue-400 shrink-0" />
@@ -347,7 +347,7 @@ export default function CourseDetails() {
                           {lesson.duration && (
                             <span className="text-xs text-gray-500">{lesson.duration}</span>
                           )}
-                          {lesson.isFree && (
+                          {lesson.is_free && (
                             <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0">
                               Free
                             </Badge>
@@ -374,7 +374,7 @@ export default function CourseDetails() {
                     <div key={review.id} className="border-b border-white/5 pb-4 last:border-0">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                          {review.user_name?.[0] || 'U'}
+                          {(review.user_name || 'U')?.[0] || 'U'}
                         </div>
                         <div>
                           <p className="text-white text-sm font-medium">{review.user_name || 'Student'}</p>

@@ -38,16 +38,31 @@ const settingsSections = [
 
 export default function Settings() {
   const { darkMode, toggleDarkMode } = useThemeStore();
-  const [toggles, setToggles] = useState<Record<string, boolean>>({
-    'Sound Effects': false,
-    'Course Updates': true,
-    'Assignment Reminders': true,
-    'Certificate Awards': true,
-    'Community Activity': false,
+  const [toggles, setToggles] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('careercode-settings');
+      return saved ? JSON.parse(saved) : {
+        'Sound Effects': false,
+        'Course Updates': true,
+        'Assignment Reminders': true,
+        'Certificate Awards': true,
+        'Community Activity': false,
+      };
+    } catch {
+      return {
+        'Sound Effects': false,
+        'Course Updates': true,
+        'Assignment Reminders': true,
+        'Certificate Awards': true,
+        'Community Activity': false,
+      };
+    }
   });
 
   const toggle = (label: string) => {
-    setToggles(prev => ({ ...prev, [label]: !prev[label] }));
+    const next = { ...toggles, [label]: !toggles[label] };
+    setToggles(next);
+    try { localStorage.setItem('careercode-settings', JSON.stringify(next)); } catch {}
   };
 
   return (

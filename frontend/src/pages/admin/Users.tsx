@@ -496,7 +496,7 @@ export default function AdminUsers() {
                   if (confirmAction.bulk) handleBulkAction(confirmAction.type);
                   else if (confirmAction.type === 'change-role' && confirmAction.userId) {
                     setActionLoading(confirmAction.userId);
-                    updateUserRole(confirmAction.userId, 'admin').finally(() => { setActionLoading(null); setConfirmAction(null); });
+                    updateUserRole(confirmAction.userId, bulkRoleTarget || 'admin').finally(() => { setActionLoading(null); setConfirmAction(null); });
                   } else handleAction(confirmAction.type, confirmAction.userId);
                 }}
                 disabled={actionLoading !== null}

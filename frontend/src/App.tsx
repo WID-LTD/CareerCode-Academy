@@ -38,6 +38,15 @@ const Apply = lazy(() => import('@/pages/Apply'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 const VerifyPayment = lazy(() => import('@/pages/VerifyPayment'));
 const VerifyCertificate = lazy(() => import('@/pages/public/VerifyCertificate'));
+const FAQ = lazy(() => import('@/pages/FAQ'));
+const Careers = lazy(() => import('@/pages/Careers'));
+const Partners = lazy(() => import('@/pages/Partners'));
+const Press = lazy(() => import('@/pages/Press'));
+const Help = lazy(() => import('@/pages/Help'));
+const Terms = lazy(() => import('@/pages/Terms'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
+const Cookies = lazy(() => import('@/pages/Cookies'));
+const Accessibility = lazy(() => import('@/pages/Accessibility'));
 
 // Student pages
 const StudentDashboard = lazy(() => import('@/pages/student/Dashboard'));
@@ -169,6 +178,15 @@ function App() {
           <Route path="/verify-payment" element={<SuspenseWrapper><VerifyPayment /></SuspenseWrapper>} />
           <Route path="/verify-certificate" element={<SuspenseWrapper><VerifyCertificate /></SuspenseWrapper>} />
           <Route path="/checkout" element={<SuspenseWrapper><Checkout /></SuspenseWrapper>} />
+          <Route path="/faq" element={<SuspenseWrapper><FAQ /></SuspenseWrapper>} />
+          <Route path="/careers" element={<SuspenseWrapper><Careers /></SuspenseWrapper>} />
+          <Route path="/partners" element={<SuspenseWrapper><Partners /></SuspenseWrapper>} />
+          <Route path="/press" element={<SuspenseWrapper><Press /></SuspenseWrapper>} />
+          <Route path="/help" element={<SuspenseWrapper><Help /></SuspenseWrapper>} />
+          <Route path="/terms" element={<SuspenseWrapper><Terms /></SuspenseWrapper>} />
+          <Route path="/privacy" element={<SuspenseWrapper><Privacy /></SuspenseWrapper>} />
+          <Route path="/cookies" element={<SuspenseWrapper><Cookies /></SuspenseWrapper>} />
+          <Route path="/accessibility" element={<SuspenseWrapper><Accessibility /></SuspenseWrapper>} />
         </Route>
 
         <Route path="/student" element={<DashboardLayout requiredRole="student" />}>

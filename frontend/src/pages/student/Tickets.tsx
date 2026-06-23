@@ -19,7 +19,7 @@ export default function StudentTickets() {
 
   const fetchTickets = async () => {
     try {
-      const { data } = await api.get('/tickets');
+      const { data } = await api.get('/student/tickets');
       setTickets(data.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load tickets');
@@ -35,7 +35,7 @@ export default function StudentTickets() {
     setSending(true);
     setError('');
     try {
-      await api.post('/tickets', form);
+      await api.post('/student/tickets', form);
       setForm({ subject: '', description: '', priority: 'medium' });
       setShowForm(false);
       fetchTickets();
@@ -111,7 +111,7 @@ export default function StudentTickets() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-sm">{ticket.subject}</h3>
-                    <Badge variant={ticket.status === 'closed' ? 'default' : ticket.status === 'in_progress' ? 'warning' : 'success'}>{ticket.status}</Badge>
+                    <Badge variant={ticket.status === 'closed' ? 'default' : ticket.status === 'in_progress' ? 'warning' : ticket.status === 'open' ? 'primary' : 'default'}>{ticket.status}</Badge>
                     <Badge variant={ticket.priority === 'urgent' ? 'danger' : ticket.priority === 'high' ? 'warning' : 'default'}>{ticket.priority}</Badge>
                   </div>
                   <p className="text-sm text-gray-500 line-clamp-2">{ticket.description}</p>

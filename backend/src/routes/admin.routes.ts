@@ -1505,7 +1505,7 @@ router.put('/users/:id/demote-admin', authorize('super_admin'), async (req: Auth
     if (target.rows[0].role !== 'admin') {
       return res.status(400).json({ success: false, message: 'User is not an admin' });
     }
-    if (parseInt(id) === req.user!.userId) {
+    if (String(parseInt(id)) === String(req.user!.userId)) {
       return res.status(400).json({ success: false, message: 'Cannot demote yourself' });
     }
     await query(`UPDATE users SET role = 'student' WHERE id = $1`, [id]);

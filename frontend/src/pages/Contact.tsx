@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MapPin, Phone, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react';
+import { Mail, MapPin, Phone, Send, MessageSquare, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 const contactInfo = [
   { icon: Mail, label: 'Email', value: 'hello@careercode.academy', href: 'mailto:hello@careercode.academy' },
@@ -14,11 +16,21 @@ const contactInfo = [
 
 export default function Contact() {
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSending(true);
+    try {
+      await api.post('/contact', formData);
+      setSubmitted(true);
+      toast.success('Message sent successfully!');
+    } catch (err) {
+      toast.error('Failed to send message. Please try again later.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -80,7 +92,9 @@ export default function Contact() {
                         required
                       />
                     </div>
-                    <Button type="submit" size="lg" icon={<Send className="w-4 h-4" />}>Send Message</Button>
+                    <Button type="submit" size="lg" icon={<Send className="w-4 h-4" />} disabled={sending}>
+                      {sending ? 'Sending...' : 'Send Message'}
+                    </Button>
                   </form>
                 )}
               </GlassCard>

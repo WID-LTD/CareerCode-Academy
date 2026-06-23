@@ -45,12 +45,16 @@ export default function StudentQuizTake() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const handleSubmit = async () => {
     if (!quizId) return;
+    setSubmitError(null);
     if (timerRef.current) clearInterval(timerRef.current);
     const formatted = Object.entries(answers).map(([questionId, answer]) => ({ questionId, answer }));
     const res = await submitAttempt(quizId, formatted);
     if (res) setResult(res);
+    else setSubmitError('Failed to submit quiz. Please try again.');
   };
 
   const questions = currentQuiz?.questions || [];
@@ -59,6 +63,15 @@ export default function StudentQuizTake() {
   // Loading
   if (isLoading && !currentQuiz) {
     return <PageSkeleton />;
+  }
+
+  if (submitError) {
+    return (
+      <div className="p-4 rounded-xl bg-danger-50 dark:bg-danger-900/20 border border-danger-200 flex items-center gap-3">
+        <AlertCircle className="w-5 h-5 text-danger-500 shrink-0" />
+        <div className="text-sm text-danger-600">{submitError}</div>
+      </div>
+    );
   }
 
   // Error
@@ -187,7 +200,7 @@ export default function StudentQuizTake() {
           </div>
           <h2 className="text-lg font-medium mb-5">{questions[currentIndex].question}</h2>
           <div className="space-y-2.5">
-            {questions[currentIndex].options.map((opt, oi) => (
+            {(Array.isArray(questions[currentIndex].options) ? questions[currentIndex].options : typeof questions[currentIndex].options === 'string' ? JSON.parse(questions[currentIndex].options) : []).map((opt: string, oi: number) => (
               <button
                 key={oi}
                 onClick={() => setAnswers({ ...answers, [questions[currentIndex].id]: opt })}

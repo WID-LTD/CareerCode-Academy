@@ -16,7 +16,7 @@ export default function VerifyEmail() {
         .then(({ data }) => {
           const d = data.data;
           if (d) {
-            useAuthStore.getState().setUser({ id: d.userId, name: d.name, email: d.email, role: d.role, isVerified: true });
+            useAuthStore.getState().setUser({ id: d.userId, name: d.name || d.fullName || d.username || 'User', email: d.email, role: d.role, isVerified: true });
           }
           navigate('/auth/verified', { replace: true });
         })

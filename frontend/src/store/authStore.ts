@@ -9,6 +9,10 @@ export interface User {
   role: 'student' | 'instructor' | 'admin' | 'super_admin';
   avatar?: string | null;
   bio?: string | null;
+  location?: string | null;
+  website?: string | null;
+  github?: string | null;
+  twitter?: string | null;
   isVerified?: boolean;
   createdAt?: Date;
   updatedAt?: Date;

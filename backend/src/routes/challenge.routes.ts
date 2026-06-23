@@ -5,8 +5,10 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import * as ChallengeModel from '../models/codingChallenge';
 import * as LessonModel from '../models/lesson';
 import * as EnrollmentModel from '../models/enrollment';
+import * as ProgressModel from '../models/progress';
 import { createNotification } from '../models/notification';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
+import { runCode, runWithTestCases, runWithExpectedOutput, getSupportedLanguages } from '../services/codeRunner';
 
 const router = Router();
 
@@ -17,15 +19,49 @@ const createChallengeSchema = z.object({
   instructions: z.string().min(1),
   starterCode: z.string().default(''),
   testCode: z.string().default(''),
+  expectedOutput: z.string().optional(),
+  testCases: z.array(z.object({
+    input: z.string(),
+    expected: z.string(),
+  })).optional().default([]),
+  timeoutSeconds: z.number().int().min(1).max(30).optional().default(5),
   language: z.string().default('javascript'),
   difficulty: z.string().default('easy'),
 });
 
+const updateChallengeSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().min(1).optional(),
+  instructions: z.string().min(1).optional(),
+  starterCode: z.string().optional(),
+  testCode: z.string().optional(),
+  expectedOutput: z.string().optional(),
+  testCases: z.array(z.object({
+    input: z.string(),
+    expected: z.string(),
+  })).optional(),
+  timeoutSeconds: z.number().int().min(1).max(30).optional(),
+  language: z.string().optional(),
+  difficulty: z.string().optional(),
+});
+
 const submitChallengeSchema = z.object({
   code: z.string().min(1),
-  passed: z.boolean(),
-  score: z.number().int().min(0).optional(),
 });
+
+const runCodeSchema = z.object({
+  code: z.string().min(1),
+  language: z.string().min(1),
+  stdin: z.string().optional(),
+});
+
+// GET /challenges/languages - get supported languages
+router.get(
+  '/languages',
+  (_req, res: Response) => {
+    res.json({ success: true, data: getSupportedLanguages() });
+  }
+);
 
 // GET /challenges/lesson/:lessonId - get challenges for a lesson (authenticated)
 router.get(
@@ -48,11 +84,27 @@ router.get(
       const results = await Promise.all(
         challenges.map(async (ch) => {
           const submission = await ChallengeModel.getSubmissionByUserAndChallenge(userId, ch.id);
-          return { ...ch, submission };
+          const { submission: _, ...challengeData } = { ...ch, submission };
+          return { ...challengeData, submission };
         })
       );
 
       res.json({ success: true, data: results });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /challenges/course/:courseId - get all challenges for a course (instructor/admin)
+router.get(
+  '/course/:courseId',
+  authenticate,
+  authorize('instructor', 'admin', 'super_admin'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const challenges = await ChallengeModel.getChallengesByCourse(req.params.courseId);
+      res.json({ success: true, data: challenges });
     } catch (error) {
       next(error);
     }
@@ -74,6 +126,22 @@ router.get(
   }
 );
 
+// POST /challenges/run - run arbitrary code (for practice mode)
+router.post(
+  '/run',
+  authenticate,
+  validate(runCodeSchema),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { code, language, stdin } = req.body;
+      const result = await runCode(code, language, stdin);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /challenges - create challenge (instructor/admin)
 router.post(
   '/',
@@ -82,7 +150,7 @@ router.post(
   validate(createChallengeSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { lessonId, title, description, instructions, starterCode, testCode, language, difficulty } = req.body;
+      const { lessonId, title, description, instructions, starterCode, testCode, expectedOutput, testCases, timeoutSeconds, language, difficulty } = req.body;
 
       const lesson = await LessonModel.getLessonById(lessonId);
       if (!lesson) throw new NotFoundError('Lesson');
@@ -94,6 +162,9 @@ router.post(
         instructions,
         starter_code: starterCode,
         test_code: testCode,
+        expected_output: expectedOutput,
+        test_cases: testCases,
+        timeout_seconds: timeoutSeconds,
         language,
         difficulty,
       });
@@ -110,6 +181,7 @@ router.put(
   '/:id',
   authenticate,
   authorize('instructor', 'admin', 'super_admin'),
+  validate(updateChallengeSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const challenge = await ChallengeModel.updateChallenge(req.params.id, req.body);
@@ -136,7 +208,7 @@ router.delete(
   }
 );
 
-// POST /challenges/:id/submit - submit a solution
+// POST /challenges/:id/submit - submit a solution (runs code server-side via Piston)
 router.post(
   '/:id/submit',
   authenticate,
@@ -145,10 +217,38 @@ router.post(
     try {
       const challengeId = req.params.id;
       const userId = req.user!.userId;
-      const { code, passed, score } = req.body;
+      const { code } = req.body;
 
       const challenge = await ChallengeModel.getChallengeById(challengeId);
       if (!challenge) throw new NotFoundError('Challenge');
+
+      let passed = false;
+      let output = '';
+      let expected_output = challenge.expected_output || '';
+      let testResults: any[] = [];
+      let score = 0;
+
+      const testCases = challenge.test_cases || [];
+      const useTestCases = Array.isArray(testCases) && testCases.length > 0;
+      const useExpectedOutput = challenge.expected_output && challenge.expected_output.trim().length > 0;
+
+      if (useTestCases) {
+        const result = await runWithTestCases(code, challenge.language, testCases);
+        testResults = result.testResults;
+        passed = result.allPassed;
+        output = testResults.map((t) => t.actual).join('\n');
+        score = passed ? 100 : Math.round((testResults.filter((t) => t.passed).length / testResults.length) * 100);
+      } else if (useExpectedOutput) {
+        const result = await runWithExpectedOutput(code, challenge.language, challenge.expected_output!);
+        output = result.output;
+        passed = result.passed;
+        score = passed ? 100 : 0;
+      } else {
+        const result = await runCode(code, challenge.language);
+        output = result.output;
+        passed = result.success;
+        score = passed ? 100 : 0;
+      }
 
       const submission = await ChallengeModel.submitChallenge({
         challenge_id: challengeId,
@@ -156,9 +256,31 @@ router.post(
         code,
         passed,
         score,
+        output,
+        expected_output: expected_output || undefined,
+        test_results: testResults,
       });
 
-      res.status(201).json({ success: true, data: submission });
+      if (passed) {
+        try {
+          const lesson = await LessonModel.getLessonById(challenge.lesson_id);
+          if (lesson) {
+            await ProgressModel.upsertLessonProgress(userId, challenge.lesson_id, lesson.course_id, true);
+          }
+        } catch { }
+      }
+
+      res.status(201).json({
+        success: true,
+        data: {
+          ...submission,
+          passed,
+          score,
+          output,
+          expected_output,
+          testResults,
+        },
+      });
     } catch (error) {
       next(error);
     }

@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Pagination } from '../../components/ui/Pagination';
 import { Loader } from '../../components/ui/Loader';
 import CodeEditor from '../../components/student/CodeEditor';
-import { Code, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-react';
+import { Code, ChevronDown, ChevronUp, Zap, Award } from 'lucide-react';
 
 export default function Challenges() {
   const [challenges, setChallenges] = useState<any[]>([]);
@@ -74,6 +74,11 @@ export default function Challenges() {
                         </Badge>
                       )}
                       <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{ch.difficulty}</Badge>
+                      {sub?.score !== null && sub?.score !== undefined && (
+                        <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
+                          <Zap className="w-3 h-3" /> {sub.score}/100
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-400 text-sm">{ch.description}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
@@ -103,13 +108,22 @@ export default function Challenges() {
                       starterCode={ch.starter_code}
                       language={ch.language}
                       initialCode={sub?.code}
+                      challengeId={ch.id}
+                      expectedOutput={ch.expected_output}
+                      showExpected={true}
                       onSubmit={async (code) => {
                         try {
-                          const { data } = await api.post(`/challenges/${ch.id}/submit`, { code, passed: false });
+                          const { data } = await api.post(`/challenges/${ch.id}/submit`, { code });
                           loadChallenges();
-                          return { passed: data.data.passed };
+                          return {
+                            passed: data.data.passed,
+                            score: data.data.score,
+                            output: data.data.output,
+                            expected_output: data.data.expected_output,
+                            testResults: data.data.testResults || [],
+                          };
                         } catch {
-                          return { passed: false, output: 'Submission failed' };
+                          return { passed: false, score: 0, output: 'Submission failed' };
                         }
                       }}
                     />

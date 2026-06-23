@@ -466,7 +466,8 @@ router.post('/announcements', async (req: AuthRequest, res: Response, next: Next
 
     // Notify all enrolled students
     const enrolledStudents = await getEnrollmentsByCourse(course_id);
-    const instructorName = req.user!.name || 'Your Instructor';
+    const userRes = await query('SELECT name FROM users WHERE id = $1', [req.user!.userId]);
+    const instructorName = userRes.rows[0]?.name || 'Your Instructor';
 
     for (const enrollment of enrolledStudents) {
       // In-app notification
@@ -844,12 +845,10 @@ router.post('/broadcast', async (req: AuthRequest, res: Response, next: NextFunc
     for (const student of students) {
       try {
         await createNotification({
-          userId: student.user_id,
-          type: 'broadcast',
+          user_id: student.user_id,
+          type: 'info',
           title,
           message,
-          relatedId: validIds[0],
-          relatedType: 'course',
         });
         io.to(student.user_id.toString()).emit('new_notification', { title, message });
         sentCount++;

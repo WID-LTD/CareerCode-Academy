@@ -1,26 +1,38 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, BookOpen, Camera, Save, Shield } from 'lucide-react';
+import { User, Mail, BookOpen, Camera, Save, Shield, Loader2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 export default function StudentProfile() {
   const { user } = useAuthStore();
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
-    name: user?.name || 'Sarah Johnson',
-    email: user?.email || 'sarah.johnson@example.com',
-    bio: user?.bio || 'Passionate about web development and design. Currently learning full-stack development.',
-    location: 'San Francisco, CA',
-    website: 'sarahjohnson.dev',
-    github: 'sarahjohnson',
-    twitter: '@sarahcodes',
+    name: user?.name || '',
+    email: user?.email || '',
+    bio: user?.bio || '',
+    location: user?.location || '',
+    website: user?.website || '',
+    github: user?.github || '',
+    twitter: user?.twitter || '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
+    try {
+      await api.put('/student/profile', formData);
+      toast.success('Profile updated successfully!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -71,7 +83,9 @@ export default function StudentProfile() {
                 <Input label="GitHub" value={formData.github} onChange={(e) => setFormData({ ...formData, github: e.target.value })} />
                 <Input label="Twitter" value={formData.twitter} onChange={(e) => setFormData({ ...formData, twitter: e.target.value })} />
               </div>
-              <Button type="submit" icon={<Save className="w-4 h-4" />}>Save Changes</Button>
+              <Button type="submit" icon={saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
             </form>
           </GlassCard>
         </div>

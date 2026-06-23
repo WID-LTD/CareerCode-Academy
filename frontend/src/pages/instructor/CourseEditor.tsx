@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, ChevronLeft, Video, Loader2, Upload, CheckCircle, XCircle, Film } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Save, Plus, Trash2, ChevronLeft, Video, Loader2, Upload, CheckCircle, XCircle, Film, Code, Edit3, X } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -215,6 +215,91 @@ export default function CourseEditor() {
     }
   };
 
+  // Challenge management
+  const [challengesByLesson, setChallengesByLesson] = useState<Record<string, any[]>>({});
+  const [challengeFormOpen, setChallengeFormOpen] = useState(false);
+  const [challengeFormLessonId, setChallengeFormLessonId] = useState<string | null>(null);
+  const [challengeForm, setChallengeForm] = useState({
+    title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy',
+  });
+  const [editingChallengeId, setEditingChallengeId] = useState<string | null>(null);
+  const [savingChallenge, setSavingChallenge] = useState(false);
+
+  const openChallengeForm = async (lessonId: string, existing?: any) => {
+    // Load existing challenges for this lesson
+    try {
+      const { data } = await api.get(`/challenges/lesson/${lessonId}`);
+      setChallengesByLesson(prev => ({ ...prev, [lessonId]: data.data || [] }));
+    } catch {}
+    setChallengeFormLessonId(lessonId);
+    if (existing) {
+      setChallengeForm({
+        title: existing.title || '',
+        instructions: existing.instructions || '',
+        starterCode: existing.starter_code || '',
+        expectedOutput: existing.expected_output || '',
+        testCases: Array.isArray(existing.test_cases) ? existing.test_cases.map((tc: any) => `${tc.input}|${tc.expected}`).join('\n') : '',
+        language: existing.language || 'javascript',
+        difficulty: existing.difficulty || 'easy',
+      });
+      setEditingChallengeId(existing.id);
+    } else {
+      setChallengeForm({ title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy' });
+      setEditingChallengeId(null);
+    }
+    setChallengeFormOpen(true);
+  };
+
+  const handleSaveChallenge = async () => {
+    if (!challengeFormLessonId || !challengeForm.title.trim()) return;
+    setSavingChallenge(true);
+    try {
+      const testCases = challengeForm.testCases.split('\n').filter(Boolean).map(line => {
+        const sep = line.includes('|') ? '|' : ',';
+        const parts = line.split(sep);
+        return { input: parts[0]?.trim() || '', expected: parts[1]?.trim() || '' };
+      });
+      const payload = {
+        lessonId: challengeFormLessonId,
+        title: challengeForm.title,
+        instructions: challengeForm.instructions,
+        starterCode: challengeForm.starterCode,
+        expectedOutput: challengeForm.expectedOutput,
+        testCases,
+        language: challengeForm.language,
+        difficulty: challengeForm.difficulty,
+      };
+
+      if (editingChallengeId) {
+        await api.put(`/challenges/${editingChallengeId}`, payload);
+        toast.success('Challenge updated');
+      } else {
+        await api.post('/challenges', payload);
+        toast.success('Challenge created');
+      }
+
+      const { data } = await api.get(`/challenges/lesson/${challengeFormLessonId}`);
+      setChallengesByLesson(prev => ({ ...prev, [challengeFormLessonId!]: data.data || [] }));
+      setChallengeFormOpen(false);
+    } catch {
+      toast.error('Failed to save challenge');
+    } finally {
+      setSavingChallenge(false);
+    }
+  };
+
+  const handleDeleteChallenge = async (challengeId: string, lessonId: string) => {
+    if (!confirm('Delete this challenge permanently?')) return;
+    try {
+      await api.delete(`/challenges/${challengeId}`);
+      const { data } = await api.get(`/challenges/lesson/${lessonId}`);
+      setChallengesByLesson(prev => ({ ...prev, [lessonId]: data.data || [] }));
+      toast.success('Challenge deleted');
+    } catch {
+      toast.error('Failed to delete challenge');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -306,10 +391,12 @@ export default function CourseEditor() {
                           lesson={lesson}
                           uploadingLesson={uploadingLesson}
                           uploadProgress={uploadProgress}
+                          challenges={challengesByLesson[lesson.id] || []}
                           onUpdate={() => handleUpdateLesson(module.id, lesson.id, lesson.title)}
                           onDelete={() => handleDeleteLesson(module.id, lesson.id)}
                           onUploadVideo={(file) => handleUploadVideo(lesson.id, file)}
                           onRemoveVideo={() => handleRemoveVideo(lesson.id)}
+                          onManageChallenge={() => openChallengeForm(lesson.id)}
                         />
                       ))}
                       <Button variant="ghost" size="sm" onClick={() => handleAddLesson(module.id, (module.lessons || []).length)} icon={<Plus className="w-3.5 h-3.5" />}>Add Lesson</Button>
@@ -333,21 +420,134 @@ export default function CourseEditor() {
           </GlassCard>
         </div>
       </div>
+
+      {/* Challenge Form Modal */}
+      <AnimatePresence>
+        {challengeFormOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setChallengeFormOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Code className="w-5 h-5 text-purple-500" />
+                  {editingChallengeId ? 'Edit' : 'Add'} Challenge
+                </h2>
+                <button onClick={() => setChallengeFormOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Existing challenges */}
+              {challengeFormLessonId && (challengesByLesson[challengeFormLessonId] || []).length > 0 && !editingChallengeId && (
+                <div className="mb-4 space-y-1.5">
+                  <p className="text-xs font-medium text-gray-500 uppercase">Existing Challenges</p>
+                  {(challengesByLesson[challengeFormLessonId] || []).map((ch: any) => (
+                    <div key={ch.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Code className="w-3 h-3 text-purple-500" />
+                        <span>{ch.title}</span>
+                        <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{ch.difficulty}</Badge>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openChallengeForm(challengeFormLessonId!, ch)} className="text-gray-400 hover:text-blue-400">
+                          <Edit3 className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => handleDeleteChallenge(ch.id, challengeFormLessonId!)} className="text-gray-400 hover:text-red-400">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Show existing challenges for this lesson */}
+              {!editingChallengeId && challengeFormLessonId && (challengesByLesson[challengeFormLessonId] || []).length > 0 && (
+                <div className="mb-4">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setChallengeForm({ title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy' });
+                    setEditingChallengeId(null);
+                  }}>
+                    <Plus className="w-3 h-3 mr-1" /> Add Another
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <Input label="Title" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} placeholder="e.g. Reverse a String" />
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Instructions</label>
+                  <textarea value={challengeForm.instructions} onChange={(e) => setChallengeForm({ ...challengeForm, instructions: e.target.value })} rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="Write the instructions the student will see..." />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Starter Code</label>
+                  <textarea value={challengeForm.starterCode} onChange={(e) => setChallengeForm({ ...challengeForm, starterCode: e.target.value })} rows={4} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="// Initial code" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Expected Output" value={challengeForm.expectedOutput} onChange={(e) => setChallengeForm({ ...challengeForm, expectedOutput: e.target.value })} placeholder="Hello, World!" />
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
+                    <select value={challengeForm.language} onChange={(e) => setChallengeForm({ ...challengeForm, language: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                      {['javascript', 'python', 'java', 'cpp', 'go', 'rust', 'typescript', 'ruby', 'php'].map(l => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Difficulty</label>
+                    <select value={challengeForm.difficulty} onChange={(e) => setChallengeForm({ ...challengeForm, difficulty: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                      {['easy', 'medium', 'hard'].map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Test Cases</label>
+                    <textarea value={challengeForm.testCases} onChange={(e) => setChallengeForm({ ...challengeForm, testCases: e.target.value })} rows={2} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="input|expected" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setChallengeFormOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveChallenge} disabled={savingChallenge || !challengeForm.title.trim()}>
+                  {savingChallenge ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  {editingChallengeId ? 'Update' : 'Create'} Challenge
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
 
 function LessonRow({
-  lesson, uploadingLesson, uploadProgress,
-  onUpdate, onDelete, onUploadVideo, onRemoveVideo,
+  lesson, uploadingLesson, uploadProgress, challenges,
+  onUpdate, onDelete, onUploadVideo, onRemoveVideo, onManageChallenge,
 }: {
   lesson: any;
   uploadingLesson: string | null;
   uploadProgress: number;
+  challenges: any[];
   onUpdate: () => void;
   onDelete: () => void;
   onUploadVideo: (file: File) => void;
   onRemoveVideo: () => void;
+  onManageChallenge: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isUploading = uploadingLesson === lesson.id;
@@ -380,6 +580,16 @@ function LessonRow({
         {lesson.title}
       </span>
       <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={onManageChallenge}
+          className="text-gray-400 hover:text-purple-400 transition-colors relative"
+          title="Manage challenge"
+        >
+          <Code className="w-3.5 h-3.5" />
+          {challenges.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-purple-500" />
+          )}
+        </button>
         {hasVideo && (
           <button
             onClick={onRemoveVideo}

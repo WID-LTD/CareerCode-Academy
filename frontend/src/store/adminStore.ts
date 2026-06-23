@@ -294,6 +294,13 @@ interface AdminState {
   featureCourse: (id: string) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
 
+  // Challenges
+  fetchChallengesForLesson: (lessonId: string) => Promise<any[]>;
+  fetchChallengesForCourse: (courseId: string) => Promise<any[]>;
+  createChallenge: (data: any) => Promise<any>;
+  updateChallenge: (id: string, data: any) => Promise<any>;
+  deleteChallenge: (id: string) => Promise<void>;
+
   // Payments
   fetchPayments: (page?: number, limit?: number) => Promise<void>;
   refundPayment: (id: string) => Promise<void>;
@@ -538,6 +545,37 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       set({ isLoading: false, error: err.response?.data?.message || 'Failed to update course' });
       throw err;
     }
+  },
+
+  // ═══════════════════════════════════════
+  // CHALLENGES
+  // ═══════════════════════════════════════
+  fetchChallengesForLesson: async (lessonId: string) => {
+    try {
+      const { data } = await api.get(`/challenges/lesson/${lessonId}`);
+      return data.data || [];
+    } catch {
+      return [];
+    }
+  },
+  fetchChallengesForCourse: async (courseId: string) => {
+    try {
+      const { data } = await api.get(`/challenges/course/${courseId}`);
+      return data.data || [];
+    } catch {
+      return [];
+    }
+  },
+  createChallenge: async (challengeData: any) => {
+    const { data } = await api.post('/challenges', challengeData);
+    return data.data;
+  },
+  updateChallenge: async (id: string, challengeData: any) => {
+    const { data } = await api.put(`/challenges/${id}`, challengeData);
+    return data.data;
+  },
+  deleteChallenge: async (id: string) => {
+    await api.delete(`/challenges/${id}`);
   },
 
   // ═══════════════════════════════════════

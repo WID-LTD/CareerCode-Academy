@@ -8,6 +8,9 @@ export interface CodingChallenge {
   instructions: string;
   starter_code: string;
   test_code: string;
+  expected_output: string | null;
+  test_cases: any[];
+  timeout_seconds: number;
   language: string;
   difficulty: string;
   created_at: Date;
@@ -22,6 +25,9 @@ export interface ChallengeSubmission {
   passed: boolean;
   score: number | null;
   feedback: string | null;
+  output: string | null;
+  expected_output: string | null;
+  test_results: any[] | null;
   submitted_at: Date;
 }
 
@@ -41,12 +47,40 @@ export async function getChallengeById(id: string): Promise<CodingChallenge | nu
   return rows[0] || null;
 }
 
-export async function createChallenge(input: Partial<CodingChallenge>): Promise<CodingChallenge> {
+export async function getChallengesByCourse(courseId: string): Promise<CodingChallenge[]> {
   const { rows } = await query<CodingChallenge>(
-    `INSERT INTO coding_challenges (lesson_id, title, description, instructions, starter_code, test_code, language, difficulty)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `SELECT cc.* FROM coding_challenges cc
+     JOIN lessons l ON cc.lesson_id = l.id
+     WHERE l.course_id = $1
+     ORDER BY l.order_index, cc.created_at`,
+    [courseId]
+  );
+  return rows;
+}
+
+export async function createChallenge(input: {
+  lesson_id: string;
+  title: string;
+  description: string;
+  instructions: string;
+  starter_code?: string;
+  test_code?: string;
+  expected_output?: string;
+  test_cases?: any[];
+  timeout_seconds?: number;
+  language?: string;
+  difficulty?: string;
+}): Promise<CodingChallenge> {
+  const { rows } = await query<CodingChallenge>(
+    `INSERT INTO coding_challenges (lesson_id, title, description, instructions, starter_code, test_code, expected_output, test_cases, timeout_seconds, language, difficulty)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
-    [input.lesson_id, input.title, input.description, input.instructions, input.starter_code, input.test_code, input.language || 'javascript', input.difficulty || 'easy']
+    [
+      input.lesson_id, input.title, input.description, input.instructions,
+      input.starter_code || '', input.test_code || '',
+      input.expected_output || null, JSON.stringify(input.test_cases || []),
+      input.timeout_seconds || 5, input.language || 'javascript', input.difficulty || 'easy'
+    ]
   );
   return rows[0];
 }
@@ -57,8 +91,9 @@ export async function updateChallenge(id: string, input: Partial<CodingChallenge
   let idx = 1;
   for (const [key, value] of Object.entries(input)) {
     if (value !== undefined) {
-      fields.push(`${key} = $${idx++}`);
-      values.push(value);
+      const dbKey = key === 'testCases' ? 'test_cases' : key === 'expectedOutput' ? 'expected_output' : key === 'timeoutSeconds' ? 'timeout_seconds' : key === 'starterCode' ? 'starter_code' : key === 'testCode' ? 'test_code' : key;
+      fields.push(`${dbKey} = $${idx++}`);
+      values.push(key === 'testCases' || key === 'test_cases' ? JSON.stringify(value) : value);
     }
   }
   if (fields.length === 0) return null;
@@ -68,6 +103,19 @@ export async function updateChallenge(id: string, input: Partial<CodingChallenge
     values
   );
   return rows[0] || null;
+}
+
+export async function ensureColumns(): Promise<void> {
+  try {
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS expected_output TEXT`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS test_cases JSONB DEFAULT '[]'::jsonb`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS timeout_seconds INTEGER DEFAULT 5`);
+    await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS output TEXT`);
+    await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS expected_output TEXT`);
+    await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS test_results JSONB DEFAULT '[]'::jsonb`);
+  } catch {
+    // columns may already exist
+  }
 }
 
 export async function deleteChallenge(id: string): Promise<boolean> {
@@ -81,12 +129,19 @@ export async function submitChallenge(input: {
   code: string;
   passed: boolean;
   score?: number;
+  output?: string;
+  expected_output?: string;
+  test_results?: any[];
 }): Promise<ChallengeSubmission> {
   const { rows } = await query<ChallengeSubmission>(
-    `INSERT INTO challenge_submissions (challenge_id, user_id, code, passed, score)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO challenge_submissions (challenge_id, user_id, code, passed, score, output, expected_output, test_results)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [input.challenge_id, input.user_id, input.code, input.passed, input.score || null]
+    [
+      input.challenge_id, input.user_id, input.code, input.passed,
+      input.score || null, input.output || null, input.expected_output || null,
+      JSON.stringify(input.test_results || [])
+    ]
   );
   return rows[0];
 }

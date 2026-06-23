@@ -1026,6 +1026,12 @@ async function initDatabaseWithRetry(retries: number = 3, delay: number = 3000):
   for (let i = 0; i < retries; i++) {
     try {
       await initDatabase();
+      try {
+        const { ensureColumns } = await import('./models/codingChallenge');
+        await ensureColumns();
+      } catch (e) {
+        // non-critical migration may fail if columns already exist
+      }
       console.log('Database connected and tables initialized');
       return true;
     } catch (error) {

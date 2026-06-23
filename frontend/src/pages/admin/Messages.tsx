@@ -94,7 +94,7 @@ export default function AdminMessages() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setApiPrefix('/instructor');
+    setApiPrefix('/admin');
     if (user) {
       initializeSocket(user.id);
       fetchConversations();

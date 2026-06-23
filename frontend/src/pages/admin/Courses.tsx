@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, CheckCircle, XCircle, Archive, Star, Trash2, Eye, AlertCircle,
   Loader2, ChevronDown, ChevronUp, Send, Clock, FileText, X, Plus, Edit3,
+  Code, BookOpen,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
@@ -38,6 +39,131 @@ export default function AdminCourses() {
   const [instructorResults, setInstructorResults] = useState<any[]>([]);
   const [searchingInstructors, setSearchingInstructors] = useState(false);
   const [selectedInstructor, setSelectedInstructor] = useState<any | null>(null);
+
+  // Challenge management
+  const { fetchChallengesForCourse, createChallenge, updateChallenge, deleteChallenge: deleteChallengeAction } = useAdminStore();
+  const [challengeModal, setChallengeModal] = useState(false);
+  const [challengeCourseId, setChallengeCourseId] = useState<string | null>(null);
+  const [challengeCourseTitle, setChallengeCourseTitle] = useState('');
+  const [challengeLessons, setChallengeLessons] = useState<any[]>([]);
+  const [challengeLessonChallenges, setChallengeLessonChallenges] = useState<Record<string, any[]>>({});
+  const [challengeFormLessonId, setChallengeFormLessonId] = useState<string | null>(null);
+  const [challengeFormData, setChallengeFormData] = useState({
+    title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '',
+    language: 'javascript', difficulty: 'easy',
+  });
+  const [challengeFormOpen, setChallengeFormOpen] = useState(false);
+  const [editingChallengeId, setEditingChallengeId] = useState<string | null>(null);
+  const [savingChallenge, setSavingChallenge] = useState(false);
+
+  const openChallengeManager = async (courseId: string, courseTitle: string) => {
+    setChallengeCourseId(courseId);
+    setChallengeCourseTitle(courseTitle);
+    setChallengeModal(true);
+    try {
+      const { data } = await api.get(`/modules/course/${courseId}`);
+      let allLessons: any[] = [];
+      for (const mod of (data.data || data || [])) {
+        const lRes = await api.get(`/lessons?courseId=${courseId}&moduleId=${mod.id}`);
+        const lessons = lRes.data.data || lRes.data || [];
+        allLessons = [...allLessons, ...lessons.map((l: any) => ({ ...l, module_title: mod.title }))];
+      }
+      setChallengeLessons(allLessons);
+      const challenges = await fetchChallengesForCourse(courseId);
+      const byLesson: Record<string, any[]> = {};
+      for (const ch of challenges) {
+        if (!byLesson[ch.lesson_id]) byLesson[ch.lesson_id] = [];
+        byLesson[ch.lesson_id].push(ch);
+      }
+      setChallengeLessonChallenges(byLesson);
+    } catch {
+      setChallengeLessons([]);
+    }
+  };
+
+  const openChallengeForm = (lessonId: string, existing?: any) => {
+    setChallengeFormLessonId(lessonId);
+    if (existing) {
+      setChallengeFormData({
+        title: existing.title || '',
+        instructions: existing.instructions || '',
+        starterCode: existing.starter_code || '',
+        expectedOutput: existing.expected_output || '',
+        testCases: Array.isArray(existing.test_cases) ? existing.test_cases.map((tc: any) => `${tc.input}|${tc.expected}`).join('\n') : '',
+        language: existing.language || 'javascript',
+        difficulty: existing.difficulty || 'easy',
+      });
+      setEditingChallengeId(existing.id);
+    } else {
+      setChallengeFormData({ title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy' });
+      setEditingChallengeId(null);
+    }
+    setChallengeFormOpen(true);
+  };
+
+  const handleSaveChallenge = async () => {
+    if (!challengeFormLessonId || !challengeFormData.title.trim()) return;
+    setSavingChallenge(true);
+    try {
+      const testCases = challengeFormData.testCases
+        .split('\n')
+        .filter(Boolean)
+        .map(line => {
+          const sep = line.includes('|') ? '|' : ',';
+          const parts = line.split(sep);
+          return { input: parts[0]?.trim() || '', expected: parts[1]?.trim() || '' };
+        });
+
+      const payload = {
+        lessonId: challengeFormLessonId,
+        title: challengeFormData.title,
+        instructions: challengeFormData.instructions,
+        starterCode: challengeFormData.starterCode,
+        expectedOutput: challengeFormData.expectedOutput,
+        testCases,
+        language: challengeFormData.language,
+        difficulty: challengeFormData.difficulty,
+      };
+
+      if (editingChallengeId) {
+        await updateChallenge(editingChallengeId, payload);
+      } else {
+        await createChallenge(payload);
+      }
+
+      if (challengeCourseId) {
+        const challenges = await fetchChallengesForCourse(challengeCourseId);
+        const byLesson: Record<string, any[]> = {};
+        for (const ch of challenges) {
+          if (!byLesson[ch.lesson_id]) byLesson[ch.lesson_id] = [];
+          byLesson[ch.lesson_id].push(ch);
+        }
+        setChallengeLessonChallenges(byLesson);
+      }
+
+      setChallengeFormOpen(false);
+    } catch {
+      // error handled by store
+    } finally {
+      setSavingChallenge(false);
+    }
+  };
+
+  const handleDeleteChallenge = async (challengeId: string) => {
+    if (!confirm('Delete this challenge permanently?')) return;
+    try {
+      await deleteChallengeAction(challengeId);
+      if (challengeCourseId) {
+        const challenges = await fetchChallengesForCourse(challengeCourseId);
+        const byLesson: Record<string, any[]> = {};
+        for (const ch of challenges) {
+          if (!byLesson[ch.lesson_id]) byLesson[ch.lesson_id] = [];
+          byLesson[ch.lesson_id].push(ch);
+        }
+        setChallengeLessonChallenges(byLesson);
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     fetchCourses();
@@ -102,6 +228,12 @@ export default function AdminCourses() {
         return;
       }
       if (type === 'archive') await archiveCourse(courseId);
+      else if (type === 'submit-review') {
+        if (!confirm('Submit this course for review?')) return;
+      }
+      else if (type === 'revert-draft') {
+        if (!confirm('Revert this course to draft?')) return;
+      }
       else if (type === 'feature') await featureCourse(courseId);
       else if (type === 'delete') {
         if (!confirm('Delete this course permanently?')) return;
@@ -332,6 +464,9 @@ export default function AdminCourses() {
                     }
                     return null;
                   })}
+                  <Button size="sm" variant="ghost" onClick={() => openChallengeManager(course._id, course.title)} title="Manage Challenges">
+                    <Code className="w-3 h-3 text-purple-500" />
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => handleAction('feature', course._id)} disabled={actionLoading === course._id}>
                     <Star className={`w-3 h-3 ${course.is_featured ? 'fill-amber-400 text-amber-400' : ''}`} />
                   </Button>
@@ -536,6 +671,137 @@ export default function AdminCourses() {
                   {savingCourse ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                   {editingCourse ? 'Update Course' : 'Create Course'}
                 </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Challenge Management Modal */}
+      <AnimatePresence>
+        {challengeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => { setChallengeModal(false); setChallengeFormOpen(false); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <Code className="w-5 h-5 text-purple-500" />
+                    Challenges
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-0.5">{challengeCourseTitle}</p>
+                </div>
+                <button onClick={() => { setChallengeModal(false); setChallengeFormOpen(false); }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Challenge form */}
+              {challengeFormOpen && (
+                <div className="mb-6 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-sm font-semibold mb-4">{editingChallengeId ? 'Edit' : 'Add'} Challenge</h3>
+                  <div className="space-y-3">
+                    <Input label="Title" value={challengeFormData.title} onChange={(e) => setChallengeFormData({ ...challengeFormData, title: e.target.value })} placeholder="Challenge title" />
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Instructions</label>
+                      <textarea value={challengeFormData.instructions} onChange={(e) => setChallengeFormData({ ...challengeFormData, instructions: e.target.value })} rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="What should the student do?" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Starter Code</label>
+                      <textarea value={challengeFormData.starterCode} onChange={(e) => setChallengeFormData({ ...challengeFormData, starterCode: e.target.value })} rows={4} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="// Initial code for the student" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input label="Expected Output" value={challengeFormData.expectedOutput} onChange={(e) => setChallengeFormData({ ...challengeFormData, expectedOutput: e.target.value })} placeholder="Hello, World!" />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
+                        <select value={challengeFormData.language} onChange={(e) => setChallengeFormData({ ...challengeFormData, language: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                          {['javascript', 'python', 'java', 'cpp', 'go', 'rust', 'typescript', 'ruby', 'php', 'swift', 'kotlin', 'csharp', 'bash'].map(l => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
+                        <select value={challengeFormData.difficulty} onChange={(e) => setChallengeFormData({ ...challengeFormData, difficulty: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                          {['easy', 'medium', 'hard'].map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Test Cases</label>
+                        <textarea value={challengeFormData.testCases} onChange={(e) => setChallengeFormData({ ...challengeFormData, testCases: e.target.value })} rows={2} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="input|expected&#10;5|25" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button variant="outline" onClick={() => setChallengeFormOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSaveChallenge} disabled={savingChallenge || !challengeFormData.title.trim()}>
+                      {savingChallenge ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                      {editingChallengeId ? 'Update' : 'Create'} Challenge
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lessons list */}
+              <div className="space-y-3">
+                {challengeLessons.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">No lessons found for this course. Add lessons in the instructor editor first.</p>
+                )}
+                {challengeLessons.map((lesson) => {
+                  const chs = challengeLessonChallenges[lesson.id] || [];
+                  return (
+                    <GlassCard key={lesson.id} className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <span className="text-xs text-gray-500">{lesson.module_title}</span>
+                          <h4 className="text-sm font-medium">{lesson.title}</h4>
+                        </div>
+                        {!challengeFormOpen && (
+                          <Button size="sm" variant="outline" onClick={() => openChallengeForm(lesson.id)}>
+                            <Plus className="w-3 h-3 mr-1" /> Add
+                          </Button>
+                        )}
+                      </div>
+                      {chs.length > 0 && (
+                        <div className="space-y-1.5 mt-2">
+                          {chs.map((ch: any) => (
+                            <div key={ch.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
+                              <div className="flex items-center gap-2">
+                                <Code className="w-3 h-3 text-purple-500" />
+                                <span className="font-medium">{ch.title}</span>
+                                <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{ch.difficulty}</Badge>
+                                <span className="text-gray-500">{ch.language}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button size="sm" variant="ghost" onClick={() => openChallengeForm(lesson.id, ch)}>
+                                  <Edit3 className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => handleDeleteChallenge(ch.id)}>
+                                  <Trash2 className="w-3 h-3 text-danger-500" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </GlassCard>
+                  );
+                })}
               </div>
             </motion.div>
           </motion.div>

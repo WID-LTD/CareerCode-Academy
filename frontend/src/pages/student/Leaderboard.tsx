@@ -39,9 +39,9 @@ export default function Leaderboard() {
             className="flex flex-col items-center gap-2"
           >
             <div className="w-12 h-12 rounded-full bg-gray-400 flex items-center justify-center text-lg font-bold text-white shadow-lg">
-              {leaderboard[1].name.charAt(0)}
+              {(leaderboard[1].name || '?').charAt(0)}
             </div>
-            <span className="text-xs font-medium text-gray-500 truncate max-w-[80px] text-center">{leaderboard[1].name}</span>
+            <span className="text-xs font-medium text-gray-500 truncate max-w-[80px] text-center">{leaderboard[1].name || 'Anonymous'}</span>
             <div className="w-16 h-20 bg-gray-200 dark:bg-gray-800 rounded-t-xl flex items-center justify-center">
               <Medal className="w-5 h-5 text-gray-400" />
             </div>
@@ -56,9 +56,9 @@ export default function Leaderboard() {
             className="flex flex-col items-center gap-2"
           >
             <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center text-xl font-bold text-white shadow-lg ring-4 ring-yellow-500/30">
-              {leaderboard[0].name.charAt(0)}
+              {(leaderboard[0].name || '?').charAt(0)}
             </div>
-            <span className="text-sm font-semibold truncate max-w-[90px] text-center">{leaderboard[0].name}</span>
+            <span className="text-sm font-semibold truncate max-w-[90px] text-center">{leaderboard[0].name || 'Anonymous'}</span>
             <div className="w-20 h-28 bg-gradient-to-t from-yellow-500/20 to-transparent rounded-t-xl flex items-center justify-center border border-yellow-500/30">
               <Crown className="w-6 h-6 text-yellow-500" />
             </div>
@@ -73,9 +73,9 @@ export default function Leaderboard() {
             className="flex flex-col items-center gap-2"
           >
             <div className="w-12 h-12 rounded-full bg-amber-600 flex items-center justify-center text-lg font-bold text-white shadow-lg">
-              {leaderboard[2].name.charAt(0)}
+              {(leaderboard[2].name || '?').charAt(0)}
             </div>
-            <span className="text-xs font-medium text-gray-500 truncate max-w-[80px] text-center">{leaderboard[2].name}</span>
+            <span className="text-xs font-medium text-gray-500 truncate max-w-[80px] text-center">{leaderboard[2].name || 'Anonymous'}</span>
             <div className="w-16 h-16 bg-amber-600/10 dark:bg-amber-900/20 rounded-t-xl flex items-center justify-center border border-amber-600/20">
               <Medal className="w-5 h-5 text-amber-600" />
             </div>
@@ -124,20 +124,20 @@ export default function Leaderboard() {
                     entry.rank === 3 ? 'bg-amber-600' :
                     'bg-primary-500'
                   )}>
-                    {entry.name.charAt(0)}
+                    {(entry.name || '?').charAt(0)}
                   </div>
 
                   {/* Name */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{entry.name}</span>
+                      <span className="font-medium text-sm truncate">{entry.name || 'Anonymous'}</span>
                       {entry.isCurrentUser && (
                         <Badge variant="primary" size="sm">You</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" /> {entry.xpPoints.toLocaleString()} XP</span>
-                      <span className="flex items-center gap-0.5"><Award className="w-3 h-3" /> {entry.badges} badges</span>
+                      <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" /> {entry.xpPoints?.toLocaleString() || 0} XP</span>
+                      <span className="flex items-center gap-0.5"><Award className="w-3 h-3" /> {entry.badges ?? 0} badges</span>
                     </div>
                   </div>
 
@@ -151,7 +151,7 @@ export default function Leaderboard() {
                     {entry.rankChange > 0 ? <TrendingUp className="w-3 h-3" /> :
                      entry.rankChange < 0 ? <TrendingDown className="w-3 h-3" /> :
                      <Minus className="w-3 h-3" />}
-                    {entry.rankChange !== 0 && Math.abs(entry.rankChange)}
+                    {entry.rankChange !== 0 && (Math.abs(entry.rankChange) || '')}
                   </div>
                 </motion.div>
               ))}

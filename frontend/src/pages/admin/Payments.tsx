@@ -54,16 +54,19 @@ export default function AdminPayments() {
     { name: 'PayPal', value: successfulAmount * 0.25 },
     { name: 'Crypto', value: successfulAmount * 0.1 },
     { name: 'Other', value: successfulAmount * 0.05 },
-  ];
+  ].filter(m => m.value > 0);
 
-  const monthlyData = [
-    { month: 'Jan', revenue: 12000, refunds: 400 },
-    { month: 'Feb', revenue: 18500, refunds: 600 },
-    { month: 'Mar', revenue: 15800, refunds: 350 },
-    { month: 'Apr', revenue: 22400, refunds: 800 },
-    { month: 'May', revenue: 19600, refunds: 500 },
-    { month: 'Jun', revenue: 28700, refunds: 700 },
-  ];
+  const monthlyData = (() => {
+    const byMonth: Record<string, { revenue: number; refunds: number }> = {};
+    payments.forEach((p) => {
+      const d = new Date(p.created_at);
+      const month = d.toLocaleString('default', { month: 'short' });
+      if (!byMonth[month]) byMonth[month] = { revenue: 0, refunds: 0 };
+      if (p.status === 'completed') byMonth[month].revenue += amount(p);
+      if (p.status === 'refunded') byMonth[month].refunds += amount(p);
+    });
+    return Object.entries(byMonth).map(([month, data]) => ({ month, ...data }));
+  })();
 
   const handleRefund = async (id: string) => {
     if (!confirm('Refund this payment? This action cannot be undone.')) return;

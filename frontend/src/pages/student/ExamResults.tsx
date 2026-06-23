@@ -45,9 +45,9 @@ export default function ExamResults() {
     );
   }
 
-  const { attempt, exam, answers } = result;
-  const passed = attempt.passed;
-  const score = attempt.score;
+  const { attempt, exam, answers } = result || {};
+  const passed = attempt?.passed;
+  const score = attempt?.score;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-3xl mx-auto space-y-6">
