@@ -130,13 +130,13 @@ export default function FAQ() {
 
           <div className="space-y-8">
             {filteredFaqs.map((category, catIdx) =>
-              category.items.length > 0 && (activeCategory === category.name || activeCategory === 'All') ? (
-                <div key={category.name}>
+              category.items.length > 0 && (activeCategory === category.category || activeCategory === 'All') ? (
+                <div key={category.category}>
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     <span className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center">
                       <HelpCircle className="w-4 h-4 text-primary-500" />
                     </span>
-                    {category.name}
+                    {category.category}
                   </h2>
                   <div className="space-y-3">
                     {category.items.map((faq, itemIdx) => {
