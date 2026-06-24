@@ -141,13 +141,13 @@ export default function ExamTake() {
         const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType });
         const fd = new FormData();
         fd.append('recording', blob, `exam-${examId}-${Date.now()}.webm`);
-        api.post(`/exams/student/${examId}/upload-recording`, fd)
+        api.post(`/exams/student/${examId}/attempts/${attemptId}/upload-recording`, fd)
           .then(() => console.log('Recording upload complete'))
           .catch(() => console.warn('Recording upload failed'));
       };
       recorder.stop();
     } catch { /* best-effort */ }
-  }, [examId]);
+  }, [examId, attemptId]);
 
   const autoSubmitViolation = useCallback(async (reason: string) => {
     if (submittingRef.current || !examId || !attemptId) return;

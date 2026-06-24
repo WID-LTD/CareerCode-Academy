@@ -877,9 +877,9 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-// POST /exams/student/:examId/upload-recording — upload WEBM recording to S3
+// POST /exams/student/:examId/attempts/:attemptId/upload-recording — upload WEBM recording to S3
 router.post(
-  '/student/:examId/upload-recording',
+  '/student/:examId/attempts/:attemptId/upload-recording',
   authenticate,
   recordingUpload.single('recording'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -889,20 +889,93 @@ router.post(
         return res.status(400).json({ success: false, message: 'No recording file provided' });
       }
 
-      const activeAttempt = await ExamModel.getActiveAttempt(req.params.examId, userId);
-      if (!activeAttempt) {
-        return res.status(400).json({ success: false, message: 'No active attempt found' });
+      const attempt = await ExamModel.getAttemptById(req.params.attemptId);
+      if (!attempt || attempt.user_id !== userId || attempt.exam_id !== req.params.examId) {
+        return res.status(400).json({ success: false, message: 'Invalid attempt' });
       }
 
-      const durationSeconds = Math.floor((Date.now() - new Date(activeAttempt.started_at).getTime()) / 1000);
+      const durationSeconds = Math.floor((Date.now() - new Date(attempt.started_at).getTime()) / 1000);
       const recording = await ExamProctoringModel.saveRecording(
-        activeAttempt.id,
+        attempt.id,
         req.file.buffer,
-        `exam-${req.params.examId}-${activeAttempt.id}.webm`,
+        `exam-${req.params.examId}-${attempt.id}.webm`,
         durationSeconds
       );
 
       res.json({ success: true, data: recording });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ───────────────────────── Monitor & Proctoring Routes (Admin & Instructor) ─────────────────────────
+
+// GET /exams/monitor/active-attempts
+router.get(
+  '/monitor/active-attempts',
+  authenticate,
+  authorize('admin', 'super_admin', 'instructor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const instructorId = req.user!.role === 'instructor' ? req.user!.userId : undefined;
+      const attempts = await ExamModel.getAllActiveAttempts(instructorId);
+      res.json({ success: true, data: attempts });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /exams/monitor/proctoring-history
+router.get(
+  '/monitor/proctoring-history',
+  authenticate,
+  authorize('admin', 'super_admin', 'instructor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(Math.abs(parseInt(req.query.limit as string) || 20), 100);
+      const offset = Math.abs(parseInt(req.query.offset as string) || 0);
+      const search = req.query.search as string || undefined;
+      const instructorId = req.user!.role === 'instructor' ? req.user!.userId : undefined;
+      const result = await ExamProctoringModel.getRecordingsHistory(limit, offset, search, instructorId);
+      res.json({ success: true, data: result.recordings, total: result.total });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /exams/monitor/proctoring-recording/:attemptId
+router.get(
+  '/monitor/proctoring-recording/:attemptId',
+  authenticate,
+  authorize('admin', 'super_admin', 'instructor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const recording = await ExamProctoringModel.getRecordingByAttemptId(req.params.attemptId);
+      if (!recording) {
+        return res.status(404).json({ success: false, message: 'Recording not found' });
+      }
+      res.json({ success: true, data: recording });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /exams/monitor/proctoring-recording/:recordingId
+router.delete(
+  '/monitor/proctoring-recording/:recordingId',
+  authenticate,
+  authorize('admin', 'super_admin', 'instructor'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await ExamProctoringModel.deleteRecordingById(req.params.recordingId);
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Recording not found' });
+      }
+      res.json({ success: true, message: 'Recording deleted' });
     } catch (error) {
       next(error);
     }

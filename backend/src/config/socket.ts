@@ -32,6 +32,22 @@ export function createSocketServer(server: http.Server) {
     },
   });
 
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error('Authentication error: No token provided'));
+    }
+    try {
+      // Import jwt if not already imported at top
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+      (socket as any).user = decoded;
+      next();
+    } catch (err) {
+      return next(new Error('Authentication error: Invalid token'));
+    }
+  });
+
   io.on('connection', (socket) => {
     console.log('A user connected via socket:', socket.id);
 

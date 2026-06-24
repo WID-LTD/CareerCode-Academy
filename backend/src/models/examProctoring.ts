@@ -40,7 +40,8 @@ export async function getRecordingByAttemptId(attemptId: string): Promise<Procto
 export async function getRecordingsHistory(
   limit: number = 20,
   offset: number = 0,
-  search?: string
+  search?: string,
+  instructorId?: string
 ): Promise<{ recordings: any[]; total: number }> {
   let whereClause = 'WHERE ea.status IN (\'completed\', \'timeout\')';
   const params: any[] = [];
@@ -51,10 +52,18 @@ export async function getRecordingsHistory(
     params.push(`%${search}%`);
     paramIndex++;
   }
+  
+  if (instructorId) {
+    whereClause += ` AND c.instructor_id = $${paramIndex}`;
+    params.push(instructorId);
+    paramIndex++;
+  }
 
   const countResult = await query(
     `SELECT COUNT(*)::int as total FROM exam_attempts ea
      JOIN users u ON ea.user_id = u.id
+     JOIN exams e ON ea.exam_id = e.id
+     JOIN courses c ON e.course_id = c.id
      ${whereClause}`,
     params
   );

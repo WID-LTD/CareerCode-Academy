@@ -466,16 +466,24 @@ export async function getPassingAttemptForCourse(userId: string, courseId: strin
   return rows[0] || null;
 }
 
-export async function getAllActiveAttempts(): Promise<any[]> {
-  const { rows } = await query(
-    `SELECT ea.*, e.title as exam_title, e.duration_minutes, e.course_id,
+export async function getAllActiveAttempts(instructorId?: string): Promise<any[]> {
+  let queryStr = `SELECT ea.*, e.title as exam_title, e.duration_minutes, e.course_id,
             c.title as course_title, u.name as user_name, u.email as user_email, u.avatar as user_avatar
      FROM exam_attempts ea
      JOIN exams e ON ea.exam_id = e.id
      JOIN courses c ON e.course_id = c.id
      JOIN users u ON ea.user_id = u.id
-     WHERE ea.status = 'in_progress'
-     ORDER BY ea.started_at DESC`
-  );
+     WHERE ea.status = 'in_progress'`;
+  
+  const params: any[] = [];
+  if (instructorId) {
+    params.push(instructorId);
+    queryStr += ` AND c.instructor_id = $1`;
+  }
+  
+  queryStr += ` ORDER BY ea.started_at DESC`;
+  
+  const { rows } = await query(queryStr, params);
   return rows;
 }
+

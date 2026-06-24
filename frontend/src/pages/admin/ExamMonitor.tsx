@@ -17,6 +17,7 @@ export default function ExamMonitor() {
   const [tab, setTab] = useState<'live' | 'history'>('live');
   const [viewModes, setViewModes] = useState<Record<string, 'composite' | 'screen' | 'camera'>>({});
   const canvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
+  const knownUsersRef = useRef<Set<string>>(new Set());
 
   // History state
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -32,6 +33,10 @@ export default function ExamMonitor() {
     if (socket) {
       socket.emit('exam:monitor:join');
       const onFrame = (data: any) => {
+        if (!knownUsersRef.current.has(data.userId)) {
+          knownUsersRef.current.add(data.userId);
+          loadActiveAttempts();
+        }
         setFrames(prev => ({ ...prev, [data.userId]: { screen: data.screen, camera: data.camera, faceDetected: data.faceDetected, violations: data.violations } }));
       };
       const onUserLeave = (data: any) => {
@@ -51,9 +56,10 @@ export default function ExamMonitor() {
   const loadActiveAttempts = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/admin/exams/active-attempts');
+      const { data } = await api.get('/exams/monitor/active-attempts');
       setActiveAttempts(data.data || []);
       setConnectedCount((data.data || []).length);
+      (data.data || []).forEach((a: any) => knownUsersRef.current.add(a.user_id));
     } catch { /* ignore */ }
     setLoading(false);
   };
@@ -61,11 +67,10 @@ export default function ExamMonitor() {
   const loadHistory = useCallback(async (search?: string, offset?: number) => {
     setHistoryLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('limit', String(historyLimit));
-      params.set('offset', String(offset ?? historyOffset));
-      if (search ?? historySearch) params.set('search', search ?? historySearch);
-      const { data } = await api.get(`/admin/exams/proctoring-history?${params}`);
+      const limit = historyLimit;
+      const currentOffset = offset ?? historyOffset;
+      const currentSearch = search ?? historySearch;
+      const { data } = await api.get(`/exams/monitor/proctoring-history?limit=${limit}&offset=${currentOffset}&search=${encodeURIComponent(currentSearch)}`);
       setHistoryData(data.data || []);
       setHistoryTotal(data.total || 0);
     } catch { /* ignore */ }
@@ -174,9 +179,12 @@ export default function ExamMonitor() {
           <p className="text-gray-500 mt-1">Live monitoring and recorded history of exam sessions.</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-sm">
-            <Wifi className={`w-4 h-4 ${socket?.connected ? 'text-emerald-400' : 'text-gray-500'}`} />
-            {socket?.connected ? 'Connected' : 'Disconnected'}
+          <span className="flex items-center gap-2 text-sm font-medium">
+            <span className="relative flex w-2.5 h-2.5">
+              {socket?.connected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${socket?.connected ? 'bg-emerald-500' : 'bg-gray-500'}`}></span>
+            </span>
+            {socket?.connected ? 'Live Sync Active' : 'Disconnected'}
           </span>
           {tab === 'live' && <Badge variant="primary">{connectedCount} active</Badge>}
           {tab === 'live' && <Button size="sm" variant="outline" onClick={loadActiveAttempts}><Loader2 className="w-3 h-3 mr-1" /> Refresh</Button>}
@@ -441,41 +449,44 @@ export default function ExamMonitor() {
             className="bg-gray-900 rounded-2xl w-full max-w-4xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
               <div>
-                <h3 className="font-semibold">{viewingRecording.user_name}</h3>
-                <p className="text-xs text-gray-500">{viewingRecording.exam_title}</p>
+                <h3 className="font-semibold text-lg">{viewingRecording.user_name}'s Session</h3>
+                <p className="text-sm text-gray-400 mt-0.5">{viewingRecording.exam_title}</p>
               </div>
-              <button onClick={() => setViewingRecording(null)} className="p-1 rounded-lg hover:bg-gray-800">
-                <X className="w-5 h-5" />
+              <button onClick={() => setViewingRecording(null)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                <X className="w-5 h-5 text-gray-400 hover:text-white" />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-6 bg-gradient-to-b from-transparent to-black/20">
               {viewingRecording.recording_url ? (
-                <video
-                  controls
-                  autoPlay
-                  className="w-full rounded-xl bg-black"
-                  style={{ maxHeight: '70vh' }}
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 bg-black">
+                  <video
+                    controls
+                    autoPlay
+                    className="w-full"
+                    style={{ maxHeight: '70vh' }}
                   src={viewingRecording.recording_url}
                 >
-                  Your browser does not support the video element.
-                </video>
+                  </video>
+                </div>
               ) : (
-                <div className="text-center py-16 text-gray-500">
+                <div className="text-center py-16 text-gray-500 bg-black/20 rounded-2xl ring-1 ring-white/5">
                   <Film className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p>Recording URL not available</p>
+                  <p className="font-medium text-lg">Recording unavailable</p>
+                  <p className="text-sm mt-1 text-gray-600">The video file could not be loaded.</p>
                 </div>
               )}
-              <div className="flex items-center gap-4 mt-4 text-sm text-gray-500">
+              <div className="flex items-center gap-4 mt-6 text-sm text-gray-400 bg-white/5 rounded-xl p-4 ring-1 ring-white/10">
                 {viewingRecording.duration_seconds && (
-                  <span>Duration: {Math.floor(viewingRecording.duration_seconds / 60)}m {viewingRecording.duration_seconds % 60}s</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-gray-500" /> {Math.floor(viewingRecording.duration_seconds / 60)}m {viewingRecording.duration_seconds % 60}s</span>
                 )}
                 {viewingRecording.file_size_bytes && (
-                  <span>Size: {(viewingRecording.file_size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
+                  <span className="flex items-center gap-1.5"><HardDrive className="w-4 h-4 text-gray-500" /> {(viewingRecording.file_size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
                 )}
-                <Badge variant={viewingRecording.passed ? 'success' : 'danger'}>
-                  {viewingRecording.score}% {viewingRecording.passed ? 'Passed' : 'Failed'}
+                <div className="flex-1" />
+                <Badge variant={viewingRecording.passed ? 'success' : 'danger'} className="px-3 py-1 text-sm font-medium">
+                  Score: {viewingRecording.score}% ({viewingRecording.passed ? 'Passed' : 'Failed'})
                 </Badge>
               </div>
             </div>

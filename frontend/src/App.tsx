@@ -229,6 +229,7 @@ function App() {
           <Route path="payouts" element={<SuspenseWrapper><InstructorPayouts /></SuspenseWrapper>} />
           <Route path="exams" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
           <Route path="exams/:examId" element={<SuspenseWrapper><AdminExams /></SuspenseWrapper>} />
+          <Route path="exams/monitor" element={<SuspenseWrapper><AdminExamMonitor /></SuspenseWrapper>} />
           <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
         </Route>
 

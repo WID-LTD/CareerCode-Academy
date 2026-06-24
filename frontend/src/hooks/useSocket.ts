@@ -7,12 +7,15 @@ export function useSocket() {
   const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState<{ id: string; name?: string; role?: string }[]>([]);
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !token) return;
     const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    const socket = io(SOCKET_URL, { 
+      transports: ['websocket', 'polling'],
+      auth: { token }
+    });
     socketRef.current = socket;
     setSocketInstance(socket);
 
