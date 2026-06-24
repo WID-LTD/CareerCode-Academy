@@ -871,147 +871,145 @@ async function initDatabase() {
     console.log('Database tables already initialized (running migrations only).');
   }
 
-    // Certificate templates table — always run for existing installations
-    await query(`
-      CREATE TABLE IF NOT EXISTS certificate_templates (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(200) NOT NULL,
-        course_id UUID UNIQUE NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-        layout_style VARCHAR(50) DEFAULT 'professional',
-        stamp_url TEXT,
-        signature_url TEXT,
-        logo_url TEXT,
-        show_stamp BOOLEAN DEFAULT true,
-        show_signature BOOLEAN DEFAULT true,
-        instructor_name VARCHAR(200) DEFAULT 'Udokamma Emmanuel',
-        org_name VARCHAR(200) DEFAULT 'Career Code WID Ltd',
-        org_rc VARCHAR(100) DEFAULT 'RC 8824091',
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-
-    // Add suspended column to users (safe for re-runs)
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
-
-    // Add revoked columns to certificates (safe for re-runs)
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
-
-    // Add certificate_template_id FK to certificates and exams (safe for re-runs)
-    await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
-    await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
-
-    // Add requires_exam to certificate_templates (safe for re-runs)
-    await query(`ALTER TABLE certificate_templates ADD COLUMN IF NOT EXISTS requires_exam BOOLEAN DEFAULT false`);
-
-    // Exam table migrations — always run to ensure columns exist for existing installations
-    try {
+    // Set up migrations tracking to avoid running ALTER statements on every boot
+    await query(`CREATE TABLE IF NOT EXISTS _schema_migrations (id VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`);
+    const migrationCheck = await query(`SELECT EXISTS (SELECT FROM _schema_migrations WHERE id = 'v1_schema_updates_001')`);
+    
+    if (!migrationCheck.rows[0].exists) {
+      console.log('Applying schema migrations...');
+      
       await query(`
-        DELETE FROM exam_answers a USING exam_answers b
-        WHERE a.id < b.id 
-          AND a.attempt_id = b.attempt_id 
-          AND a.question_id = b.question_id
+        CREATE TABLE IF NOT EXISTS certificate_templates (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR(200) NOT NULL,
+          course_id UUID UNIQUE NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+          layout_style VARCHAR(50) DEFAULT 'professional',
+          stamp_url TEXT,
+          signature_url TEXT,
+          logo_url TEXT,
+          show_stamp BOOLEAN DEFAULT true,
+          show_signature BOOLEAN DEFAULT true,
+          instructor_name VARCHAR(200) DEFAULT 'Udokamma Emmanuel',
+          org_name VARCHAR(200) DEFAULT 'Career Code WID Ltd',
+          org_rc VARCHAR(100) DEFAULT 'RC 8824091',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
       `);
-      await query('ALTER TABLE exam_answers ADD CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)');
-    } catch (e) {
-      // Ignore if constraint already exists or fails
+
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT`);
+
+      await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT false`);
+      await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
+
+      await query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
+      await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS certificate_template_id UUID REFERENCES certificate_templates(id) ON DELETE SET NULL`);
+      await query(`ALTER TABLE certificate_templates ADD COLUMN IF NOT EXISTS requires_exam BOOLEAN DEFAULT false`);
+
+      try {
+        await query(`
+          DELETE FROM exam_answers a USING exam_answers b
+          WHERE a.id < b.id 
+            AND a.attempt_id = b.attempt_id 
+            AND a.question_id = b.question_id
+        `);
+        await query('ALTER TABLE exam_answers ADD CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)');
+      } catch (e) {}
+
+      await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ');
+      await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ');
+      await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS instructions TEXT');
+      await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS random_questions_count INTEGER DEFAULT 0');
+      await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN DEFAULT false');
+      await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS negative_percentage NUMERIC DEFAULT 0');
+      await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS flagged_answers JSONB DEFAULT \'[]\'');
+      await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS manual_score INTEGER');
+      await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT false');
+
+      await query('CREATE INDEX IF NOT EXISTS idx_exams_course ON exams(course_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_exam_questions_exam ON exam_questions(exam_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam ON exam_attempts(exam_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_user ON exam_attempts(user_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)');
+
+      await query('CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_wishlists_course ON wishlists(course_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON lesson_progress(lesson_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_learning_paths_slug ON learning_paths(slug)');
+      await query('CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)');
+      await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS learning_path_enrollments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          path_id UUID NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+          progress INTEGER DEFAULT 0,
+          completed BOOLEAN DEFAULT false,
+          started_at TIMESTAMPTZ DEFAULT NOW(),
+          completed_at TIMESTAMPTZ,
+          UNIQUE(user_id, path_id)
+        )
+      `);
+      await query('CREATE INDEX IF NOT EXISTS idx_lpe_user ON learning_path_enrollments(user_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_lpe_path ON learning_path_enrollments(path_id)');
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS payouts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          amount DECIMAL(10, 2) NOT NULL,
+          fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
+          net_amount DECIMAL(10, 2) NOT NULL,
+          status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
+          payment_method VARCHAR(100),
+          payment_details TEXT,
+          period_start TIMESTAMPTZ,
+          period_end TIMESTAMPTZ,
+          notes TEXT,
+          admin_notes TEXT,
+          reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+          reviewed_at TIMESTAMPTZ,
+          requested_at TIMESTAMPTZ DEFAULT NOW(),
+          processed_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await query('CREATE INDEX IF NOT EXISTS idx_payouts_instructor ON payouts(instructor_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_payouts_status ON payouts(status)');
+
+      await query(`
+        INSERT INTO system_settings (key, value, category, description)
+        VALUES ('commission_rate', '30', 'payouts', 'Platform commission percentage')
+        ON CONFLICT (key) DO NOTHING
+      `);
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS exam_proctoring_recordings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          attempt_id UUID UNIQUE NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+          s3_url TEXT NOT NULL,
+          duration_seconds INTEGER DEFAULT 0,
+          file_size_bytes BIGINT DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          expires_at TIMESTAMPTZ NOT NULL
+        )
+      `);
+      await query('CREATE INDEX IF NOT EXISTS idx_proctoring_recording_attempt ON exam_proctoring_recordings(attempt_id)');
+
+      await query(`INSERT INTO _schema_migrations (id) VALUES ('v1_schema_updates_001')`);
+      console.log('Schema migrations applied successfully');
     }
-  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ');
-  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ');
-  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS instructions TEXT');
-  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS random_questions_count INTEGER DEFAULT 0');
-  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN DEFAULT false');
-  await query('ALTER TABLE exams ADD COLUMN IF NOT EXISTS negative_percentage NUMERIC DEFAULT 0');
-  await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS flagged_answers JSONB DEFAULT \'[]\'');
-  await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS manual_score INTEGER');
-  await query('ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT false');
 
-  await query('CREATE INDEX IF NOT EXISTS idx_exams_course ON exams(course_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_exam_questions_exam ON exam_questions(exam_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam ON exam_attempts(exam_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_exam_attempts_user ON exam_attempts(user_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)');
-
-  // Add indexes for new tables
-  await query('CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_wishlists_course ON wishlists(course_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON lesson_progress(lesson_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_learning_paths_slug ON learning_paths(slug)');
-  await query('CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)');
-  await query('CREATE INDEX IF NOT EXISTS idx_coding_challenges_lesson ON coding_challenges(lesson_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_challenge ON challenge_submissions(challenge_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_challenge_submissions_user ON challenge_submissions(user_id)');
-
-  // Learning path enrollments table (per-user progress tracking)
-  await query(`
-    CREATE TABLE IF NOT EXISTS learning_path_enrollments (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      path_id UUID NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
-      progress INTEGER DEFAULT 0,
-      completed BOOLEAN DEFAULT false,
-      started_at TIMESTAMPTZ DEFAULT NOW(),
-      completed_at TIMESTAMPTZ,
-      UNIQUE(user_id, path_id)
-    )
-  `);
-  await query('CREATE INDEX IF NOT EXISTS idx_lpe_user ON learning_path_enrollments(user_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_lpe_path ON learning_path_enrollments(path_id)');
-
-  // Payouts table
-  await query(`
-    CREATE TABLE IF NOT EXISTS payouts (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      amount DECIMAL(10, 2) NOT NULL,
-      fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      net_amount DECIMAL(10, 2) NOT NULL,
-      status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
-      payment_method VARCHAR(100),
-      payment_details TEXT,
-      period_start TIMESTAMPTZ,
-      period_end TIMESTAMPTZ,
-      notes TEXT,
-      admin_notes TEXT,
-      reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
-      reviewed_at TIMESTAMPTZ,
-      requested_at TIMESTAMPTZ DEFAULT NOW(),
-      processed_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  await query('CREATE INDEX IF NOT EXISTS idx_payouts_instructor ON payouts(instructor_id)');
-  await query('CREATE INDEX IF NOT EXISTS idx_payouts_status ON payouts(status)');
-
-  // Add commission_rate to system_settings
-  await query(`
-    INSERT INTO system_settings (key, value, category, description)
-    VALUES ('commission_rate', '30', 'payouts', 'Platform commission percentage')
-    ON CONFLICT (key) DO NOTHING
-  `);
-
-  // Exam proctoring recordings table
-  await query(`
-    CREATE TABLE IF NOT EXISTS exam_proctoring_recordings (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      attempt_id UUID UNIQUE NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
-      s3_url TEXT NOT NULL,
-      duration_seconds INTEGER DEFAULT 0,
-      file_size_bytes BIGINT DEFAULT 0,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      expires_at TIMESTAMPTZ NOT NULL
-    )
-  `);
-  await query('CREATE INDEX IF NOT EXISTS idx_proctoring_recording_attempt ON exam_proctoring_recordings(attempt_id)');
-
-  console.log('Database migrations complete');
+    console.log('Database migrations complete');
   } catch (error) {
     console.error('Database initialization error:', error);
     throw error;
