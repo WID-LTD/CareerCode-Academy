@@ -44,6 +44,7 @@ import testRoutes from './routes/test.routes';
 import { query } from './config/db';
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Security middleware
