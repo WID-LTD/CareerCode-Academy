@@ -102,6 +102,8 @@ router.post(
           name: user.name,
           email: user.email,
           role: user.role,
+          token,
+          refreshToken,
         },
       });
     } catch (error) {
@@ -148,6 +150,8 @@ router.post(
           role: user.role,
           avatar: user.avatar,
           isVerified: user.is_verified,
+          token,
+          refreshToken,
         },
       });
     } catch (error) {
@@ -266,6 +270,8 @@ router.post(
           name: user.name,
           email: user.email,
           role: user.role,
+          token: newToken,
+          refreshToken,
         },
       });
     } catch (error) {
@@ -310,6 +316,8 @@ router.get(
           name: user.name,
           email: user.email,
           role: user.role,
+          token: newToken,
+          refreshToken,
         },
       });
     } catch (error) {

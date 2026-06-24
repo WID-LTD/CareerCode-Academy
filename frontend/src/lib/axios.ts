@@ -10,6 +10,22 @@ const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const { useAuthStore } = await import('@/store/authStore');
+      const token = useAuthStore.getState().token;
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (e) {
+      // Store might not be ready
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 function resolveUploadPaths(obj: any, baseUrl: string): any {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'string') {
@@ -42,15 +58,35 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    if (error.response?.status === 401 && !error.config._retry) {
+    if (error.response?.status === 401 && !error.config._retry && error.config.url !== '/auth/login' && error.config.url !== '/auth/refresh-token') {
       error.config._retry = true;
       try {
+        const { useAuthStore } = await import('@/store/authStore');
+        const refreshToken = useAuthStore.getState().refreshToken;
+
+        if (!refreshToken) {
+          useAuthStore.getState().logout();
+          return Promise.reject(error);
+        }
+
         const refreshUrl = import.meta.env.VITE_API_URL
           ? `${import.meta.env.VITE_API_URL}/auth/refresh-token`
           : '/api/v1/auth/refresh-token';
-        const { data } = await axios.post(refreshUrl, {}, { withCredentials: true });
-        return api(error.config);
-      } catch {
+          
+        const { data } = await axios.post(refreshUrl, { refreshToken }, { withCredentials: true });
+        
+        if (data && data.success && data.data) {
+          useAuthStore.setState({
+            token: data.data.token,
+            refreshToken: data.data.refreshToken
+          });
+          
+          error.config.headers.Authorization = `Bearer ${data.data.token}`;
+          return api(error.config);
+        } else {
+          throw new Error('Refresh failed');
+        }
+      } catch (err) {
         const { useAuthStore } = await import('@/store/authStore');
         useAuthStore.getState().logout();
       }

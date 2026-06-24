@@ -20,6 +20,8 @@ export interface User {
 
 interface AuthState {
   user: User | null;
+  token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   initialized: boolean;
@@ -36,6 +38,8 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
+      token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       initialized: false,
@@ -56,6 +60,8 @@ export const useAuthStore = create<AuthState>()(
               avatar: userData.avatar,
               isVerified: userData.isVerified,
             },
+            token: userData.token,
+            refreshToken: userData.refreshToken,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -77,6 +83,8 @@ export const useAuthStore = create<AuthState>()(
               email: userData.email,
               role: userData.role,
             },
+            token: userData.token,
+            refreshToken: userData.refreshToken,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -88,10 +96,13 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
-          await api.post('/auth/logout', {});
+          const currentRefreshToken = get().refreshToken;
+          await api.post('/auth/logout', { refreshToken: currentRefreshToken });
         } catch { }
         set({
           user: null,
+          token: null,
+          refreshToken: null,
           isAuthenticated: false,
         });
       },
@@ -172,6 +183,8 @@ export const useAuthStore = create<AuthState>()(
       name: 'careercode-auth',
       partialize: (state) => ({
         user: state.user,
+        token: state.token,
+        refreshToken: state.refreshToken,
       }),
     }
   )
