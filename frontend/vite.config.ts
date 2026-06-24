@@ -36,10 +36,10 @@ export default defineConfig({
     target: 'es2020',
   },
   server: {
-    https: {
+    https: fs.existsSync(path.resolve(process.cwd(), 'cert/key.pem')) ? {
       key: fs.readFileSync(path.resolve(process.cwd(), 'cert/key.pem')),
       cert: fs.readFileSync(path.resolve(process.cwd(), 'cert/cert.pem')),
-    },
+    } : undefined,
     port: 3000,
     host: true,
     proxy: {
