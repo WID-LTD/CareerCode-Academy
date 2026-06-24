@@ -51,17 +51,11 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:3000',
-    'https://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://127.0.0.1:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
+    process.env.FRONTEND_URL,
     'https://career-code-academy.vercel.app',
     'https://careercode-academy-1.onrender.com',
     ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []),
-  ],
+  ].filter(Boolean) as string[],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],

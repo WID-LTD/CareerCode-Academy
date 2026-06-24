@@ -125,7 +125,7 @@ router.post(
         }
       } else {
         // Dev mode: skip payment gateway and auto-enroll
-        paymentData.authorizationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-payment?reference=${payment.reference}&status=success`;
+        paymentData.authorizationUrl = `${process.env.FRONTEND_URL}/verify-payment?reference=${payment.reference}&status=success`;
         paymentData.publicKey = process.env.PAYSTACK_PUBLIC_KEY || '';
       }
 
