@@ -18,6 +18,8 @@ import {
   Hash,
   Monitor,
   ShieldAlert,
+  Map,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -41,6 +43,8 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Community', path: '/community', icon: Users },
     { label: 'Leaderboard', path: '/student/leaderboard', icon: Trophy },
     { label: 'Calendar', path: '/student/calendar', icon: Calendar },
+    { label: 'Roadmap', path: '/student/roadmap', icon: Map },
+    { label: 'Study Plans', path: '/student/study-plans', icon: Target },
     { label: 'Notifications', path: '/student/notifications', icon: Bell },
     { label: 'Messages', path: '/student/messages', icon: Users },
     { label: 'Support', path: '/student/tickets', icon: Users },
@@ -75,6 +79,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Exam Monitor', path: '/admin/exams/monitor', icon: Monitor },
     { label: 'Certificates', path: '/admin/certificates', icon: Award },
     { label: 'Cert. Templates', path: '/admin/certificate-templates', icon: Award },
+    { label: 'Calendar', path: '/admin/calendar', icon: Calendar },
     { label: 'Support Tickets', path: '/admin/tickets', icon: Users },
     { label: 'Notifications', path: '/admin/broadcasts', icon: Bell },
     { label: 'Reports', path: '/admin/reports', icon: LayoutDashboard },
@@ -95,6 +100,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Exam Monitor', path: '/admin/exams/monitor', icon: Monitor },
     { label: 'Certificates', path: '/admin/certificates', icon: Award },
     { label: 'Cert. Templates', path: '/admin/certificate-templates', icon: Award },
+    { label: 'Calendar', path: '/admin/calendar', icon: Calendar },
     { label: 'Support Tickets', path: '/admin/tickets', icon: Users },
     { label: 'Notifications', path: '/admin/broadcasts', icon: Bell },
     { label: 'Reports', path: '/admin/reports', icon: LayoutDashboard },

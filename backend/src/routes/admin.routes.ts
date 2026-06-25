@@ -1466,4 +1466,62 @@ router.put('/users/:id/demote-admin', authorize('super_admin'), async (req: Auth
   } catch (error) { next(error); }
 });
 
+// GET /admin/calendar — all events across all courses (admin view)
+router.get('/calendar', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const [assignmentsRes, liveClassesRes, quizzesRes, examsRes, certificatesRes] = await Promise.all([
+      query(`
+        SELECT a.id, a.title, a.due_date as date, c.title as course_title, 'assignment' as type
+        FROM assignments a
+        JOIN courses c ON c.id = a.course_id
+        WHERE a.due_date >= NOW()
+        ORDER BY a.due_date ASC
+        LIMIT 50
+      `),
+      query(`
+        SELECT lc.id, lc.title, lc.scheduled_at as date, c.title as course_title, 'live-class' as type
+        FROM live_classes lc
+        JOIN courses c ON c.id = lc.course_id
+        WHERE lc.scheduled_at >= NOW()
+        ORDER BY lc.scheduled_at ASC
+        LIMIT 50
+      `),
+      query(`
+        SELECT q.id, q.title, q.due_date as date, c.title as course_title, 'quiz' as type
+        FROM quizzes q
+        JOIN courses c ON c.id = q.course_id
+        WHERE q.due_date IS NOT NULL AND q.due_date >= NOW()
+        ORDER BY q.due_date ASC
+        LIMIT 50
+      `),
+      query(`
+        SELECT e.id, e.title, e.starts_at as date, c.title as course_title, 'exam' as type
+        FROM exams e
+        JOIN courses c ON c.id = e.course_id
+        WHERE e.starts_at >= NOW() AND e.is_published = true
+        ORDER BY e.starts_at ASC
+        LIMIT 50
+      `),
+      query(`
+        SELECT c.id, co.title || ' Certificate' as title, c.issued_at as date, co.title as course_title, 'certificate' as type
+        FROM certificates c
+        JOIN courses co ON co.id = c.course_id
+        WHERE c.issued_at >= NOW() - INTERVAL '30 days'
+        ORDER BY c.issued_at DESC
+        LIMIT 50
+      `),
+    ]);
+
+    const events = [
+      ...assignmentsRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+      ...liveClassesRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+      ...quizzesRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+      ...examsRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+      ...certificatesRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+    ].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    res.json({ success: true, data: events });
+  } catch (error) { next(error); }
+});
+
 export default router;

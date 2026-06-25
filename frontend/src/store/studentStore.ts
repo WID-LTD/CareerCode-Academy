@@ -159,6 +159,7 @@ interface StudentState {
   badges: Badge[];
   leaderboard: LeaderboardEntry[];
   calendarEvents: CalendarEvent[];
+  completedEvents: string[];
   weeklyActivity: WeeklyActivity[];
   monthlyLearning: { month: string; hours: number }[];
   skillGrowth: SkillGrowth[];
@@ -181,6 +182,8 @@ interface StudentState {
   fetchBadges: () => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
   fetchCalendarEvents: () => Promise<void>;
+  fetchCompletedEvents: () => Promise<void>;
+  toggleCompleteEvent: (eventId: string, eventType: string) => Promise<boolean>;
   fetchAnalytics: () => Promise<void>;
   globalSearch: (query: string) => Promise<void>;
   clearSearch: () => void;
@@ -198,6 +201,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   badges: [],
   leaderboard: [],
   calendarEvents: [],
+  completedEvents: [],
   weeklyActivity: [],
   monthlyLearning: [],
   skillGrowth: [],
@@ -375,6 +379,30 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       set({ calendarEvents: data.data || [] });
     } catch {
       set({ calendarEvents: [] });
+    }
+  },
+
+  fetchCompletedEvents: async () => {
+    try {
+      const { data } = await api.get('/student/completed-events');
+      set({ completedEvents: (data.data || []).map((e: any) => e.event_id) });
+    } catch {
+      set({ completedEvents: [] });
+    }
+  },
+
+  toggleCompleteEvent: async (eventId: string, eventType: string) => {
+    try {
+      const { data } = await api.post('/student/completed-events/toggle', { event_id: eventId, event_type: eventType });
+      const completed = data.completed;
+      set((state) => ({
+        completedEvents: completed
+          ? [...state.completedEvents, eventId]
+          : state.completedEvents.filter((id) => id !== eventId),
+      }));
+      return completed;
+    } catch {
+      return false;
     }
   },
 

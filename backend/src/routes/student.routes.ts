@@ -441,7 +441,7 @@ router.get('/leaderboard', async (req: AuthRequest, res: Response, next: NextFun
 router.get('/calendar', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
-    const [assignmentsRes, liveClassesRes, quizzesRes] = await Promise.all([
+    const [assignmentsRes, liveClassesRes, quizzesRes, examsRes, certificatesRes] = await Promise.all([
       query(`
         SELECT a.id, a.title, a.due_date as date, c.title as course_title, 'assignment' as type
         FROM assignments a
@@ -472,12 +472,32 @@ router.get('/calendar', async (req: AuthRequest, res: Response, next: NextFuncti
         ORDER BY q.due_date ASC
         LIMIT 20
       `, [userId]),
+      query(`
+        SELECT e.id, e.title, e.starts_at as date, c.title as course_title, 'exam' as type
+        FROM exams e
+        JOIN courses c ON c.id = e.course_id
+        WHERE e.starts_at >= NOW() AND e.is_published = true AND e.course_id IN (
+          SELECT course_id FROM enrollments WHERE user_id = $1
+        )
+        ORDER BY e.starts_at ASC
+        LIMIT 20
+      `, [userId]),
+      query(`
+        SELECT c.id, co.title || ' Certificate' as title, c.issued_at as date, co.title as course_title, 'certificate' as type
+        FROM certificates c
+        JOIN courses co ON co.id = c.course_id
+        WHERE c.user_id = $1 AND c.issued_at >= NOW() - INTERVAL '30 days'
+        ORDER BY c.issued_at DESC
+        LIMIT 20
+      `, [userId]),
     ]);
 
     const events = [
       ...assignmentsRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
       ...liveClassesRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
       ...quizzesRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+      ...examsRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
+      ...certificatesRes.rows.map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })),
     ].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     res.json({ success: true, data: events });
@@ -864,6 +884,176 @@ router.put('/messages/read-all', async (req: AuthRequest, res: Response, next: N
       [userId]
     );
     res.json({ success: true, updated: rowCount });
+  } catch (error) { next(error); }
+});
+
+// ----------------------------------------------------------------------
+// MENTORING BOOKING
+// ----------------------------------------------------------------------
+// GET /student/mentoring-slots - View available slots for student's courses
+router.get('/mentoring-slots', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const { rows } = await query(`
+      SELECT ms.*, u.name as instructor_name, u.avatar as instructor_avatar, c.title as course_title
+      FROM mentoring_slots ms
+      JOIN courses c ON ms.course_id = c.id
+      JOIN enrollments e ON e.course_id = c.id AND e.user_id = $1
+      JOIN users u ON ms.instructor_id = u.id
+      WHERE ms.status = 'available' AND ms.start_time > NOW()
+      ORDER BY ms.start_time ASC
+    `, [studentId]);
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// POST /student/mentoring-slots/:id/book - Book a slot
+router.post('/mentoring-slots/:id/book', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const { id } = req.params;
+
+    const slotRes = await query(
+      'SELECT * FROM mentoring_slots WHERE id = $1 AND status = $2',
+      [id, 'available']
+    );
+    if (slotRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Slot not available' });
+    }
+
+    const { rows } = await query(`
+      UPDATE mentoring_slots
+      SET student_id = $1, status = 'booked', updated_at = NOW()
+      WHERE id = $2 AND status = 'available'
+      RETURNING *
+    `, [studentId, id]);
+
+    if (rows.length === 0) {
+      return res.status(409).json({ success: false, message: 'Slot was just taken' });
+    }
+
+    // Notify instructor
+    await createNotification({
+      userId: slotRes.rows[0].instructor_id,
+      type: 'booking',
+      title: 'New Mentoring Booking',
+      message: 'A student has booked your mentoring slot.',
+    });
+
+    res.json({ success: true, data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// GET /student/my-mentoring-slots - View student's booked slots
+router.get('/my-mentoring-slots', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const { rows } = await query(`
+      SELECT ms.*, u.name as instructor_name, u.avatar as instructor_avatar, c.title as course_title
+      FROM mentoring_slots ms
+      LEFT JOIN courses c ON ms.course_id = c.id
+      LEFT JOIN users u ON ms.instructor_id = u.id
+      WHERE ms.student_id = $1
+      ORDER BY ms.start_time DESC
+    `, [studentId]);
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// ----------------------------------------------------------------------
+// COMPLETED EVENTS
+// ----------------------------------------------------------------------
+// POST /student/completed-events/toggle - Toggle event completion
+router.post('/completed-events/toggle', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { event_id, event_type } = req.body;
+
+    const existing = await query(
+      'SELECT id FROM completed_events WHERE user_id = $1 AND event_id = $2',
+      [userId, event_id]
+    );
+
+    if (existing.rows.length > 0) {
+      await query('DELETE FROM completed_events WHERE user_id = $1 AND event_id = $2', [userId, event_id]);
+      res.json({ success: true, completed: false });
+    } else {
+      await query(
+        'INSERT INTO completed_events (user_id, event_id, event_type) VALUES ($1, $2, $3)',
+        [userId, event_id, event_type]
+      );
+      res.json({ success: true, completed: true });
+    }
+  } catch (error) { next(error); }
+});
+
+// GET /student/completed-events - Get all completed event IDs for the user
+router.get('/completed-events', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { rows } = await query(
+      'SELECT event_id, event_type, completed_at FROM completed_events WHERE user_id = $1',
+      [userId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// ----------------------------------------------------------------------
+// STUDY PLANS
+// ----------------------------------------------------------------------
+// GET /student/study-plans - Get current & past study plans
+router.get('/study-plans', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const { rows } = await query(
+      'SELECT * FROM study_plans WHERE student_id = $1 ORDER BY week_start DESC LIMIT 12',
+      [studentId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// POST /student/study-plans - Create or update a study plan for the current week
+router.post('/study-plans', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const { week_start, week_end, goal_hours, goal_topics, notes } = req.body;
+
+    // Compute current week bounds if not provided
+    const start = week_start || (() => {
+      const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0];
+    })();
+    const end = week_end || (() => {
+      const d = new Date(); d.setDate(d.getDate() + (6 - d.getDay())); return d.toISOString().split('T')[0];
+    })();
+
+    const { rows } = await query(`
+      INSERT INTO study_plans (student_id, week_start, week_end, goal_hours, goal_topics, notes)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (student_id, week_start)
+      DO UPDATE SET goal_hours = EXCLUDED.goal_hours,
+                    goal_topics = EXCLUDED.goal_topics,
+                    notes = EXCLUDED.notes,
+                    updated_at = NOW()
+      RETURNING *
+    `, [studentId, start, end, goal_hours || 5, goal_topics || [], notes || null]);
+
+    res.json({ success: true, data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// DELETE /student/study-plans/:id - Delete a study plan
+router.delete('/study-plans/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const { id } = req.params;
+    const { rowCount } = await query(
+      'DELETE FROM study_plans WHERE id = $1 AND student_id = $2',
+      [id, studentId]
+    );
+    if (rowCount === 0) return res.status(404).json({ success: false, message: 'Study plan not found' });
+    res.json({ success: true, message: 'Study plan deleted' });
   } catch (error) { next(error); }
 });
 

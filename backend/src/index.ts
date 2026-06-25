@@ -502,6 +502,47 @@ async function initDatabase() {
       )
     `);
 
+    // New recurring events table
+    await query(`
+      CREATE TABLE IF NOT EXISTS recurring_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        event_type VARCHAR(20) NOT NULL CHECK (event_type IN ('class', 'workshop', 'meeting', 'webinar')),
+        course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        recurrence_pattern VARCHAR(10) NOT NULL CHECK (recurrence_pattern IN ('daily','weekly','biweekly','monthly')),
+        day_of_week INTEGER CHECK (day_of_week BETWEEN 0 AND 6),
+        day_of_month INTEGER CHECK (day_of_month BETWEEN 1 AND 31),
+        start_time TIME NOT NULL,
+        duration INTEGER NOT NULL DEFAULT 60,
+        start_date DATE NOT NULL,
+        end_date DATE,
+        meeting_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Mentoring slots table (one-on-one booking)
+    await query(`
+      CREATE TABLE IF NOT EXISTS mentoring_slots (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        instructor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL DEFAULT 'Mentoring Session',
+        description TEXT,
+        start_time TIMESTAMPTZ NOT NULL,
+        end_time TIMESTAMPTZ NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'available'
+          CHECK (status IN ('available', 'booked', 'cancelled', 'completed')),
+        meeting_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     // New resources table
     await query(`
       CREATE TABLE IF NOT EXISTS resources (
@@ -513,6 +554,35 @@ async function initDatabase() {
         file_type VARCHAR(50),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Completed events table (tracking what events users mark done)
+    await query(`
+      CREATE TABLE IF NOT EXISTS completed_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        event_id TEXT NOT NULL,
+        event_type VARCHAR(20) NOT NULL,
+        completed_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, event_id)
+      )
+    `);
+
+    // Study plans table (student-set weekly goals)
+    await query(`
+      CREATE TABLE IF NOT EXISTS study_plans (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        week_start DATE NOT NULL,
+        week_end DATE NOT NULL,
+        goal_hours REAL NOT NULL DEFAULT 5,
+        goal_topics TEXT[] DEFAULT '{}',
+        notes TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(student_id, week_start)
       )
     `);
 
@@ -1085,6 +1155,8 @@ async function start() {
   // Start background workers
   const { startBroadcastWorker } = await import('./workers/broadcastWorker');
   startBroadcastWorker(io);
+  const { startCalendarReminderWorker } = await import('./workers/calendarReminderWorker');
+  startCalendarReminderWorker(io);
   const { startProctoringCleanupWorker } = await import('./workers/proctoringCleanupWorker');
   startProctoringCleanupWorker();
 }

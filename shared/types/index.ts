@@ -245,6 +245,21 @@ export interface ILessonProgress {
   updatedAt: string;
 }
 
+export type CalendarEventType = 'live-class' | 'assignment' | 'quiz' | 'exam' | 'webinar' | 'certificate' | 'mentoring' | 'milestone';
+
+export interface ICalendarEvent {
+  id: string;
+  title: string;
+  type: CalendarEventType;
+  date: string;
+  time: string;
+  course_title: string;
+  description?: string;
+  meeting_url?: string;
+  duration?: number;
+  end_date?: string;
+}
+
 export interface INavLink {
   label: string;
   href: string;

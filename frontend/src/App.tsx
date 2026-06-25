@@ -69,6 +69,8 @@ const StudentExamsList = lazy(() => import('@/pages/student/ExamsList'));
 const StudentExamTake = lazy(() => import('@/pages/student/ExamTake'));
 const StudentExamResults = lazy(() => import('@/pages/student/ExamResults'));
 const StudentChallenges = lazy(() => import('@/pages/student/Challenges'));
+const StudentRoadmap = lazy(() => import('@/pages/student/Roadmap'));
+const StudentStudyPlans = lazy(() => import('@/pages/student/StudyPlans'));
 
 // Instructor pages
 const InstructorDashboard = lazy(() => import('@/pages/instructor/Dashboard'));
@@ -107,6 +109,7 @@ const AdminReports = lazy(() => import('@/pages/admin/Reports'));
 const AdminMessages = lazy(() => import('@/pages/admin/Messages'));
 const AdminPayouts = lazy(() => import('@/pages/admin/Payouts'));
 const AdminManagement = lazy(() => import('@/pages/admin/AdminManagement'));
+const AdminCalendar = lazy(() => import('@/pages/admin/Calendar'));
 
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -209,6 +212,8 @@ function App() {
           <Route path="exams/:examId" element={<SuspenseWrapper><StudentExamTake /></SuspenseWrapper>} />
           <Route path="exams/:examId/results/:attemptId" element={<SuspenseWrapper><StudentExamResults /></SuspenseWrapper>} />
           <Route path="challenges" element={<SuspenseWrapper><StudentChallenges /></SuspenseWrapper>} />
+          <Route path="roadmap" element={<SuspenseWrapper><StudentRoadmap /></SuspenseWrapper>} />
+          <Route path="study-plans" element={<SuspenseWrapper><StudentStudyPlans /></SuspenseWrapper>} />
           <Route path="profile" element={<SuspenseWrapper><StudentProfile /></SuspenseWrapper>} />
           <Route path="settings" element={<SuspenseWrapper><StudentSettings /></SuspenseWrapper>} />
         </Route>
@@ -255,6 +260,7 @@ function App() {
           <Route path="audit-log" element={<SuspenseWrapper><AdminAuditLog /></SuspenseWrapper>} />
           <Route path="admin-management" element={<SuspenseWrapper><AdminManagement /></SuspenseWrapper>} />
           <Route path="analytics" element={<SuspenseWrapper><AdminAnalytics /></SuspenseWrapper>} />
+          <Route path="calendar" element={<SuspenseWrapper><AdminCalendar /></SuspenseWrapper>} />
           <Route path="settings" element={<SuspenseWrapper><AdminSettings /></SuspenseWrapper>} />
         </Route>
 

@@ -558,6 +558,86 @@ router.post('/live-classes', async (req: AuthRequest, res: Response, next: NextF
 });
 
 // ----------------------------------------------------------------------
+// RECURRING EVENTS
+// ----------------------------------------------------------------------
+// GET /instructor/recurring-events - List recurring events
+router.get('/recurring-events', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { rows } = await query(
+      `SELECT re.*, c.title as course_title
+       FROM recurring_events re
+       LEFT JOIN courses c ON c.id = re.course_id
+       WHERE re.instructor_id = $1
+       ORDER BY re.created_at DESC`,
+      [instructorId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// POST /instructor/recurring-events - Create recurring event
+router.post('/recurring-events', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { title, description, event_type, course_id, recurrence_pattern, day_of_week, day_of_month, start_time, duration, start_date, end_date, meeting_url } = req.body;
+
+    const { rows } = await query(`
+      INSERT INTO recurring_events (title, description, event_type, course_id, instructor_id, recurrence_pattern, day_of_week, day_of_month, start_time, duration, start_date, end_date, meeting_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING *
+    `, [title, description, event_type, course_id || null, instructorId, recurrence_pattern, day_of_week || null, day_of_month || null, start_time, duration || 60, start_date, end_date || null, meeting_url || null]);
+
+    res.json({ success: true, data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// PUT /instructor/recurring-events/:id - Update recurring event
+router.put('/recurring-events/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { id } = req.params;
+    const { title, description, event_type, course_id, recurrence_pattern, day_of_week, day_of_month, start_time, duration, start_date, end_date, meeting_url } = req.body;
+
+    const { rows } = await query(`
+      UPDATE recurring_events SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        event_type = COALESCE($3, event_type),
+        course_id = COALESCE($4, course_id),
+        recurrence_pattern = COALESCE($5, recurrence_pattern),
+        day_of_week = COALESCE($6, day_of_week),
+        day_of_month = COALESCE($7, day_of_month),
+        start_time = COALESCE($8, start_time),
+        duration = COALESCE($9, duration),
+        start_date = COALESCE($10, start_date),
+        end_date = COALESCE($11, end_date),
+        meeting_url = COALESCE($12, meeting_url),
+        updated_at = NOW()
+      WHERE id = $13 AND instructor_id = $14
+      RETURNING *
+    `, [title, description, event_type, course_id, recurrence_pattern, day_of_week, day_of_month, start_time, duration, start_date, end_date, meeting_url, id, instructorId]);
+
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Recurring event not found' });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// DELETE /instructor/recurring-events/:id - Delete recurring event
+router.delete('/recurring-events/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { id } = req.params;
+    const { rowCount } = await query(
+      'DELETE FROM recurring_events WHERE id = $1 AND instructor_id = $2',
+      [id, instructorId]
+    );
+    if (rowCount === 0) return res.status(404).json({ success: false, message: 'Recurring event not found' });
+    res.json({ success: true, message: 'Recurring event deleted' });
+  } catch (error) { next(error); }
+});
+
+// ----------------------------------------------------------------------
 // ATTENDANCE
 // ----------------------------------------------------------------------
 // POST /instructor/live-classes/:id/attendance - Mark attendance (instructor marks students)
@@ -767,8 +847,63 @@ router.get('/schedule', async (req: AuthRequest, res: Response, next: NextFuncti
       LIMIT 10
     `, [instructorId]);
 
+    // Resolve recurring events into actual dates (next 60 days)
+    const recurringRes = await query(`
+      SELECT * FROM recurring_events
+      WHERE instructor_id = $1 AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+    `, [instructorId]);
+
+    const now = new Date();
+    const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+    const recurringEvents: any[] = [];
+
+    for (const re of recurringRes.rows) {
+      const current = new Date(re.start_date);
+      const end = re.end_date ? new Date(re.end_date) : sixtyDaysFromNow;
+
+      while (current <= end) {
+        if (current < now) {
+          if (re.recurrence_pattern === 'daily') { current.setDate(current.getDate() + 1); continue; }
+          else if (re.recurrence_pattern === 'weekly') { current.setDate(current.getDate() + 7); continue; }
+          else if (re.recurrence_pattern === 'biweekly') { current.setDate(current.getDate() + 14); continue; }
+          else if (re.recurrence_pattern === 'monthly') { current.setMonth(current.getMonth() + 1); continue; }
+          else break;
+        }
+
+        let matches = false;
+        if (re.recurrence_pattern === 'daily') matches = true;
+        else if (re.recurrence_pattern === 'weekly') matches = current.getDay() === re.day_of_week;
+        else if (re.recurrence_pattern === 'biweekly') matches = current.getDay() === re.day_of_week;
+        else if (re.recurrence_pattern === 'monthly') matches = current.getDate() === re.day_of_month;
+
+        if (matches) {
+          const eventDate = new Date(current);
+          const [hours, minutes] = re.start_time.split(':').map(Number);
+          eventDate.setHours(hours, minutes, 0, 0);
+
+          recurringEvents.push({
+            id: re.id + '-' + eventDate.toISOString(),
+            title: re.title,
+            date: eventDate.toISOString(),
+            type: 'live_class',
+            meeting_url: re.meeting_url,
+            course_title: re.course_title || '',
+            recurring: true,
+          });
+        }
+
+        if (re.recurrence_pattern === 'daily') current.setDate(current.getDate() + 1);
+        else if (re.recurrence_pattern === 'weekly') current.setDate(current.getDate() + 7);
+        else if (re.recurrence_pattern === 'biweekly') current.setDate(current.getDate() + 14);
+        else if (re.recurrence_pattern === 'monthly') current.setMonth(current.getMonth() + 1);
+        else break;
+
+        if (recurringEvents.length > 20) break;
+      }
+    }
+
     // Merge and sort
-    const schedule = [...classesRes.rows, ...assignmentsRes.rows].sort((a, b) => 
+    const schedule = [...classesRes.rows, ...assignmentsRes.rows, ...recurringEvents].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -881,6 +1016,85 @@ router.post('/broadcast', async (req: AuthRequest, res: Response, next: NextFunc
   } catch (error) {
     next(error);
   }
+});
+
+// ----------------------------------------------------------------------
+// MENTORING SLOTS
+// ----------------------------------------------------------------------
+// GET /instructor/mentoring-slots - List instructor's mentoring slots
+router.get('/mentoring-slots', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { rows } = await query(`
+      SELECT ms.*, u.name as student_name, u.email as student_email, u.avatar as student_avatar, c.title as course_title
+      FROM mentoring_slots ms
+      LEFT JOIN users u ON ms.student_id = u.id
+      LEFT JOIN courses c ON ms.course_id = c.id
+      WHERE ms.instructor_id = $1
+      ORDER BY ms.start_time ASC
+    `, [instructorId]);
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
+// POST /instructor/mentoring-slots - Create availability slots (accepts array or single)
+router.post('/mentoring-slots', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const slots = Array.isArray(req.body) ? req.body : [req.body];
+    const created: any[] = [];
+
+    for (const slot of slots) {
+      const { course_id, title, description, start_time, end_time, meeting_url } = slot;
+      const { rows } = await query(`
+        INSERT INTO mentoring_slots (instructor_id, course_id, title, description, start_time, end_time, meeting_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `, [instructorId, course_id || null, title || 'Mentoring Session', description || null, start_time, end_time, meeting_url || null]);
+      created.push(rows[0]);
+    }
+
+    res.status(201).json({ success: true, data: created });
+  } catch (error) { next(error); }
+});
+
+// PUT /instructor/mentoring-slots/:id - Update a slot
+router.put('/mentoring-slots/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { id } = req.params;
+    const { title, description, start_time, end_time, status, meeting_url } = req.body;
+
+    const { rows } = await query(`
+      UPDATE mentoring_slots SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        start_time = COALESCE($3, start_time),
+        end_time = COALESCE($4, end_time),
+        status = COALESCE($5, status),
+        meeting_url = COALESCE($6, meeting_url),
+        updated_at = NOW()
+      WHERE id = $7 AND instructor_id = $8
+      RETURNING *
+    `, [title, description, start_time, end_time, status, meeting_url, id, instructorId]);
+
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Slot not found' });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// DELETE /instructor/mentoring-slots/:id - Delete a slot
+router.delete('/mentoring-slots/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const { id } = req.params;
+    const { rowCount } = await query(
+      'DELETE FROM mentoring_slots WHERE id = $1 AND instructor_id = $2',
+      [id, instructorId]
+    );
+    if (rowCount === 0) return res.status(404).json({ success: false, message: 'Slot not found' });
+    res.json({ success: true, message: 'Slot deleted' });
+  } catch (error) { next(error); }
 });
 
 export default router;
