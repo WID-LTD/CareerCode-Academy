@@ -47,6 +47,7 @@ const Terms = lazy(() => import('@/pages/Terms'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
 const Cookies = lazy(() => import('@/pages/Cookies'));
 const Accessibility = lazy(() => import('@/pages/Accessibility'));
+const UserGuide = lazy(() => import('@/pages/Guide'));
 
 // Student pages
 const StudentDashboard = lazy(() => import('@/pages/student/Dashboard'));
@@ -183,6 +184,7 @@ function App() {
           <Route path="/partners" element={<SuspenseWrapper><Partners /></SuspenseWrapper>} />
           <Route path="/press" element={<SuspenseWrapper><Press /></SuspenseWrapper>} />
           <Route path="/help" element={<SuspenseWrapper><Help /></SuspenseWrapper>} />
+          <Route path="/guide" element={<SuspenseWrapper><UserGuide /></SuspenseWrapper>} />
           <Route path="/terms" element={<SuspenseWrapper><Terms /></SuspenseWrapper>} />
           <Route path="/privacy" element={<SuspenseWrapper><Privacy /></SuspenseWrapper>} />
           <Route path="/cookies" element={<SuspenseWrapper><Cookies /></SuspenseWrapper>} />
