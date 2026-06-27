@@ -146,7 +146,6 @@ app.use('/api/v1/payouts', payoutRoutes);
 // E2E test helper routes (dev only)
 if (process.env.NODE_ENV === 'development') {
   app.use('/api/v1/test', testRoutes);
-  console.log('✓ E2E test routes registered (development mode)');
 }
 
 // 404 handler
@@ -1143,8 +1142,6 @@ function startKeepAlive() {
 
 // Start server
 async function start() {
-  await initDatabaseWithRetry(3, 3000);
-
   server.listen(PORT, () => {
     console.log(`CareerCode Academy API running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);

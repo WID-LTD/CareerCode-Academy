@@ -1,13 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, Plus, Trash2, ChevronLeft, Video, Loader2, Upload, CheckCircle, XCircle, Film, Code, Edit3, X } from 'lucide-react';
+import { Save, Plus, Trash2, ChevronLeft, Video, Loader2, Upload, CheckCircle, XCircle, Film, Code, Edit3, X, Image, FileText, Palette, Briefcase, PenLine } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import api from '@/lib/axios';
 import toast from 'react-hot-toast';
+
+const CHALLENGE_TYPES = [
+  { value: 'code', label: 'Code', icon: Code, color: 'text-purple-500' },
+  { value: 'practical', label: 'Practical', icon: FileText, color: 'text-orange-500' },
+  { value: 'design', label: 'Design', icon: Palette, color: 'text-pink-500' },
+  { value: 'media', label: 'Media', icon: Image, color: 'text-cyan-500' },
+  { value: 'business', label: 'Business', icon: Briefcase, color: 'text-emerald-500' },
+  { value: 'essay', label: 'Essay', icon: PenLine, color: 'text-amber-500' },
+];
 
 export default function CourseEditor() {
   const { slug } = useParams();
@@ -220,13 +229,14 @@ export default function CourseEditor() {
   const [challengeFormOpen, setChallengeFormOpen] = useState(false);
   const [challengeFormLessonId, setChallengeFormLessonId] = useState<string | null>(null);
   const [challengeForm, setChallengeForm] = useState({
-    title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy',
+    title: '', instructions: '', type: 'code' as string,
+    starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy',
+    submissionType: 'file_upload' as string, allowedFileTypes: '', rubric: '' as string, maxFileSize: 10,
   });
   const [editingChallengeId, setEditingChallengeId] = useState<string | null>(null);
   const [savingChallenge, setSavingChallenge] = useState(false);
 
   const openChallengeForm = async (lessonId: string, existing?: any) => {
-    // Load existing challenges for this lesson
     try {
       const { data } = await api.get(`/challenges/lesson/${lessonId}`);
       setChallengesByLesson(prev => ({ ...prev, [lessonId]: data.data || [] }));
@@ -236,15 +246,20 @@ export default function CourseEditor() {
       setChallengeForm({
         title: existing.title || '',
         instructions: existing.instructions || '',
+        type: existing.type || 'code',
         starterCode: existing.starter_code || '',
         expectedOutput: existing.expected_output || '',
         testCases: Array.isArray(existing.test_cases) ? existing.test_cases.map((tc: any) => `${tc.input}|${tc.expected}`).join('\n') : '',
         language: existing.language || 'javascript',
         difficulty: existing.difficulty || 'easy',
+        submissionType: existing.submission_type || 'file_upload',
+        allowedFileTypes: existing.allowed_file_types || '',
+        rubric: Array.isArray(existing.rubric) ? existing.rubric.map((r: any) => `${r.criterion}|${r.maxScore}`).join('\n') : '',
+        maxFileSize: existing.max_file_size || 10,
       });
       setEditingChallengeId(existing.id);
     } else {
-      setChallengeForm({ title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy' });
+      setChallengeForm({ title: '', instructions: '', type: 'code', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy', submissionType: 'file_upload', allowedFileTypes: '', rubric: '', maxFileSize: 10 });
       setEditingChallengeId(null);
     }
     setChallengeFormOpen(true);
@@ -254,21 +269,40 @@ export default function CourseEditor() {
     if (!challengeFormLessonId || !challengeForm.title.trim()) return;
     setSavingChallenge(true);
     try {
-      const testCases = challengeForm.testCases.split('\n').filter(Boolean).map(line => {
+      const testCases = challengeForm.type === 'code' ? challengeForm.testCases.split('\n').filter(Boolean).map(line => {
         const sep = line.includes('|') ? '|' : ',';
         const parts = line.split(sep);
         return { input: parts[0]?.trim() || '', expected: parts[1]?.trim() || '' };
+      }) : [];
+
+      const rubricItems = challengeForm.rubric.split('\n').filter(Boolean).map(line => {
+        const parts = line.split('|');
+        return { criterion: parts[0]?.trim() || '', maxScore: parseInt(parts[1]) || 10 };
       });
-      const payload = {
+
+      const payload: any = {
         lessonId: challengeFormLessonId,
         title: challengeForm.title,
         instructions: challengeForm.instructions,
-        starterCode: challengeForm.starterCode,
-        expectedOutput: challengeForm.expectedOutput,
-        testCases,
-        language: challengeForm.language,
+        type: challengeForm.type,
         difficulty: challengeForm.difficulty,
       };
+
+      if (challengeForm.type === 'code') {
+        Object.assign(payload, {
+          starterCode: challengeForm.starterCode,
+          expectedOutput: challengeForm.expectedOutput,
+          testCases,
+          language: challengeForm.language,
+        });
+      } else {
+        Object.assign(payload, {
+          submissionType: challengeForm.submissionType,
+          allowedFileTypes: challengeForm.allowedFileTypes,
+          rubric: rubricItems,
+          maxFileSize: challengeForm.maxFileSize,
+        });
+      }
 
       if (editingChallengeId) {
         await api.put(`/challenges/${editingChallengeId}`, payload);
@@ -440,12 +474,37 @@ export default function CourseEditor() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Code className="w-5 h-5 text-purple-500" />
+                  {(() => {
+                    const t = CHALLENGE_TYPES.find(t => t.value === challengeForm.type);
+                    const Icon = t?.icon || Code;
+                    return <Icon className="w-5 h-5" style={{ color: t?.color?.replace('text-', '') }} />;
+                  })()}
                   {editingChallengeId ? 'Edit' : 'Add'} Challenge
                 </h2>
                 <button onClick={() => setChallengeFormOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                   <X className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* Challenge Type Selector */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">Challenge Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {CHALLENGE_TYPES.map(t => {
+                    const Icon = t.icon;
+                    const isActive = challengeForm.type === t.value;
+                    return (
+                      <button key={t.value} onClick={() => setChallengeForm({ ...challengeForm, type: t.value })}
+                        className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                          isActive ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Existing challenges */}
@@ -455,9 +514,14 @@ export default function CourseEditor() {
                   {(challengesByLesson[challengeFormLessonId] || []).map((ch: any) => (
                     <div key={ch.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
                       <div className="flex items-center gap-2">
-                        <Code className="w-3 h-3 text-purple-500" />
+                        {(() => {
+                          const t = CHALLENGE_TYPES.find(ct => ct.value === ch.type);
+                          const Icon = t?.icon || Code;
+                          return <Icon className="w-3 h-3" style={{ color: t?.color?.replace('text-', '') }} />;
+                        })()}
                         <span>{ch.title}</span>
                         <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{ch.difficulty}</Badge>
+                        <Badge className="bg-gray-500/10 text-gray-400 text-[10px]">{ch.type || 'code'}</Badge>
                       </div>
                       <div className="flex items-center gap-1">
                         <button onClick={() => openChallengeForm(challengeFormLessonId!, ch)} className="text-gray-400 hover:text-blue-400">
@@ -476,7 +540,7 @@ export default function CourseEditor() {
               {!editingChallengeId && challengeFormLessonId && (challengesByLesson[challengeFormLessonId] || []).length > 0 && (
                 <div className="mb-4">
                   <Button size="sm" variant="outline" onClick={() => {
-                    setChallengeForm({ title: '', instructions: '', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy' });
+                    setChallengeForm({ title: '', instructions: '', type: 'code', starterCode: '', expectedOutput: '', testCases: '', language: 'javascript', difficulty: 'easy', submissionType: 'file_upload', allowedFileTypes: '', rubric: '', maxFileSize: 10 });
                     setEditingChallengeId(null);
                   }}>
                     <Plus className="w-3 h-3 mr-1" /> Add Another
@@ -485,40 +549,81 @@ export default function CourseEditor() {
               )}
 
               <div className="space-y-3">
-                <Input label="Title" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} placeholder="e.g. Reverse a String" />
+                <Input label="Title" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} placeholder="e.g. Reverse a String / Portfolio Design" />
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Instructions</label>
-                  <textarea value={challengeForm.instructions} onChange={(e) => setChallengeForm({ ...challengeForm, instructions: e.target.value })} rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="Write the instructions the student will see..." />
+                  <textarea value={challengeForm.instructions} onChange={(e) => setChallengeForm({ ...challengeForm, instructions: e.target.value })} rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="Describe what the student needs to do..." />
                 </div>
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Starter Code</label>
-                  <textarea value={challengeForm.starterCode} onChange={(e) => setChallengeForm({ ...challengeForm, starterCode: e.target.value })} rows={4} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="// Initial code" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="Expected Output" value={challengeForm.expectedOutput} onChange={(e) => setChallengeForm({ ...challengeForm, expectedOutput: e.target.value })} placeholder="Hello, World!" />
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
-                    <select value={challengeForm.language} onChange={(e) => setChallengeForm({ ...challengeForm, language: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
-                      {['javascript', 'python', 'java', 'cpp', 'go', 'rust', 'typescript', 'ruby', 'php'].map(l => (
-                        <option key={l} value={l}>{l}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Difficulty</label>
-                    <select value={challengeForm.difficulty} onChange={(e) => setChallengeForm({ ...challengeForm, difficulty: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
-                      {['easy', 'medium', 'hard'].map(d => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Test Cases</label>
-                    <textarea value={challengeForm.testCases} onChange={(e) => setChallengeForm({ ...challengeForm, testCases: e.target.value })} rows={2} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="input|expected" />
-                  </div>
-                </div>
+
+                {/* Code-specific fields */}
+                {challengeForm.type === 'code' && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Starter Code</label>
+                      <textarea value={challengeForm.starterCode} onChange={(e) => setChallengeForm({ ...challengeForm, starterCode: e.target.value })} rows={4} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="// Initial code" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input label="Expected Output" value={challengeForm.expectedOutput} onChange={(e) => setChallengeForm({ ...challengeForm, expectedOutput: e.target.value })} placeholder="Hello, World!" />
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
+                        <select value={challengeForm.language} onChange={(e) => setChallengeForm({ ...challengeForm, language: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                          {['javascript', 'python', 'java', 'cpp', 'go', 'rust', 'typescript', 'ruby', 'php'].map(l => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Difficulty</label>
+                        <select value={challengeForm.difficulty} onChange={(e) => setChallengeForm({ ...challengeForm, difficulty: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                          {['easy', 'medium', 'hard'].map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Test Cases</label>
+                        <textarea value={challengeForm.testCases} onChange={(e) => setChallengeForm({ ...challengeForm, testCases: e.target.value })} rows={2} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="input|expected" />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Non-code shared fields */}
+                {challengeForm.type !== 'code' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Submission Type</label>
+                        <select value={challengeForm.submissionType} onChange={(e) => setChallengeForm({ ...challengeForm, submissionType: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                          <option value="file_upload">File Upload</option>
+                          <option value="text">Text Answer</option>
+                          <option value="both">File + Text</option>
+                          <option value="link">Link/URL</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Difficulty</label>
+                        <select value={challengeForm.difficulty} onChange={(e) => setChallengeForm({ ...challengeForm, difficulty: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">
+                          {['easy', 'medium', 'hard'].map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Allowed File Types</label>
+                        <input type="text" value={challengeForm.allowedFileTypes} onChange={(e) => setChallengeForm({ ...challengeForm, allowedFileTypes: e.target.value })} placeholder="pdf, jpg, png, doc" className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Max File Size (MB)</label>
+                        <input type="number" value={challengeForm.maxFileSize} onChange={(e) => setChallengeForm({ ...challengeForm, maxFileSize: parseInt(e.target.value) || 10 })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Rubric (one per line: criterion|maxScore)</label>
+                      <textarea value={challengeForm.rubric} onChange={(e) => setChallengeForm({ ...challengeForm, rubric: e.target.value })} rows={2} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="Design Quality|40&#10;Functionality|30&#10;Creativity|30" />
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => setChallengeFormOpen(false)}>Cancel</Button>
@@ -553,6 +658,16 @@ function LessonRow({
   const isUploading = uploadingLesson === lesson.id;
   const hasVideo = !!lesson.video_url;
 
+  const challengeTypeIcons: Record<string, any> = {
+    code: Code, practical: FileText, design: Palette, media: Image, business: Briefcase, essay: PenLine,
+  };
+
+  const challengeColors: Record<string, string> = {
+    code: 'text-purple-400', practical: 'text-orange-400', design: 'text-pink-400', media: 'text-cyan-400', business: 'text-emerald-400', essay: 'text-amber-400',
+  };
+
+  const ChallengeIcon = challenges.length > 0 ? (challengeTypeIcons[challenges[0]?.type] || Code) : Code;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -582,10 +697,10 @@ function LessonRow({
       <div className="flex items-center gap-1.5 shrink-0">
         <button
           onClick={onManageChallenge}
-          className="text-gray-400 hover:text-purple-400 transition-colors relative"
+          className={`text-gray-400 hover:${challengeColors[challenges[0]?.type] || 'text-purple-400'} transition-colors relative`}
           title="Manage challenge"
         >
-          <Code className="w-3.5 h-3.5" />
+          <ChallengeIcon className="w-3.5 h-3.5" />
           {challenges.length > 0 && (
             <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-purple-500" />
           )}

@@ -74,10 +74,13 @@ export function EventList({ events, selectedDate, typeConfig, months, emptyMessa
                       </a>
                     )}
                     <EventActions
-                      title={event.title}
-                      description={event.course_title || ''}
-                      date={eventDate}
-                      type={event.type}
+                      event={{
+                        title: event.title,
+                        description: event.course_title || '',
+                        date: eventDate,
+                        time: event.time,
+                        meeting_url: event.meeting_url,
+                      }}
                     />
                   </div>
                 </div>

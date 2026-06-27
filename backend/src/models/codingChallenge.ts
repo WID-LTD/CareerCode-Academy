@@ -6,6 +6,7 @@ export interface CodingChallenge {
   title: string;
   description: string;
   instructions: string;
+  type: string;
   starter_code: string;
   test_code: string;
   expected_output: string | null;
@@ -13,6 +14,10 @@ export interface CodingChallenge {
   timeout_seconds: number;
   language: string;
   difficulty: string;
+  submission_type: string;
+  allowed_file_types: string;
+  rubric: any[];
+  max_file_size: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -22,6 +27,8 @@ export interface ChallengeSubmission {
   challenge_id: string;
   user_id: string;
   code: string;
+  file_url: string | null;
+  text_answer: string | null;
   passed: boolean;
   score: number | null;
   feedback: string | null;
@@ -63,6 +70,7 @@ export async function createChallenge(input: {
   title: string;
   description: string;
   instructions: string;
+  type?: string;
   starter_code?: string;
   test_code?: string;
   expected_output?: string;
@@ -70,16 +78,23 @@ export async function createChallenge(input: {
   timeout_seconds?: number;
   language?: string;
   difficulty?: string;
+  submission_type?: string;
+  allowed_file_types?: string;
+  rubric?: any[];
+  max_file_size?: number;
 }): Promise<CodingChallenge> {
   const { rows } = await query<CodingChallenge>(
-    `INSERT INTO coding_challenges (lesson_id, title, description, instructions, starter_code, test_code, expected_output, test_cases, timeout_seconds, language, difficulty)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO coding_challenges (lesson_id, title, description, instructions, type, starter_code, test_code, expected_output, test_cases, timeout_seconds, language, difficulty, submission_type, allowed_file_types, rubric, max_file_size)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING *`,
     [
       input.lesson_id, input.title, input.description, input.instructions,
+      input.type || 'code',
       input.starter_code || '', input.test_code || '',
       input.expected_output || null, JSON.stringify(input.test_cases || []),
-      input.timeout_seconds || 5, input.language || 'javascript', input.difficulty || 'easy'
+      input.timeout_seconds || 5, input.language || 'javascript', input.difficulty || 'easy',
+      input.submission_type || '', input.allowed_file_types || '', JSON.stringify(input.rubric || []),
+      input.max_file_size || 10,
     ]
   );
   return rows[0];
@@ -91,9 +106,10 @@ export async function updateChallenge(id: string, input: Partial<CodingChallenge
   let idx = 1;
   for (const [key, value] of Object.entries(input)) {
     if (value !== undefined) {
-      const dbKey = key === 'testCases' ? 'test_cases' : key === 'expectedOutput' ? 'expected_output' : key === 'timeoutSeconds' ? 'timeout_seconds' : key === 'starterCode' ? 'starter_code' : key === 'testCode' ? 'test_code' : key;
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      const dbKey = snakeKey === 'starter_code' ? 'starter_code' : snakeKey === 'test_code' ? 'test_code' : snakeKey === 'expected_output' ? 'expected_output' : snakeKey === 'test_cases' ? 'test_cases' : snakeKey === 'timeout_seconds' ? 'timeout_seconds' : snakeKey === 'submission_type' ? 'submission_type' : snakeKey === 'allowed_file_types' ? 'allowed_file_types' : snakeKey === 'max_file_size' ? 'max_file_size' : snakeKey;
       fields.push(`${dbKey} = $${idx++}`);
-      values.push(key === 'testCases' || key === 'test_cases' ? JSON.stringify(value) : value);
+      values.push(dbKey === 'test_cases' || dbKey === 'rubric' ? JSON.stringify(value) : value);
     }
   }
   if (fields.length === 0) return null;
@@ -110,9 +126,16 @@ export async function ensureColumns(): Promise<void> {
     await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS expected_output TEXT`);
     await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS test_cases JSONB DEFAULT '[]'::jsonb`);
     await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS timeout_seconds INTEGER DEFAULT 5`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'code'`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS submission_type VARCHAR(50) DEFAULT ''`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS allowed_file_types VARCHAR(500) DEFAULT ''`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS rubric JSONB DEFAULT '[]'::jsonb`);
+    await query(`ALTER TABLE coding_challenges ADD COLUMN IF NOT EXISTS max_file_size INTEGER DEFAULT 10`);
     await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS output TEXT`);
     await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS expected_output TEXT`);
     await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS test_results JSONB DEFAULT '[]'::jsonb`);
+    await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS file_url TEXT`);
+    await query(`ALTER TABLE challenge_submissions ADD COLUMN IF NOT EXISTS text_answer TEXT`);
   } catch {
     // columns may already exist
   }
@@ -126,7 +149,9 @@ export async function deleteChallenge(id: string): Promise<boolean> {
 export async function submitChallenge(input: {
   challenge_id: string;
   user_id: string;
-  code: string;
+  code?: string;
+  file_url?: string;
+  text_answer?: string;
   passed: boolean;
   score?: number;
   output?: string;
@@ -134,11 +159,12 @@ export async function submitChallenge(input: {
   test_results?: any[];
 }): Promise<ChallengeSubmission> {
   const { rows } = await query<ChallengeSubmission>(
-    `INSERT INTO challenge_submissions (challenge_id, user_id, code, passed, score, output, expected_output, test_results)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO challenge_submissions (challenge_id, user_id, code, file_url, text_answer, passed, score, output, expected_output, test_results)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
     [
-      input.challenge_id, input.user_id, input.code, input.passed,
+      input.challenge_id, input.user_id, input.code || '',
+      input.file_url || null, input.text_answer || null, input.passed,
       input.score || null, input.output || null, input.expected_output || null,
       JSON.stringify(input.test_results || [])
     ]

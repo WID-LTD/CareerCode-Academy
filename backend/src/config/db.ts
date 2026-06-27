@@ -44,10 +44,6 @@ export async function query<T extends QueryResultRow = any>(
     const start = Date.now();
     try {
       const result = await p.query<T>(text, params);
-      const duration = Date.now() - start;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Executed query', { text: text.substring(0, 80), duration, rows: result.rowCount });
-      }
       return result;
     } catch (err: any) {
       const isConnErr = isConnectionError(err);

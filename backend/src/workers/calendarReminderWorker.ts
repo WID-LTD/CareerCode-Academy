@@ -133,17 +133,13 @@ export function startCalendarReminderWorker(io: Server) {
         }
       }
     } catch (err) {
-      console.error('Calendar reminder worker error:', err);
     }
   }, 60000);
-
-  console.log('Calendar reminder worker started (interval: 60s)');
 }
 
 export function stopCalendarReminderWorker() {
   if (interval) {
     clearInterval(interval);
     interval = null;
-    console.log('Calendar reminder worker stopped');
   }
 }

@@ -5,8 +5,17 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Pagination } from '../../components/ui/Pagination';
 import { Loader } from '../../components/ui/Loader';
-import CodeEditor from '../../components/student/CodeEditor';
-import { Code, ChevronDown, ChevronUp, Zap, Award } from 'lucide-react';
+import SolveChallenge from '../../components/student/SolveChallenge';
+import { Code, FileText, Palette, Image, Briefcase, PenLine, ChevronDown, ChevronUp, Zap, Award } from 'lucide-react';
+
+const typeConfig: Record<string, { icon: any; label: string; color: string }> = {
+  code: { icon: Code, label: 'Code', color: 'text-purple-500 bg-purple-500/10' },
+  practical: { icon: FileText, label: 'Practical', color: 'text-orange-500 bg-orange-500/10' },
+  design: { icon: Palette, label: 'Design', color: 'text-pink-500 bg-pink-500/10' },
+  media: { icon: Image, label: 'Media', color: 'text-cyan-500 bg-cyan-500/10' },
+  business: { icon: Briefcase, label: 'Business', color: 'text-emerald-500 bg-emerald-500/10' },
+  essay: { icon: PenLine, label: 'Essay', color: 'text-amber-500 bg-amber-500/10' },
+};
 
 export default function Challenges() {
   const [challenges, setChallenges] = useState<any[]>([]);
@@ -17,9 +26,7 @@ export default function Challenges() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    loadChallenges();
-  }, [page, pageSize]);
+  useEffect(() => { loadChallenges(); }, [page, pageSize]);
 
   const loadChallenges = async () => {
     setLoading(true);
@@ -30,50 +37,49 @@ export default function Challenges() {
         setTotalItems(data.pagination.total);
         setTotalPages(data.pagination.pages);
       }
-    } catch {
-      setChallenges([]);
-    } finally {
-      setLoading(false);
-    }
+    } catch { setChallenges([]); }
+    finally { setLoading(false); }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader size="lg" />
-      </div>
-    );
+    return <div className="min-h-[60vh] flex items-center justify-center"><Loader size="lg" /></div>;
   }
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Coding Challenges</h1>
-        <p className="text-gray-500">Practice coding with interactive challenges from your courses.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Challenges</h1>
+        <p className="text-gray-500">Practice with interactive challenges from your courses.</p>
       </div>
 
       <div className="space-y-4">
         {challenges.length === 0 ? (
           <GlassCard className="p-8 text-center">
             <Code className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-500">No coding challenges available yet.</p>
+            <p className="text-gray-500">No challenges available yet.</p>
           </GlassCard>
         ) : (
           challenges.map((ch: any) => {
             const isOpen = expanded === ch.id;
             const sub = ch.submission;
+            const tc = typeConfig[ch.type] || typeConfig.code;
+            const Icon = tc.icon;
             return (
               <GlassCard key={ch.id} className="p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${tc.color}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
                       <h3 className="text-white font-semibold">{ch.title}</h3>
                       {sub && (
                         <Badge className={sub.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
-                          {sub.passed ? 'Passed' : 'Failed'}
+                          {sub.passed ? 'Passed' : sub.score !== null ? 'Graded' : 'Submitted'}
                         </Badge>
                       )}
                       <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{ch.difficulty}</Badge>
+                      <Badge className="bg-gray-500/10 text-gray-400 text-[10px]">{tc.label}</Badge>
                       {sub?.score !== null && sub?.score !== undefined && (
                         <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
                           <Zap className="w-3 h-3" /> {sub.score}/100
@@ -82,16 +88,12 @@ export default function Challenges() {
                     </div>
                     <p className="text-gray-400 text-sm">{ch.description}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                      <span>{ch.language}</span>
+                      {ch.language && <span>{ch.language}</span>}
                       <span>Course: {ch.course_title}</span>
                       <span>Lesson: {ch.lesson_title}</span>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpanded(isOpen ? null : ch.id)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setExpanded(isOpen ? null : ch.id)}>
                     {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -104,28 +106,10 @@ export default function Challenges() {
                         Feedback: {sub.feedback}
                       </div>
                     )}
-                    <CodeEditor
-                      starterCode={ch.starter_code}
-                      language={ch.language}
-                      initialCode={sub?.code}
-                      challengeId={ch.id}
-                      expectedOutput={ch.expected_output}
-                      showExpected={true}
-                      onSubmit={async (code) => {
-                        try {
-                          const { data } = await api.post(`/challenges/${ch.id}/submit`, { code });
-                          loadChallenges();
-                          return {
-                            passed: data.data.passed,
-                            score: data.data.score,
-                            output: data.data.output,
-                            expected_output: data.data.expected_output,
-                            testResults: data.data.testResults || [],
-                          };
-                        } catch {
-                          return { passed: false, score: 0, output: 'Submission failed' };
-                        }
-                      }}
+                    <SolveChallenge
+                      challenge={ch}
+                      submission={sub}
+                      onSubmitted={loadChallenges}
                     />
                   </div>
                 )}

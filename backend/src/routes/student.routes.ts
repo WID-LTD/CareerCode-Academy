@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { query } from '../config/db';
 import { io } from '../config/socket';
+import { createNotification } from '../models/notification';
 
 const router = Router();
 const analyticsCache = new Map<string, { data: any; expiresAt: number }>();
@@ -605,7 +606,8 @@ router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunc
     const { rows } = await query(`
       SELECT cc.*, l.title as lesson_title, c.title as course_title, c.slug as course_slug,
         cs.id as submission_id, cs.code as submission_code, cs.passed as submission_passed,
-        cs.score as submission_score, cs.feedback as submission_feedback, cs.submitted_at as submission_at
+        cs.score as submission_score, cs.feedback as submission_feedback, cs.submitted_at as submission_at,
+        cs.file_url as submission_file_url, cs.text_answer as submission_text_answer
       FROM coding_challenges cc
       JOIN lessons l ON cc.lesson_id = l.id
       JOIN courses c ON l.course_id = c.id
@@ -626,10 +628,13 @@ router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunc
       title: r.title,
       description: r.description,
       instructions: r.instructions,
+      type: r.type || 'code',
       starter_code: r.starter_code,
       test_code: r.test_code,
       language: r.language,
       difficulty: r.difficulty,
+      submission_type: r.submission_type,
+      allowed_file_types: r.allowed_file_types,
       lesson_title: r.lesson_title,
       course_title: r.course_title,
       course_slug: r.course_slug,
@@ -640,6 +645,8 @@ router.get('/challenges', async (req: AuthRequest, res: Response, next: NextFunc
         score: r.submission_score,
         feedback: r.submission_feedback,
         submitted_at: r.submission_at,
+        file_url: r.submission_file_url,
+        text_answer: r.submission_text_answer,
       } : null,
     }));
 
@@ -887,6 +894,44 @@ router.put('/messages/read-all', async (req: AuthRequest, res: Response, next: N
   } catch (error) { next(error); }
 });
 
+// GET /student/users - Search users the student can message (same courses)
+router.get('/users', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const studentId = req.user!.userId;
+    const search = req.query.search as string;
+
+    let sql = `
+      SELECT DISTINCT u.id, u.name, u.email, u.role, u.avatar
+      FROM users u
+      WHERE u.id != $1
+      AND (
+        (u.role = 'instructor' AND u.id IN (
+          SELECT c.instructor_id FROM courses c
+          JOIN enrollments e ON e.course_id = c.id
+          WHERE e.user_id = $1
+        ))
+        OR
+        (u.role = 'student' AND u.id IN (
+          SELECT e2.user_id FROM enrollments e2
+          WHERE e2.course_id IN (
+            SELECT course_id FROM enrollments WHERE user_id = $1
+          )
+        ))
+      )
+    `;
+    const params: any[] = [studentId];
+
+    if (search) {
+      params.push(`%${search}%`);
+      sql += ` AND (u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`;
+    }
+    sql += ' ORDER BY u.name ASC LIMIT 20';
+
+    const { rows } = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
+});
+
 // ----------------------------------------------------------------------
 // MENTORING BOOKING
 // ----------------------------------------------------------------------
@@ -934,8 +979,8 @@ router.post('/mentoring-slots/:id/book', async (req: AuthRequest, res: Response,
 
     // Notify instructor
     await createNotification({
-      userId: slotRes.rows[0].instructor_id,
-      type: 'booking',
+      user_id: slotRes.rows[0].instructor_id,
+      type: 'info',
       title: 'New Mentoring Booking',
       message: 'A student has booked your mentoring slot.',
     });

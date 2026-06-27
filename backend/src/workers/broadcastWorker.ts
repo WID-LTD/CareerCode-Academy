@@ -44,17 +44,13 @@ export function startBroadcastWorker(io: Server) {
         );
       }
     } catch (err) {
-      console.error('Broadcast worker error:', err);
     }
   }, 60000);
-
-  console.log('Broadcast scheduled delivery worker started (interval: 60s)');
 }
 
 export function stopBroadcastWorker() {
   if (interval) {
     clearInterval(interval);
     interval = null;
-    console.log('Broadcast worker stopped');
   }
 }

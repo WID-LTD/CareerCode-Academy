@@ -7,7 +7,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
-import CodeEditor from '../../components/student/CodeEditor';
+import SolveChallenge from '../../components/student/SolveChallenge';
 import { optimizeImageUrl, optimizeVideoThumbnail } from '../../lib/cloudinary';
 import toast from 'react-hot-toast';
 import {
@@ -15,7 +15,7 @@ import {
   FileText, Download, Maximize, BookOpen, Clock, Award,
   ChevronDown, ChevronUp, PenLine, HelpCircle, Monitor, Code,
   Bookmark, BookmarkCheck, Gauge, Minimize2, PartyPopper,
-  Megaphone, BarChart3, Brain,
+  Megaphone, BarChart3, Brain, Palette, Image, Briefcase,
 } from 'lucide-react';
 
 type Tab = 'notes' | 'quiz' | 'resources' | 'challenge' | 'announcements' | 'analytics';
@@ -893,21 +893,49 @@ export default function CourseView() {
 function ChallengeCard({ challenge }: { challenge: any }) {
   const [showEditor, setShowEditor] = useState(false);
   const latestSubmission = challenge.submission;
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get(`/challenges/${challenge.id}/submissions`);
+        setSubmissions(data.data || []);
+      } catch { setSubmissions([]); }
+    })();
+  }, [challenge.id, refreshing]);
+
+  const typeConfig: Record<string, { icon: any; color: string }> = {
+    code: { icon: Code, color: 'text-purple-500 bg-purple-500/10' },
+    practical: { icon: FileText, color: 'text-orange-500 bg-orange-500/10' },
+    design: { icon: Palette, color: 'text-pink-500 bg-pink-500/10' },
+    media: { icon: Image, color: 'text-cyan-500 bg-cyan-500/10' },
+    business: { icon: Briefcase, color: 'text-emerald-500 bg-emerald-500/10' },
+    essay: { icon: PenLine, color: 'text-amber-500 bg-amber-500/10' },
+  };
+  const tc = typeConfig[challenge.type] || typeConfig.code;
+  const TypeIcon = tc.icon;
 
   return (
     <GlassCard className="p-4">
       <div className="flex items-start justify-between mb-2">
-        <div>
-          <h4 className="text-white text-sm font-medium">{challenge.title}</h4>
-          <p className="text-gray-500 text-xs mt-0.5">{challenge.description}</p>
+        <div className="flex items-center gap-2">
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${tc.color}`}>
+            <TypeIcon className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <h4 className="text-white text-sm font-medium">{challenge.title}</h4>
+            <p className="text-gray-500 text-xs mt-0.5">{challenge.description}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {latestSubmission && (
-            <Badge className={latestSubmission.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
-              {latestSubmission.passed ? 'Passed' : 'Failed'}
+            <Badge className={latestSubmission.passed ? 'bg-emerald-500/20 text-emerald-400' : latestSubmission.score !== null ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}>
+              {latestSubmission.passed ? 'Passed' : latestSubmission.score !== null ? `Graded (${latestSubmission.score}/100)` : 'Failed'}
             </Badge>
           )}
           <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">{challenge.difficulty}</Badge>
+          <Badge className="bg-gray-500/10 text-gray-400 text-[10px]">{challenge.type || 'code'}</Badge>
         </div>
       </div>
 
@@ -920,28 +948,10 @@ function ChallengeCard({ challenge }: { challenge: any }) {
       )}
 
       {showEditor && (
-        <CodeEditor
-          starterCode={challenge.starter_code}
-          language={challenge.language}
-          initialCode={latestSubmission?.code}
-          challengeId={challenge.id}
-          expectedOutput={challenge.expected_output}
-          showExpected={true}
-          onSubmit={async (code) => {
-            try {
-              const { data } = await api.post(`/challenges/${challenge.id}/submit`, { code });
-              const d = data.data;
-              return {
-                passed: d.passed,
-                score: d.score,
-                output: d.output,
-                expected_output: d.expected_output,
-                testResults: d.testResults || [],
-              };
-            } catch {
-              return { passed: false, score: 0, output: 'Failed to submit' };
-            }
-          }}
+        <SolveChallenge
+          challenge={challenge}
+          submission={latestSubmission}
+          onSubmitted={() => setRefreshing(r => r + 1)}
         />
       )}
 
@@ -951,7 +961,7 @@ function ChallengeCard({ challenge }: { challenge: any }) {
         className="mt-2"
         onClick={() => setShowEditor(!showEditor)}
       >
-        {showEditor ? 'Hide Editor' : latestSubmission ? 'Edit Submission' : 'Solve Challenge'}
+        {showEditor ? 'Hide' : latestSubmission ? 'Edit Submission' : 'Solve Challenge'}
       </Button>
     </GlassCard>
   );

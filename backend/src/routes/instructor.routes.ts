@@ -364,8 +364,8 @@ router.get('/challenge-submissions', async (req: AuthRequest, res: Response, nex
   try {
     const instructorId = req.user!.userId;
     const { rows } = await query(`
-      SELECT cs.id, cs.challenge_id, cs.code, cs.passed, cs.score, cs.feedback, cs.submitted_at,
-        cc.title as challenge_title, cc.language, cc.difficulty,
+      SELECT cs.id, cs.challenge_id, cs.code, cs.file_url, cs.text_answer, cs.passed, cs.score, cs.feedback, cs.submitted_at,
+        cc.title as challenge_title, cc.language, cc.difficulty, cc.type, cc.submission_type, cc.allowed_file_types, cc.rubric,
         l.title as lesson_title, c.title as course_title,
         u.name as student_name, u.email as student_email
       FROM challenge_submissions cs
@@ -1016,6 +1016,44 @@ router.post('/broadcast', async (req: AuthRequest, res: Response, next: NextFunc
   } catch (error) {
     next(error);
   }
+});
+
+// GET /instructor/users - Search users the instructor can message
+router.get('/users', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.user!.userId;
+    const search = req.query.search as string;
+
+    let sql = `
+      SELECT DISTINCT u.id, u.name, u.email, u.role, u.avatar
+      FROM users u
+      WHERE u.id != $1
+      AND (
+        (u.role = 'student' AND u.id IN (
+          SELECT e.user_id FROM enrollments e
+          JOIN courses c ON c.id = e.course_id
+          WHERE c.instructor_id = $1
+        ))
+        OR
+        (u.role = 'instructor' AND u.id IN (
+          SELECT c2.instructor_id FROM courses c2
+          WHERE c2.id IN (
+            SELECT c3.id FROM courses c3 WHERE c3.instructor_id = $1
+          )
+        ))
+      )
+    `;
+    const params: any[] = [instructorId];
+
+    if (search) {
+      params.push(`%${search}%`);
+      sql += ` AND (u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`;
+    }
+    sql += ' ORDER BY u.name ASC LIMIT 20';
+
+    const { rows } = await query(sql, params);
+    res.json({ success: true, data: rows });
+  } catch (error) { next(error); }
 });
 
 // ----------------------------------------------------------------------

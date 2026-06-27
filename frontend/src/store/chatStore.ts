@@ -203,7 +203,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!query.trim()) { set({ searchResults: [], isSearching: false }); return; }
     set({ isSearching: true });
     try {
-      const { data } = await api.get(`/admin/users?search=${encodeURIComponent(query)}&limit=20`);
+      const prefix = get().apiPrefix;
+      const { data } = await api.get(`${prefix}/users?search=${encodeURIComponent(query)}&limit=20`);
       set({ searchResults: data.data, isSearching: false });
     } catch (error) {
       console.error(error);
