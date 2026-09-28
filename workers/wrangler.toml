@@ -32,6 +32,11 @@ JWT_REFRESH_EXPIRES_IN = "7d"
 FRONTEND_URL = "https://careercode.com.ng"
 CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
 
+# --- Custom domain (Phase 1 cutover): api.careercode.com.ng ---
+[[routes]]
+pattern = "api.careercode.com.ng/*"
+zone_name = "careercode.com.ng"
+
 # [env.production.hyperdrive]  # uncomment after creating the production Hyperdrive
 # binding = "HYPERDRIVE"
 # id = "PASTE_PROD_HYPERDRIVE_ID_HERE"
