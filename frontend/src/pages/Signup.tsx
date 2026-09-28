@@ -172,6 +172,7 @@ export default function Signup() {
                     <div>
                       <Input
                         label="Password"
+                        autoComplete="new-password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Create a strong password"
                         icon={<Lock className="w-4 h-4" />}

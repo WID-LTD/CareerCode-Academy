@@ -175,6 +175,7 @@ export default function ResetPassword() {
                 <div className="space-y-1.5">
                   <Input
                     label="New Password"
+                    autoComplete="new-password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter new password"
                     icon={<Lock className="w-4 h-4 text-gray-400" />}
@@ -217,6 +218,7 @@ export default function ResetPassword() {
                 {/* Confirm Password */}
                 <Input
                   label="Confirm New Password"
+                  autoComplete="new-password"
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="Re-enter new password"
                   icon={<KeyRound className="w-4 h-4 text-gray-400" />}

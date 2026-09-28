@@ -59,6 +59,7 @@ export default function SetPassword() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
                 label="Password"
+                autoComplete="new-password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="At least 6 characters"
                 icon={<Lock className="w-4 h-4" />}
@@ -73,6 +74,7 @@ export default function SetPassword() {
               />
               <Input
                 label="Confirm Password"
+                autoComplete="new-password"
                 type="password"
                 placeholder="Re-enter your password"
                 icon={<CheckCircle className="w-4 h-4" />}

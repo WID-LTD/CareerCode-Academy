@@ -77,6 +77,7 @@ export default function Login() {
               <Input
                 label="Email"
                 type="email"
+                autoComplete="email"
                 placeholder="you@example.com"
                 icon={<Mail className="w-4 h-4" />}
                 value={email}
@@ -87,6 +88,7 @@ export default function Login() {
               <Input
                 label="Password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 placeholder="Enter your password"
                 icon={<Lock className="w-4 h-4" />}
                 rightIcon={

@@ -66,6 +66,31 @@ app.get('/db-health', async (c) => {
 // import authRoutes from './routes/auth';
 // app.route('/api/v1/auth', authRoutes);
 
+// ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
+// transparently forwarded to the legacy Express API so the new domain is
+// fully functional during the port. Mounted LAST among /api/v1 routes —
+// every app.route('/api/v1/...') added above takes precedence over it.
+// TODO(port): remove once all routes are native.
+const LEGACY_API = 'https://careercode-academy.onrender.com';
+
+app.all('/api/v1/*', async (c) => {
+  const url = new URL(c.req.url);
+  const target = `${LEGACY_API}${url.pathname}${url.search}`;
+  const headers = new Headers();
+  c.req.raw.headers.forEach((value, key) => {
+    const k = key.toLowerCase();
+    if (k !== 'host' && k !== 'content-length' && k !== 'connection') headers.set(key, value);
+  });
+  const method = c.req.method.toUpperCase();
+  const resp = await fetch(target, {
+    method,
+    headers,
+    body: method === 'GET' || method === 'HEAD' ? undefined : c.req.raw.body,
+    redirect: 'manual',
+  });
+  return resp;
+});
+
 // ── 404 + errors (same envelope as Express API) ──────────
 app.notFound((c) => c.json({ success: false, message: 'Route not found' }, 404));
 app.onError((err, c) => {
