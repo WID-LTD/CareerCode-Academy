@@ -126,22 +126,37 @@ app.all('/api/v1/*', async (c) => {
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), { method: 'GET' });
     const cached = await cache.match(cacheKey).catch(() => undefined);
-    try {
-      const fresh = await fetchLegacy(c, target, { ...init, method: 'GET', body: undefined });
-      if (fresh.ok) {
-        // `new Response` detaches the body from `fresh`; cache a clone of the
-        // new response and return the new response itself (fresh is consumed).
-        const res = new Response(fresh.body, fresh);
-        res.headers.set('Cache-Control', `public, max-age=${CACHE_TTL_SECONDS}`);
-        c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
-        return res;
+    // Retry loop: a flaky origin often succeeds on the second attempt.
+    // Never pass a raw origin 5xx to the client for safe reads — serve
+    // stale cache, else an honest 502.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const fresh = await fetchLegacy(c, target, { ...init, method: 'GET', body: undefined });
+        if (fresh.ok) {
+          // `new Response` detaches the body from `fresh`; cache a clone of the
+          // new response and return the new response itself (fresh is consumed).
+          const res = new Response(fresh.body, fresh);
+          res.headers.set('Cache-Control', `public, max-age=${CACHE_TTL_SECONDS}`);
+          c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
+          return res;
+        }
+        if (fresh.status >= 500 && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 800));
+          continue; // retry once on origin 5xx
+        }
+        if (cached) return cached; // origin error -> serve stale
+        return fresh;
+      } catch {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 800));
+          continue; // retry once on network failure
+        }
+        if (cached) return cached; // origin unreachable -> serve stale
+        return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
       }
-      if (cached) return cached; // origin error -> serve stale
-      return fresh;
-    } catch {
-      if (cached) return cached; // origin unreachable -> serve stale
-      return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
     }
+    if (cached) return cached;
+    return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
   }
 
   // 2) Mutations + authenticated reads: no cache, one retry, honest 502.
