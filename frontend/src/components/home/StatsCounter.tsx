@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { BookOpen, Users, Award, GraduationCap } from 'lucide-react';
-import { api } from '@/lib/axios';
 
-const defaultStats = [
-  { icon: Users, value: 0, label: 'Students Enrolled', suffix: '' },
-  { icon: BookOpen, value: 0, label: 'Courses Available', suffix: '' },
-  { icon: Award, value: 0, label: 'Certificates Issued', suffix: '' },
-  { icon: GraduationCap, value: 0, label: 'Graduate Alumni', suffix: '' },
+// Social-proof counters: animate 0 -> 999+ when scrolled into view.
+const SOCIAL_PROOF_STATS = [
+  { icon: Users, value: 999, label: 'Students Enrolled', suffix: '+' },
+  { icon: BookOpen, value: 999, label: 'Courses Available', suffix: '+' },
+  { icon: Award, value: 999, label: 'Certificates Issued', suffix: '+' },
+  { icon: GraduationCap, value: 999, label: 'Graduate Alumni', suffix: '+' },
 ];
 
 function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
@@ -41,21 +41,7 @@ function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
 }
 
 export function StatsCounter() {
-  const [stats, setStats] = useState(defaultStats);
-
-  useEffect(() => {
-    api.get('/public/stats')
-      .then(({ data }) => {
-        const s = data?.data || {};
-        setStats([
-          { icon: Users, value: Number(s.students) || 0, label: 'Students Enrolled', suffix: '' },
-          { icon: BookOpen, value: Number(s.courses) || 0, label: 'Courses Available', suffix: '' },
-          { icon: Award, value: Number(s.certificates) || 0, label: 'Certificates Issued', suffix: '' },
-          { icon: GraduationCap, value: Number(s.alumni) || 0, label: 'Graduate Alumni', suffix: '' },
-        ]);
-      })
-      .catch(() => {/* keep defaults */});
-  }, []);
+  const stats = SOCIAL_PROOF_STATS;
 
   return (
     <section className="py-16 relative">

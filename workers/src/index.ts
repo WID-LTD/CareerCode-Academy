@@ -73,22 +73,92 @@ app.get('/db-health', async (c) => {
 // TODO(port): remove once all routes are native.
 const LEGACY_API = 'https://careercode-academy.onrender.com';
 
+// Paths safe for short edge caching: public, unauthenticated GETs only.
+// Authenticated requests (Authorization header) are NEVER cached.
+const CACHEABLE_PREFIXES = [
+  '/api/v1/courses',
+  '/api/v1/public/',
+  '/api/v1/blogs',
+  '/api/v1/schools',
+  '/api/v1/career/jobs',
+  '/api/v1/career/internships',
+  '/api/v1/career/alumni',
+  '/api/v1/search',
+];
+const CACHE_TTL_SECONDS = 60;
+
+function isCacheable(c: any): boolean {
+  if (c.req.method.toUpperCase() !== 'GET') return false;
+  if (c.req.header('authorization')) return false;
+  const path = new URL(c.req.url).pathname;
+  return CACHEABLE_PREFIXES.some((p) => path === p || path.startsWith(p));
+}
+
+async function fetchLegacy(c: any, target: string, init: RequestInit, timeoutMs = 25000): Promise<Response> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(target, { ...init, signal: controller.signal, redirect: 'manual' });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 app.all('/api/v1/*', async (c) => {
   const url = new URL(c.req.url);
   const target = `${LEGACY_API}${url.pathname}${url.search}`;
   const headers = new Headers();
-  c.req.raw.headers.forEach((value, key) => {
+  c.req.raw.headers.forEach((value: string, key: string) => {
     const k = key.toLowerCase();
     if (k !== 'host' && k !== 'content-length' && k !== 'connection') headers.set(key, value);
   });
   const method = c.req.method.toUpperCase();
-  const resp = await fetch(target, {
+  const init: RequestInit = {
     method,
     headers,
     body: method === 'GET' || method === 'HEAD' ? undefined : c.req.raw.body,
-    redirect: 'manual',
-  });
-  return resp;
+  };
+
+  // 1) Edge cache for safe public GETs (absorbs origin/DB blips for reads).
+  // Cache key is the URL alone: cookies/Authorization never vary it, and
+  // isCacheable() already excluded authenticated requests entirely.
+  if (isCacheable(c)) {
+    const cache = caches.default;
+    const cacheKey = new Request(url.toString(), { method: 'GET' });
+    const cached = await cache.match(cacheKey).catch(() => undefined);
+    try {
+      const fresh = await fetchLegacy(c, target, { ...init, method: 'GET', body: undefined });
+      if (fresh.ok) {
+        // `new Response` detaches the body from `fresh`; cache a clone of the
+        // new response and return the new response itself (fresh is consumed).
+        const res = new Response(fresh.body, fresh);
+        res.headers.set('Cache-Control', `public, max-age=${CACHE_TTL_SECONDS}`);
+        c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
+        return res;
+      }
+      if (cached) return cached; // origin error -> serve stale
+      return fresh;
+    } catch {
+      if (cached) return cached; // origin unreachable -> serve stale
+      return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
+    }
+  }
+
+  // 2) Mutations + authenticated reads: no cache, one retry, honest 502.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await fetchLegacy(c, target, init);
+    } catch (err: any) {
+      if (attempt === 1) {
+        return c.json(
+          { success: false, message: 'Upstream service temporarily unavailable. Please retry.' },
+          502
+        );
+      }
+      await new Promise((r) => setTimeout(r, 800));
+    }
+  }
+  return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
 });
 
 // ── 404 + errors (same envelope as Express API) ──────────

@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Play, Code2, Sparkles, Shield, Zap, Award, Users, BookOpen, Building2, Star, ChevronRight } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { Badge } from '@/components/ui/Badge';
-import { api } from '@/lib/axios';
 
 const typingTexts = [
   'Master In-Demand Skills',
@@ -68,25 +67,30 @@ export function Hero() {
   const [textIndex, setTextIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [stats, setStats] = useState([
-    { number: '0', label: 'Students' },
-    { number: '0', label: 'Courses' },
-    { number: '0', label: 'Certificates Issued' },
-    { number: '0', label: 'Graduate Alumni' },
-  ]);
+
+  // Social-proof counters: animate 0 -> 999+ on mount.
+  const SOCIAL_PROOF_TARGET = 999;
+  const [counts, setCounts] = useState([0, 0, 0, 0]);
+  const stats = [
+    { number: `${counts[0].toLocaleString()}+`, label: 'Students' },
+    { number: `${counts[1].toLocaleString()}+`, label: 'Courses' },
+    { number: `${counts[2].toLocaleString()}+`, label: 'Certificates Issued' },
+    { number: `${counts[3].toLocaleString()}+`, label: 'Graduate Alumni' },
+  ];
 
   useEffect(() => {
-    api.get('/public/stats')
-      .then(({ data }) => {
-        const s = data?.data || {};
-        setStats([
-          { number: String(s.students ?? 0).toLocaleString(), label: 'Students' },
-          { number: String(s.courses ?? 0).toLocaleString(), label: 'Courses' },
-          { number: String(s.certificates ?? 0).toLocaleString(), label: 'Certificates Issued' },
-          { number: String(s.alumni ?? 0).toLocaleString(), label: 'Graduate Alumni' },
-        ]);
-      })
-      .catch(() => {/* keep defaults */});
+    const duration = 2000;
+    const startedAt = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const value = Math.floor(eased * SOCIAL_PROOF_TARGET);
+      setCounts([value, value, value, value]);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   useEffect(() => {
