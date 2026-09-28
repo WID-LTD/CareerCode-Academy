@@ -1,0 +1,20 @@
+[Unit]
+Description=CareerCode Academy API
+After=network.target
+
+[Service]
+Type=simple
+User=careercode
+WorkingDirectory=/srv/careercode/repo/backend
+EnvironmentFile=/srv/careercode/backend.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/careercode/api.log
+StandardError=append:/var/log/careercode/api-error.log
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

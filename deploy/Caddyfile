@@ -1,0 +1,41 @@
+# CareerCode Academy — Caddy reverse proxy (careercode-prod VPS)
+# Install: sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# Caddy handles Let's Encrypt automatically. Cloudflare SSL mode must be Full (Strict).
+
+{
+	email johndavidnzubechukwu008@gmail.com
+}
+
+# ── Frontend ──────────────────────────────────────────────
+careercode.com.ng, www.careercode.com.ng {
+	root * /srv/careercode/frontend/dist
+	encode gzip
+	try_files {path} /index.html
+	file_server
+
+	# SPA fallback: serve index.html for non-file routes
+	# (Vite build output; deployed by deploy.sh)
+}
+
+# ── Backend API ───────────────────────────────────────────
+api.careercode.com.ng {
+	encode gzip
+	reverse_proxy 127.0.0.1:5000
+
+	header {
+		# HSTS (Cloudflare also sends its own; harmless duplicate max-age)
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-X-Powered-By
+	}
+
+	# Large uploads (videos, resources)
+	request_body {
+		max_size 512MB
+	}
+}
+
+# ── LiveKit signaling (Phase 4 — uncomment when LiveKit is deployed) ──
+# meet.careercode.com.ng {
+# 	encode gzip
+# 	reverse_proxy 127.0.0.1:7880
+# }
