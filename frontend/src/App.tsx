@@ -165,6 +165,7 @@ const AdminCourseDetail = lazy(() => import('@/pages/admin/AdminCourseDetail'));
 const AdminCareer = lazy(() => import('@/pages/admin/CareerManagement'));
 const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
 const AdminBoardOversight = lazy(() => import('@/pages/admin/BoardOversight'));
+const AdminPrograms = lazy(() => import('@/pages/admin/Programs'));
 
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -340,6 +341,7 @@ function App() {
           <Route path="courses" element={<SuspenseWrapper><AdminCourses /></SuspenseWrapper>} />
           <Route path="courses/:id" element={<SuspenseWrapper><AdminCourseDetail /></SuspenseWrapper>} />
           <Route path="course-proposals" element={<SuspenseWrapper><AdminCourseProposals /></SuspenseWrapper>} />
+          <Route path="programs" element={<SuspenseWrapper><AdminPrograms /></SuspenseWrapper>} />
           <Route path="applications" element={<SuspenseWrapper><AdminApplications /></SuspenseWrapper>} />
           <Route path="payments" element={<SuspenseWrapper><AdminPayments /></SuspenseWrapper>} />
           <Route path="payouts" element={<SuspenseWrapper><AdminPayouts /></SuspenseWrapper>} />

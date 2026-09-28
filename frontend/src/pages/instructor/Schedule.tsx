@@ -27,7 +27,7 @@ export default function InstructorSchedule() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Schedule & Timeline</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Calendar and Events</h1>
         <p className="text-gray-500">Your upcoming live classes and assignment deadlines.</p>
       </div>
 

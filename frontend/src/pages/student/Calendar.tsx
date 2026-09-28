@@ -63,7 +63,7 @@ export default function CalendarPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">
-              <span className="gradient-text">Calendar</span>
+              <span className="gradient-text">Calendar and Events</span>
             </h1>
             <p className="text-gray-400 text-sm mt-1">Your academic and career activity timeline</p>
           </div>

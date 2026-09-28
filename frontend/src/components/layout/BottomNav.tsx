@@ -36,7 +36,7 @@ const roleLinks: Record<string, { label: string; path: string; icon: any }[]> = 
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
-    { label: 'Calendar', path: '/admin/calendar', icon: Calendar },
+    { label: 'Calendar and Events', path: '/admin/calendar', icon: Calendar },
     { label: 'Messages', path: '/admin/messages', icon: MessageSquare },
   ],
 };

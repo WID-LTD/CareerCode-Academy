@@ -56,7 +56,7 @@ export default function AdminCalendarManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">
-              <span className="gradient-text">Event Management</span>
+              <span className="gradient-text">Calendar and Events</span>
             </h1>
             <p className="text-gray-400 text-sm mt-1">Create, manage, and monitor all calendar events</p>
           </div>

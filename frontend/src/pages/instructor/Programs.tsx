@@ -1,11 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { GraduationCap, BookOpen, Users, RefreshCw, School } from 'lucide-react';
+import { GraduationCap, BookOpen, Users, RefreshCw, School, Plus } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { useInstructorStore } from '@/store/instructorStore';
+import { useProgramStore } from '@/store/programStore';
+import { ProgramWizard, SchoolOption } from '@/components/programs/ProgramWizard';
+import { api } from '@/lib/axios';
 import SEO from '@/components/seo/SEO';
 
 const programGradients = [
@@ -31,20 +35,55 @@ const item = {
 
 export default function Programs() {
   const { programs, isLoading, error, fetchPrograms } = useInstructorStore();
+  const { programs: authored, fetchPrograms: fetchAuthored } = useProgramStore();
+  const [wizardOpen, setWizardOpen] = React.useState(false);
+  const [schools, setSchools] = React.useState<SchoolOption[]>([]);
 
   React.useEffect(() => {
     fetchPrograms();
-  }, [fetchPrograms]);
+    fetchAuthored();
+  }, [fetchPrograms, fetchAuthored]);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get('/schools');
+        setSchools((data.data || []).map((s: any) => ({ id: s.id, name: s.name, slug: s.slug })));
+      } catch {
+        setSchools([]);
+      }
+    })();
+  }, []);
+
+  // Limit the school select to schools the instructor is already part of.
+  // Falls back to the full list when the instructor has no programs yet.
+  const instructorSchools = React.useMemo(() => {
+    if (programs.length === 0) return schools;
+    const names = new Set(programs.map((p) => p.school).filter(Boolean));
+    const limited = schools.filter((s) => names.has(s.name));
+    return limited.length > 0 ? limited : schools;
+  }, [programs, schools]);
+
+  const statusBySlug = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of authored) {
+      if (p.slug) map.set(p.slug, p.status);
+    }
+    return map;
+  }, [authored]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <SEO title="My Programs" />
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">My Programs</h1>
           <p className="text-gray-500">View and manage the programs you are part of.</p>
         </div>
+        <Button onClick={() => setWizardOpen(true)} icon={<Plus className="w-4 h-4" />}>
+          Propose Program
+        </Button>
       </div>
 
       {/* Loading State */}
@@ -137,6 +176,11 @@ export default function Programs() {
                     <Badge variant="primary" size="sm" className="ml-auto">
                       View Details
                     </Badge>
+                    {statusBySlug.get(program.slug) === 'pending_review' && (
+                      <Badge variant="warning" size="sm">
+                        Pending review
+                      </Badge>
+                    )}
                   </div>
                 </GlassCard>
               </Link>
@@ -144,6 +188,23 @@ export default function Programs() {
           ))}
         </motion.div>
       )}
+
+      <Modal
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        title="Propose Program"
+        size="xl"
+        className="!max-w-3xl"
+      >
+        <ProgramWizard
+          schools={instructorSchools}
+          onClose={() => setWizardOpen(false)}
+          onSaved={() => {
+            fetchPrograms();
+            fetchAuthored();
+          }}
+        />
+      </Modal>
     </motion.div>
   );
 }

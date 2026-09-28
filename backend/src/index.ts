@@ -63,6 +63,7 @@ import guidedRoutes from './routes/guided.routes';
 import pathwayFinderRoutes from './routes/pathwayFinder.routes';
 import promotionRoutes from './routes/promotion.routes';
 import boardRoutes from './routes/board.routes';
+import programsRoutes from './routes/programs.routes';
 import { query } from './config/db';
 import passport, { configurePassport } from './config/passport';
 
@@ -200,6 +201,7 @@ app.use('/api/v1/guided', guidedRoutes);
 app.use('/api/v1/pathway-finder', pathwayFinderRoutes);
 app.use('/api/v1/promotions', promotionRoutes);
 app.use('/api/v1/board', boardRoutes);
+app.use('/api/v1/programs', programsRoutes);
 
 // E2E test helper routes (dev only)
 if (process.env.NODE_ENV === 'development') {
