@@ -1,3 +1,3 @@
-# Cloudflare Pages SPA fallback (mirrors vercel.json rewrite).
-# All non-file routes serve index.html so React Router owns routing.
+# Cloudflare Pages SPA fallback. All non-file routes serve index.html
+# so React Router owns routing.
 /*    /index.html   200

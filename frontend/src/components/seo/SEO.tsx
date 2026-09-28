@@ -2,7 +2,7 @@ import { Helmet } from 'react-helmet-async';
 
 const SITE_NAME = 'CareerCode Academy';
 const DEFAULT_DESC = 'Helping beginners become job-ready software developers through practical project-based learning.';
-const BASE_URL = 'https://career-code-academy.vercel.app';
+const BASE_URL = 'https://careercode.com.ng';
 
 interface SEOProps {
   title?: string;

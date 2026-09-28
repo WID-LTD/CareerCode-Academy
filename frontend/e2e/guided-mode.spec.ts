@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const API = process.env.API_URL || 'https://careercode-academy.onrender.com/api/v1';
+const API = process.env.API_URL || 'https://api.careercode.com.ng/api/v1';
 const EMAIL = process.env.GUIDED_EMAIL;
 const PASSWORD = process.env.GUIDED_PASSWORD;
 

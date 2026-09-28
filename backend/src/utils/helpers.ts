@@ -31,7 +31,7 @@ export function verifyRefreshToken(token: string): TokenPayload {
  * Short-lived, single-purpose code handed to the SPA after a cross-site OAuth
  * redirect. It lets the frontend obtain real tokens via a same-request POST
  * instead of relying on third-party auth cookies (which browsers block when the
- * API lives on a different site than the frontend, e.g. onrender.com -> vercel.app).
+ * API lives on a different site than the frontend).
  */
 export function generateOAuthExchangeCode(payload: TokenPayload): string {
   return jwt.sign({ ...payload, purpose: 'oauth_exchange' }, process.env.JWT_SECRET!, {
@@ -62,9 +62,7 @@ export function generateCertificateCode(): string {
 }
 
 // Cookies must be SameSite=None; Secure whenever the frontend and API live on
-// different sites (the production setup: vercel.app -> onrender.com), otherwise
-// browsers refuse to attach them to the SPA's cross-site requests. Relying on
-// NODE_ENV alone is brittle (Render does not always set it), so also infer from
+// different sites. Relying on NODE_ENV alone is brittle, so also infer from
 // an https FRONTEND_URL.
 const CROSS_SITE_COOKIES =
   process.env.NODE_ENV === 'production' ||

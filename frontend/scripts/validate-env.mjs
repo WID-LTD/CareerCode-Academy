@@ -31,7 +31,7 @@ if (!viteApi) add('VITE_API_URL', 'fail', 'Missing - should be http://localhost:
 else {
   try { new URL(viteApi); 
     if (viteApi.includes('localhost:5000')) add('VITE_API_URL', 'pass', viteApi);
-    else if (viteApi.includes('onrender')) add('VITE_API_URL', 'warn', `${viteApi} (production URL, use localhost for dev)`);
+    else if (viteApi.includes('careercode.com.ng')) add('VITE_API_URL', 'warn', `${viteApi} (production URL, use localhost for dev)`);
     else add('VITE_API_URL', 'pass', viteApi);
   } catch { add('VITE_API_URL', 'fail', `Invalid URL: ${viteApi}`); }
 }

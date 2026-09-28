@@ -133,7 +133,7 @@ function ProjectSubmitForm({ project, submitted, onSubmitted }: { project: any; 
           </div>
           <div>
             <label className="text-xs font-medium text-gray-300">Live Deployment URL (optional)</label>
-            <input value={liveUrl} onChange={e=>setLiveUrl(e.target.value)} placeholder="https://your-project.vercel.app" className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
+            <input value={liveUrl} onChange={e=>setLiveUrl(e.target.value)} placeholder="https://your-live-project-url" className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={handleSubmit} loading={submitting} disabled={submitting}>Submit</Button>

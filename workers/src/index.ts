@@ -8,7 +8,8 @@ const app = new Hono<{ Bindings: Env }>();
 function allowedOrigins(env: Env): string[] {
   return [
     env.FRONTEND_URL,
-    'https://career-code-academy.vercel.app', // transition overlap, remove at cutover
+    'https://careercode.com.ng',
+    'https://www.careercode.com.ng',
     ...(env.CORS_ORIGINS ? env.CORS_ORIGINS.split(',') : []),
   ]
     .filter(Boolean)
@@ -21,7 +22,6 @@ app.use('*', async (c, next) => {
     origin: (origin) => {
       if (!origin) return origin;
       if (allowed.includes(origin)) return origin;
-      if (/\.vercel\.app$/.test(origin)) return origin; // transition overlap
       return null;
     },
     credentials: true,
