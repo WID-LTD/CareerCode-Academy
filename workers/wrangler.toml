@@ -3,6 +3,7 @@
 #   wrangler secret put <NAME>
 # or .dev.vars locally (gitignored). NEVER commit secrets here.
 
+account_id = "ae5f7e6e4a91cf13a04d8343c445e583"
 name = "careercode-academy-api"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
