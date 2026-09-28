@@ -1,0 +1,36 @@
+# Cloudflare Workers config for the CareerCode Academy API.
+# Secrets (DATABASE_URL, JWT secrets, gateway keys) are set via
+#   wrangler secret put <NAME>
+# or .dev.vars locally (gitignored). NEVER commit secrets here.
+
+name = "careercode-academy-api"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+[vars]
+FRONTEND_URL = "https://careercode.com.ng"
+CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
+JWT_EXPIRES_IN = "15m"
+JWT_REFRESH_EXPIRES_IN = "7d"
+
+# --- Phase 2+: Neon via Hyperdrive (connection pooling). ---
+# Create once: wrangler hyperdrive create careercode-neon --connection-string="$DATABASE_URL"
+# Then uncomment:
+#[[hyperdrive]]
+#binding = "HYPERDRIVE"
+#id = "PASTE_HYPERDRIVE_ID_HERE"
+
+# --- Phase 3: R2 bucket binding (replaces access keys) ---
+# Create once: wrangler r2 bucket create career-code-academy
+# Then uncomment:
+#[[r2_buckets]]
+#binding = "R2"
+#bucket_name = "career-code-academy"
+
+[env.production.vars]
+FRONTEND_URL = "https://careercode.com.ng"
+CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
+
+# [env.production.hyperdrive]  # uncomment after creating the production Hyperdrive
+# binding = "HYPERDRIVE"
+# id = "PASTE_PROD_HYPERDRIVE_ID_HERE"

@@ -11,6 +11,8 @@ build/
 .env.local
 .env.*
 !.env.production
+.dev.vars
+.wrangler/
 
 # IDE
 .vscode/

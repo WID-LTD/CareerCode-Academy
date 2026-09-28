@@ -1,0 +1,23 @@
+{
+  "name": "careercode-academy-workers",
+  "version": "1.0.0",
+  "description": "CareerCode Academy API on Cloudflare Workers (Hono + Neon + R2)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:production": "wrangler deploy --env production",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250922.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.114.0"
+  }
+}

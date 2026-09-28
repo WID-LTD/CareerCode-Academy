@@ -6,13 +6,15 @@
   "type": "module",
   "workspaces": [
     "backend",
-    "frontend"
+    "frontend",
+    "workers"
   ],
   "scripts": {
     "dev": "npm run dev:all",
     "dev:all": "concurrently --names \"backend,frontend\" --prefix-colors \"cyan,magenta\" \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:workers": "npm run dev --workspace=workers",
     "dev:env": "npm run test:env --workspace=backend && npm run test:env --workspace=frontend",
     "test:env": "npm run test:env --workspace=backend && npm run test:env --workspace=frontend",
     "env:check": "npm run test:env",
@@ -20,6 +22,8 @@
     "start:backend": "npm run dev --workspace=backend",
     "start:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "build:workers": "npm run typecheck --workspace=workers",
+    "typecheck:workers": "npm run typecheck --workspace=workers",
     "install:all": "npm install --workspace=backend && npm install --workspace=frontend",
     "migrate": "npm run migrate --workspace=backend",
     "seed": "npm run seed --workspace=backend",
