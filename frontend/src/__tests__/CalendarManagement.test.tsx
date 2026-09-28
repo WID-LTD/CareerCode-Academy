@@ -85,7 +85,7 @@ describe('CalendarManagement — page load', () => {
 
   it('renders the header and Create Event button', () => {
     render(<CalendarManagement />);
-    expect(screen.getByRole('heading', { name: /Event Management/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Calendar and Events/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Create Event/ })).toBeInTheDocument();
   });
 
