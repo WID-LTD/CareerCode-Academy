@@ -109,6 +109,7 @@ const StudentSkillTree = lazy(() => import('@/pages/student/SkillTree'));
 const StudentApplications = lazy(() => import('@/pages/student/Applications'));
 const StudentPortfolio = lazy(() => import('@/pages/student/Portfolio'));
 const StudentGuidedMode = lazy(() => import('@/pages/student/GuidedMode'));
+const StudentLiveRoom = lazy(() => import('@/pages/student/LiveRoom'));
 const StudentPathwayFinder = lazy(() => import('@/pages/student/PathwayFinder'));
 
 // Instructor pages
@@ -301,6 +302,7 @@ function App() {
           <Route path="portfolio" element={<SuspenseWrapper><StudentPortfolio /></SuspenseWrapper>} />
           <Route path="guided" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
           <Route path="guided/:slug" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
+          <Route path="live/:sessionId" element={<SuspenseWrapper><StudentLiveRoom /></SuspenseWrapper>} />
           <Route path="pathway-finder" element={<SuspenseWrapper><StudentPathwayFinder /></SuspenseWrapper>} />
         </Route>
 

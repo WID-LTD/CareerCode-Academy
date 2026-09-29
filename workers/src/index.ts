@@ -6,6 +6,7 @@ import { AuthDO } from './crypto-do';
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
 import publicRoutes from './routes/public';
+import liveRoutes from './routes/live';
 
 export { AuthDO };
 
@@ -73,6 +74,7 @@ app.get('/db-health', async (c) => {
 app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/analytics', analyticsRoutes);
 app.route('/api/v1/public', publicRoutes);
+app.route('/api/v1/live', liveRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -122,7 +124,7 @@ app.all('/api/v1/*', async (c) => {
   const url = new URL(c.req.url);
   // Deterministic native-precedence guard (independent of router ordering):
   // anything under a natively-ported namespace must never reach the proxy.
-  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/'];
+  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/', '/api/v1/live/'];
   if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
     return c.json({ success: false, message: 'Route not found' }, 404);
   }
