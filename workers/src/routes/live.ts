@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { authenticate } from '../auth-helpers';
-import { closeRealtimeSession, createRealtimeSession, mintParticipantToken } from '../realtime';
+import { closeRealtimeSession, createRealtimeSession, mintParticipantToken, probeRealtime } from '../realtime';
 
 const live = new Hono<{ Bindings: Env }>();
 
@@ -197,6 +197,18 @@ live.post('/sessions/:id/end', async (c) => {
     return c.json({ success: true, data: { id: room.id, status: 'ended' } });
   } catch (e: any) {
     return err(c, e?.statusCode || 500, e?.message || 'Failed to end session');
+  }
+});
+
+// GET /api/v1/live/admin/verify (admin): self-test Realtime wiring live
+live.get('/admin/verify', async (c) => {
+  try {
+    await requireRole(c, ['admin', 'super_admin']);
+    const checks = await probeRealtime(c.env);
+    const allOk = checks.every((x) => x.ok);
+    return c.json({ success: allOk, data: { checks } }, (allOk ? 200 : 503) as any);
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Verify failed');
   }
 });
 
