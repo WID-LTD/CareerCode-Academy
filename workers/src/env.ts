@@ -23,5 +23,5 @@ export interface Env {
   // Bindings (phased in)
   // HYPERDRIVE?: Hyperdrive;
   // R2?: R2Bucket;
-  // AUTH_DO?: DurableObjectNamespace;
+  AUTH_DO?: DurableObjectNamespace;
 }

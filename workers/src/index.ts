@@ -2,6 +2,12 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './env';
 import { getDb } from './db';
+import { AuthDO } from './crypto-do';
+import authRoutes from './routes/auth';
+import analyticsRoutes from './routes/analytics';
+import publicRoutes from './routes/public';
+
+export { AuthDO };
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -62,9 +68,11 @@ app.get('/db-health', async (c) => {
   }
 });
 
-// ── Phase 1+: versioned API mounts (ported from backend/src/routes) ──
-// import authRoutes from './routes/auth';
-// app.route('/api/v1/auth', authRoutes);
+// ── Phase 1: native versioned API mounts (ported from backend/src/routes) ──
+// Registered BEFORE the strangler proxy so native routes take precedence.
+app.route('/api/v1/auth', authRoutes);
+app.route('/api/v1/analytics', analyticsRoutes);
+app.route('/api/v1/public', publicRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -112,6 +120,12 @@ async function fetchLegacy(c: any, target: string, init: RequestInit, timeoutMs 
 
 app.all('/api/v1/*', async (c) => {
   const url = new URL(c.req.url);
+  // Deterministic native-precedence guard (independent of router ordering):
+  // anything under a natively-ported namespace must never reach the proxy.
+  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/'];
+  if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
+    return c.json({ success: false, message: 'Route not found' }, 404);
+  }
   const target = `${LEGACY_API}${url.pathname}${url.search}`;
   const headers = new Headers();
   c.req.raw.headers.forEach((value: string, key: string) => {

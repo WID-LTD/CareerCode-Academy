@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^2.4.3",
     "hono": "^4.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250922.0",
+    "@types/bcryptjs": "^2.4.6",
     "typescript": "^5.4.5",
     "wrangler": "^3.114.0"
   }
