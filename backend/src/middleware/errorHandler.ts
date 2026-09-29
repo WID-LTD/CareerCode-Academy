@@ -14,12 +14,18 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  // Handle database connection errors
+  // Handle database connection errors (including DNS/network storms toward
+  // the managed Postgres host: EAI_AGAIN/ENOTFOUND/ENETUNREACH surface as
+  // generic Errors, so match them explicitly instead of leaking 500s).
   function isDbError(e: any): boolean {
     const msg = (e?.message || '').toLowerCase();
+    const code = (e?.code || '').toLowerCase();
     return msg.includes('econnrefused') || msg.includes('etimedout') ||
            msg.includes('connect') || msg.includes('database') ||
-           msg.includes('timeout') || msg.includes('closed');
+           msg.includes('timeout') || msg.includes('closed') ||
+           msg.includes('eai_again') || msg.includes('enotfound') ||
+           msg.includes('enetunreach') || msg.includes('getaddrinfo') ||
+           code === 'eai_again' || code === 'enotfound' || code === 'enetunreach';
   }
 
   if (isDbError(err)) {
