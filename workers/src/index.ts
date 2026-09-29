@@ -97,8 +97,14 @@ function isCacheable(c: any): boolean {
 async function fetchLegacy(c: any, target: string, init: RequestInit, timeoutMs = 25000): Promise<Response> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
   try {
-    return await fetch(target, { ...init, signal: controller.signal, redirect: 'manual' });
+    const resp = await fetch(target, { ...init, signal: controller.signal, redirect: 'manual' });
+    console.log(JSON.stringify({ src: 'edge-proxy', method: init.method, target: target.replace('https://careercode-academy.onrender.com', 'legacy'), status: resp.status, ms: Date.now() - started }));
+    return resp;
+  } catch (err: any) {
+    console.error(JSON.stringify({ src: 'edge-proxy', method: init.method, target: target.replace('https://careercode-academy.onrender.com', 'legacy'), error: err?.name || 'fetch-failed', ms: Date.now() - started }));
+    throw err;
   } finally {
     clearTimeout(t);
   }
@@ -152,11 +158,11 @@ app.all('/api/v1/*', async (c) => {
           continue; // retry once on network failure
         }
         if (cached) return cached; // origin unreachable -> serve stale
-        return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
+        return c.json({ success: false, source: 'edge', message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
       }
     }
     if (cached) return cached;
-    return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
+    return c.json({ success: false, source: 'edge', message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
   }
 
   // 2) Mutations + authenticated reads: no cache, one retry, honest 502.
@@ -173,14 +179,15 @@ app.all('/api/v1/*', async (c) => {
       await new Promise((r) => setTimeout(r, 800));
     }
   }
-  return c.json({ success: false, message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
+  return c.json({ success: false, source: 'edge', message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
 });
 
 // ── 404 + errors (same envelope as Express API) ──────────
 app.notFound((c) => c.json({ success: false, message: 'Route not found' }, 404));
 app.onError((err, c) => {
   const status = (err as any)?.statusCode ?? (err as any)?.status ?? 500;
-  return c.json({ success: false, message: err?.message || 'Internal server error' }, status as any);
+  console.error(JSON.stringify({ src: 'edge-onerror', message: err?.message, status }));
+  return c.json({ success: false, source: 'edge', message: err?.message || 'Internal server error' }, status as any);
 });
 
 export default app;
