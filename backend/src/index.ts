@@ -125,7 +125,7 @@ app.use(analyticsTracker);
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ success: true, message: 'CareerCode Academy API is running', timestamp: new Date().toISOString() });
+  res.json({ success: true, message: 'CareerCode Academy API is running', timestamp: new Date().toISOString(), build: 'c8a454b-probe' });
 });
 
 app.get('/db-health', async (_req, res) => {
