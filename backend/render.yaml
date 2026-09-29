@@ -13,7 +13,7 @@ services:
       - key: FRONTEND_URL
         value: https://careercode.com.ng
       - key: CORS_ORIGINS
-        value: https://careercode.com.ng,https://careercode-academy-1.onrender.com,https://careercode-academy.onrender.com
+        value: https://careercode.com.ng,https://www.careercode.com.ng,https://careercode-academy-1.onrender.com,https://careercode-academy.onrender.com
       - key: GOOGLE_CALLBACK_URL
         value: https://careercode-academy.onrender.com/api/v1/auth/google/callback
       - key: BREVO_SENDER_EMAIL
