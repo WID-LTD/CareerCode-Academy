@@ -34,7 +34,7 @@ bindings = [{ name = "AUTH_DO", class_name = "AuthDO" }]
 
 [[migrations]]
 tag = "v1"
-new_classes = ["AuthDO"]
+new_sqlite_classes = ["AuthDO"]
 
 [env.production.vars]
 FRONTEND_URL = "https://careercode.com.ng"
