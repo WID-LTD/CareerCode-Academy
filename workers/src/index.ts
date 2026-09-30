@@ -9,6 +9,10 @@ import publicRoutes from './routes/public';
 import liveRoutes from './routes/live';
 import courseRoutes from './routes/courses';
 import schoolRoutes from './routes/schools';
+import studentRoutes from './routes/student';
+import notificationRoutes from './routes/notifications';
+import certificateRoutes from './routes/certificates';
+import careerGoalRoutes from './routes/career-goals';
 
 export { AuthDO };
 
@@ -79,6 +83,10 @@ app.route('/api/v1/public', publicRoutes);
 app.route('/api/v1/live', liveRoutes);
 app.route('/api/v1/courses', courseRoutes);
 app.route('/api/v1/schools', schoolRoutes);
+app.route('/api/v1/student', studentRoutes);
+app.route('/api/v1/notifications', notificationRoutes);
+app.route('/api/v1/certificates', certificateRoutes);
+app.route('/api/v1/career-goals', careerGoalRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -128,7 +136,7 @@ app.all('/api/v1/*', async (c) => {
   const url = new URL(c.req.url);
   // Deterministic native-precedence guard (independent of router ordering):
   // anything under a natively-ported namespace must never reach the proxy.
-  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/', '/api/v1/live/', '/api/v1/courses/', '/api/v1/courses', '/api/v1/schools/', '/api/v1/schools'];
+  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/', '/api/v1/live/', '/api/v1/courses/', '/api/v1/courses', '/api/v1/schools/', '/api/v1/schools', '/api/v1/student/', '/api/v1/notifications/', '/api/v1/notifications', '/api/v1/certificates/', '/api/v1/certificates', '/api/v1/career-goals/'];
   if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
     return c.json({ success: false, message: 'Route not found' }, 404);
   }
