@@ -131,6 +131,33 @@ export async function mintParticipantToken(
   throw new Error('No participant endpoint matched');
 }
 
+// ── TURN (verified live 2026-09-30): key created once via API, per-join
+// credentials minted here. iceServers drop straight into RTCPeerConnection.
+export interface IceServers {
+  urls: string[];
+  username: string;
+  credential: string;
+}
+
+export async function issueTurnCredentials(env: Env, ttlSeconds = 86400): Promise<IceServers | null> {
+  const keyId = (env as any).TURN_KEY_ID as string | undefined;
+  const keySecret = (env as any).TURN_KEY_SECRET as string | undefined;
+  if (!keyId || !keySecret) return null;
+  try {
+    const resp = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${keySecret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttl: Math.min(Math.max(ttlSeconds, 300), 86400) }),
+    });
+    const data: any = await resp.json().catch(() => ({}));
+    const ice = data?.iceServers;
+    if (!ice?.urls?.length || !ice?.username || !ice?.credential) return null;
+    return { urls: ice.urls, username: ice.username, credential: ice.credential };
+  } catch {
+    return null;
+  }
+}
+
 // Probe used by `npm run verify:realtime` (docs/REALTIME-VERIFY.md).
 export async function probeRealtime(env: Env): Promise<Array<{ check: string; ok: boolean; detail: string }>> {
   const out: Array<{ check: string; ok: boolean; detail: string }> = [];

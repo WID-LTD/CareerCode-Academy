@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { authenticate } from '../auth-helpers';
-import { closeRealtimeSession, createRealtimeSession, mintParticipantToken, probeRealtime } from '../realtime';
+import { closeRealtimeSession, createRealtimeSession, issueTurnCredentials, mintParticipantToken, probeRealtime } from '../realtime';
 
 const live = new Hono<{ Bindings: Env }>();
 
@@ -146,7 +146,9 @@ live.post('/sessions/:id/join', async (c) => {
         client = { error: e?.message || 'Token mint failed' };
       }
     }
-    return c.json({ success: true, data: { session: room, role, realtime: client } });
+    // Verified TURN ICE servers (mesh-capable fallback + NAT traversal for WHIP/WHEP).
+    const iceServers = await issueTurnCredentials(c.env).catch(() => null);
+    return c.json({ success: true, data: { session: room, role, realtime: client, iceServers } });
   } catch (e: any) {
     return err(c, e?.statusCode || 500, e?.message || 'Failed to join session');
   }

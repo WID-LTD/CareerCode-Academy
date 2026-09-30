@@ -59,9 +59,12 @@ export default function LiveRoom() {
       try {
         const { data } = await api.post(`/live/sessions/${sessionId}/join`);
         if (cancelled) return;
-        const { session, role: myRole, realtime } = data.data;
+        const { session, role: myRole, realtime, iceServers } = data.data;
         setTitle(session.title);
         setRole(myRole);
+        const rtcConfig: RTCConfiguration | undefined = iceServers?.urls?.length
+          ? { iceServers: [{ urls: iceServers.urls, username: iceServers.username, credential: iceServers.credential }] }
+          : undefined;
         if (!realtime || realtime.error || (!realtime.whipUrl && !realtime.whepUrl)) {
           throw new Error(realtime?.error || 'Live media is not provisioned for this session yet (Realtime token pending).');
         }
@@ -78,7 +81,7 @@ export default function LiveRoom() {
 
         // Publish local media (WHIP)
         if (realtime.whipUrl) {
-          const pub = new RTCPeerConnection();
+          const pub = new RTCPeerConnection(rtcConfig);
           pcsRef.current.push(pub);
           stream.getTracks().forEach((t) => pub.addTrack(t, stream));
           const offer = await pub.createOffer();
@@ -97,7 +100,7 @@ export default function LiveRoom() {
 
         // Subscribe to room mix (WHEP)
         if (realtime.whepUrl) {
-          const sub = new RTCPeerConnection();
+          const sub = new RTCPeerConnection(rtcConfig);
           pcsRef.current.push(sub);
           sub.addTransceiver('video', { direction: 'recvonly' });
           sub.addTransceiver('audio', { direction: 'recvonly' });

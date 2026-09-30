@@ -24,4 +24,6 @@ export interface Env {
   // HYPERDRIVE?: Hyperdrive;
   // R2?: R2Bucket;
   AUTH_DO?: DurableObjectNamespace;
+  TURN_KEY_ID?: string;
+  TURN_KEY_SECRET?: string;
 }
