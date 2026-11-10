@@ -24,6 +24,8 @@ export interface Env {
   MAIL_FROM?: string;
   // Cloudflare Turnstile
   TURNSTILE_SECRET?: string;
+  // Workers AI binding
+  AI?: { run: (model: string, input: any) => Promise<any> };
   PAYSTACK_SECRET_KEY?: string;
   PAYSTACK_PUBLIC_KEY?: string;
   FLUTTERWAVE_SECRET_KEY?: string;

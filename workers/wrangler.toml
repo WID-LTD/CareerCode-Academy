@@ -28,6 +28,10 @@ binding = "DB"
 database_name = "careercode-academy"
 database_id = "1287fa42-8291-4192-a2c9-47b44b03001b"
 
+# --- Workers AI (GiGo assistant) ---
+[ai]
+binding = "AI"
+
 # --- Transactional email (Cloudflare Email Service) ---
 [[send_email]]
 name = "EMAIL"

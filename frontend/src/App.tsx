@@ -10,6 +10,7 @@ import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { PwaBridge } from '@/components/pwa/PwaBridge';
+import { GigoWidget } from '@/components/ai/GigoWidget';
 import { ScrollToTop, ErrorBoundary } from '@/components/ui';
 import { SkeletonLine, SkeletonBlock } from '@/components/ui/Skeleton';
 
@@ -273,6 +274,7 @@ function App() {
       <NotificationBridge />
       <RoleWatcher />
       <PwaBridge />
+      <GigoWidget />
       <ScrollToTop />
       <Routes>
         <Route element={<ErrorBoundary><MainLayout /></ErrorBoundary>}>
