@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
+import { requireAuth } from '../route-utils';
 
 const courses = new Hono<{ Bindings: Env }>();
 
@@ -130,6 +131,71 @@ courses.get('/:id', async (c) => {
     return c.json({ success: true, data: await courseDetail(c.env, rows[0]) });
   } catch (e: any) {
     return err(c, 500, e?.message || 'Failed to load course');
+  }
+});
+
+// POST /api/v1/courses/:id/enroll
+courses.post('/:id/enroll', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const courseId = c.req.param('id');
+    const { rows } = await db.query<any>('SELECT * FROM courses WHERE id = $1', [courseId]);
+    const course = rows[0];
+    if (!course) return err(c, 404, 'Course not found');
+
+    const existing = await db.query<any>(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [s.userId, courseId]
+    );
+    if (existing.rows.length) return err(c, 409, 'Already enrolled in this course');
+
+    if (Number(course.price) > 0) {
+      const paid = await db.query<any>(
+        `SELECT id FROM payments WHERE user_id = $1 AND course_id = $2 AND status = 'completed'`,
+        [s.userId, courseId]
+      );
+      if (!paid.rows.length) {
+        return c.json({ success: false, message: 'Payment required. Please complete payment first.' }, 402);
+      }
+    }
+
+    const enrollment = await db.query<any>(
+      `INSERT INTO enrollments (user_id, course_id, status) VALUES ($1, $2, 'active') RETURNING *`,
+      [s.userId, courseId]
+    );
+
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type)
+       VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
+      [course.instructor_id, `A new student enrolled in "${course.title}"`]
+    );
+
+    return c.json({ success: true, data: enrollment.rows[0] }, 201);
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to enroll');
+  }
+});
+
+// DELETE /api/v1/courses/:id/enroll
+courses.delete('/:id/enroll', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const courseId = c.req.param('id');
+    const course = await db.query<any>('SELECT id FROM courses WHERE id = $1', [courseId]);
+    if (!course.rows.length) return err(c, 404, 'Course not found');
+
+    const existing = await db.query<any>(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [s.userId, courseId]
+    );
+    if (!existing.rows.length) return err(c, 404, 'Enrollment not found');
+
+    await db.query('DELETE FROM enrollments WHERE user_id = $1 AND course_id = $2', [s.userId, courseId]);
+    return c.json({ success: true, message: 'Un-enrolled from course successfully' });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to un-enroll');
   }
 });
 

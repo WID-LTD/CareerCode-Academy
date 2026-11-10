@@ -95,13 +95,24 @@ async function call(pathname: string, opts: { token?: string; method?: string; b
 
 async function main() {
   const user: any = raw.prepare(
-    "SELECT id, role FROM users WHERE role = 'student' ORDER BY created_at ASC LIMIT 1"
+    `SELECT u.id, u.role FROM users u JOIN enrollments e ON e.user_id = u.id
+     WHERE u.role = 'student' GROUP BY u.id ORDER BY COUNT(*) DESC LIMIT 1`
   ).get();
   const admin: any = raw.prepare(
     "SELECT id, role FROM users WHERE role IN ('admin','super_admin') LIMIT 1"
   ).get();
   const course: any = raw.prepare("SELECT slug FROM courses LIMIT 1").get();
   const school: any = raw.prepare("SELECT slug FROM schools LIMIT 1").get();
+  const enrolled: any = raw.prepare(
+    "SELECT e.course_id, c.title FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE e.user_id = ? LIMIT 1"
+  ).get(user.id);
+  const anyLesson: any = raw.prepare(
+    "SELECT id, course_id FROM lessons WHERE course_id = ? ORDER BY order_index LIMIT 1"
+  ).get(enrolled.course_id);
+  const freeCourse: any = raw.prepare(
+    "SELECT id, slug FROM courses WHERE published = 1 AND (price IS NULL OR price = 0) LIMIT 1"
+  ).get();
+
   const token = await sign({ userId: user.id, role: user.role, exp: Math.floor(Date.now() / 1000) + 900 }, JWT_SECRET);
   const adminToken = admin
     ? await sign({ userId: admin.id, role: admin.role, exp: Math.floor(Date.now() / 1000) + 900 }, JWT_SECRET)
@@ -170,6 +181,31 @@ async function main() {
       const row = raw.prepare('SELECT COUNT(*) AS c FROM click_events WHERE visitor_id = ?').get(v) as any;
       return { ...r, __rows: row.c };
     }, (r) => (r.json?.success && r.__rows === 1 ? null : `status ${r.status}, rows ${r.__rows}`)],
+    ['GET /api/v1/enrollments', () => call('/api/v1/enrollments?limit=5', { token }), (r) => (Array.isArray(r.json?.data) && r.json.data.length ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/enrollments/:id', async () => {
+      const id = raw.prepare('SELECT id FROM enrollments WHERE user_id = ? LIMIT 1').get(user.id)!.id;
+      return call(`/api/v1/enrollments/${id}`, { token });
+    }, (r) => (r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/progress', () => call(`/api/v1/progress?courseId=${enrolled.course_id}`, { token }), (r) => (r.json?.data?.progress ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/progress', () => call('/api/v1/progress', { method: 'POST', token, body: { lessonId: anyLesson.id, completed: true } }), (r) => {
+      // 403 is correct when the lesson has a published quiz the user hasn't passed.
+      if (r.status === 403 && r.json?.quizRequired) return null;
+      return r.json?.data?.totalLessons > 0 ? null : JSON.stringify(r.json).slice(0, 200);
+    }],
+    ['GET /api/v1/progress/detailed', () => call(`/api/v1/progress/detailed?courseId=${enrolled.course_id}`, { token }), (r) => (r.json?.data?.lessons ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/progress/modules', () => call(`/api/v1/progress/modules?courseId=${enrolled.course_id}`, { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/progress/continue-watching', () => call('/api/v1/progress/continue-watching', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['PUT /api/v1/progress/watch-position', () => call('/api/v1/progress/watch-position', { method: 'PUT', token, body: { lessonId: anyLesson.id, courseId: enrolled.course_id, watchPosition: 42, watchPercentage: 20 } }), (r) => (r.json?.data?.lesson_id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/modules/course/:id', () => call(`/api/v1/modules/course/${enrolled.course_id}`), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/lessons/:id', () => call(`/api/v1/lessons/${anyLesson.id}`), (r) => (r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/lessons/:id/notes', () => call(`/api/v1/lessons/${anyLesson.id}/notes`, { method: 'POST', token, body: { content: 'd1 note' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/lessons/:id/notes', () => call(`/api/v1/lessons/${anyLesson.id}/notes`, { token }), (r) => (r.json?.data === 'd1 note' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/reviews/course/:id', () => call(`/api/v1/reviews/course/${enrolled.course_id}`), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/reviews', () => call('/api/v1/reviews', { method: 'POST', token, body: { courseId: enrolled.course_id, rating: 5, comment: 'd1 review' } }), (r) => (r.status === 201 || r.status === 409 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/wishlists', () => call('/api/v1/wishlists', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/wishlists', () => call('/api/v1/wishlists', { method: 'POST', token, body: { courseId: freeCourse.id } }), (r) => (r.status === 201 || r.status === 409 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/wishlists/:courseId', () => call(`/api/v1/wishlists/${freeCourse.id}`, { method: 'DELETE', token }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/courses/:id/enroll (already enrolled)', () => call(`/api/v1/courses/${enrolled.course_id}/enroll`, { method: 'POST', token }), (r) => (r.status === 409 ? null : `expected 409, got ${r.status}`)],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

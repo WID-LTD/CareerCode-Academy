@@ -13,6 +13,12 @@ import studentRoutes from './routes/student';
 import notificationRoutes from './routes/notifications';
 import certificateRoutes from './routes/certificates';
 import careerGoalRoutes from './routes/career-goals';
+import enrollmentRoutes from './routes/enrollments';
+import lessonRoutes from './routes/lessons';
+import moduleRoutes from './routes/modules';
+import progressRoutes from './routes/progress';
+import reviewRoutes from './routes/reviews';
+import wishlistRoutes from './routes/wishlists';
 
 export { AuthDO };
 
@@ -78,6 +84,12 @@ app.route('/api/v1/student', studentRoutes);
 app.route('/api/v1/notifications', notificationRoutes);
 app.route('/api/v1/certificates', certificateRoutes);
 app.route('/api/v1/career-goals', careerGoalRoutes);
+app.route('/api/v1/enrollments', enrollmentRoutes);
+app.route('/api/v1/lessons', lessonRoutes);
+app.route('/api/v1/modules', moduleRoutes);
+app.route('/api/v1/progress', progressRoutes);
+app.route('/api/v1/reviews', reviewRoutes);
+app.route('/api/v1/wishlists', wishlistRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -127,7 +139,14 @@ app.all('/api/v1/*', async (c) => {
   const url = new URL(c.req.url);
   // Deterministic native-precedence guard (independent of router ordering):
   // anything under a natively-ported namespace must never reach the proxy.
-  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/', '/api/v1/live/', '/api/v1/courses/', '/api/v1/courses', '/api/v1/schools/', '/api/v1/schools', '/api/v1/student/', '/api/v1/notifications/', '/api/v1/notifications', '/api/v1/certificates/', '/api/v1/certificates', '/api/v1/career-goals/'];
+  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/', '/api/v1/live/', '/api/v1/courses/', '/api/v1/courses', '/api/v1/schools/', '/api/v1/schools', '/api/v1/student/', '/api/v1/notifications/', '/api/v1/notifications', '/api/v1/certificates/', '/api/v1/certificates', '/api/v1/career-goals/',
+    '/api/v1/enrollments/', '/api/v1/enrollments',
+    '/api/v1/lessons/', '/api/v1/lessons',
+    '/api/v1/modules/', '/api/v1/modules',
+    '/api/v1/progress/', '/api/v1/progress',
+    '/api/v1/reviews/', '/api/v1/reviews',
+    '/api/v1/wishlists/', '/api/v1/wishlists',
+  ];
   if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
     return c.json({ success: false, message: 'Route not found' }, 404);
   }
