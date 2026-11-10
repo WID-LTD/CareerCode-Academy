@@ -16,12 +16,6 @@ services:
         value: https://careercode.com.ng,https://www.careercode.com.ng,https://careercode-academy-1.onrender.com,https://careercode-academy.onrender.com
       - key: GOOGLE_CALLBACK_URL
         value: https://careercode-academy.onrender.com/api/v1/auth/google/callback
-      - key: BREVO_SENDER_EMAIL
-        value: johndavidnzubechukwu008@gmail.com
-      - key: BREVO_SENDER_NAME
-        value: CareerCode Academy
-      - key: BREVO_API_KEY
-        sync: false
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
