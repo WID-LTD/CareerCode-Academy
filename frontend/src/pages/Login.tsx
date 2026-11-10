@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Turnstile } from '@/components/security/Turnstile';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Code2, Github, Star, Shield, Award, TrendingUp, Quote } from 'lucide-react';
@@ -26,6 +27,7 @@ const testimonials = [
 export default function Login() {
   const location = useLocation();
   const [email, setEmail] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginTimeout, setLoginTimeout] = useState(false);
@@ -46,7 +48,7 @@ export default function Login() {
     setLoginTimeout(false);
     const timer = setTimeout(() => setLoginTimeout(true), 30000);
     try {
-      await login(email, password);
+      await login(email, password, captchaToken || undefined);
     } finally {
       clearTimeout(timer);
     }
@@ -110,6 +112,7 @@ export default function Login() {
                 <Link to="/forgot-password" className="text-primary-600 dark:text-primary-400 hover:underline">Forgot password?</Link>
               </div>
 
+              <Turnstile onToken={setCaptchaToken} />
               <Button type="submit" className="w-full" loading={isLoading}>Sign In</Button>
               {isLoading && loginTimeout && (
                 <p className="text-xs text-amber-600 text-center">

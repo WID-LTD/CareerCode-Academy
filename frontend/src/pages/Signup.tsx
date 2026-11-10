@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Turnstile } from '@/components/security/Turnstile';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Lock, Eye, EyeOff, Code2, GraduationCap, Github, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BookOpen, Brain, Trophy, Zap } from 'lucide-react';
@@ -29,6 +30,7 @@ export default function Signup() {
   const location = useLocation();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -71,7 +73,7 @@ export default function Signup() {
     }
     setErrorMsg('');
     try {
-      await register(name, email, password, 'student');
+      await register(name, email, password, 'student', captchaToken || undefined);
     } catch (err: any) {
       const data = err.response?.data;
       if (data?.errors) {
@@ -292,6 +294,7 @@ export default function Signup() {
                 )}
               </AnimatePresence>
 
+              <Turnstile onToken={setCaptchaToken} />
               <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
                 {step > 0 ? (
                   <Button type="button" variant="outline" onClick={handleBack} icon={<ArrowLeft className="w-4 h-4" />}>

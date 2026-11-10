@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import api from '@/lib/axios';
+import { Turnstile } from '@/components/security/Turnstile';
 
 const steps = [
   { title: 'Personal Info', icon: User },
@@ -65,6 +66,7 @@ export default function Apply() {
     motivation: ''
   });
   
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [resume, setResume] = useState<File | null>(null);
   const [profileImage, setProfileImage] = useState<File | null>(null);
 
@@ -109,6 +111,7 @@ export default function Apply() {
       Object.entries(formData).forEach(([key, value]) => {
         data.append(key, value);
       });
+      data.append('turnstileToken', captchaToken || '');
       if (resume) data.append('resume', resume);
       if (profileImage) data.append('profileImage', profileImage);
 
@@ -407,6 +410,7 @@ export default function Apply() {
               ) : (
                 <div />
               )}
+              <Turnstile onToken={setCaptchaToken} />
               <Button type="submit" disabled={!canProceed && step < 4} loading={isSubmitting} className="sm:min-w-[160px]">
                 {step < 4 ? (
                   <>Next <ArrowRight className="w-4 h-4" /></>

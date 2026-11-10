@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import api from '@/lib/axios';
+import { Turnstile } from '@/components/security/Turnstile';
 import toast from 'react-hot-toast';
 import SEO from '@/components/seo/SEO';
 
@@ -27,6 +28,7 @@ const RESEND_COOLDOWN = 60; // 60 seconds
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -69,7 +71,7 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      await api.post('/auth/forgot-password', { email: email.trim() });
+      await api.post('/auth/forgot-password', { email: email.trim(), turnstileToken: captchaToken || undefined });
       setSent(true);
       setCountdown(RESEND_COOLDOWN);
       toast.success('Password reset link sent! Check your inbox.');
@@ -92,7 +94,7 @@ export default function ForgotPassword() {
 
     setIsResending(true);
     try {
-      await api.post('/auth/forgot-password', { email: email.trim() });
+      await api.post('/auth/forgot-password', { email: email.trim(), turnstileToken: captchaToken || undefined });
       setCountdown(RESEND_COOLDOWN);
       toast.success('Reset email resent successfully!');
     } catch (err: unknown) {
@@ -295,7 +297,8 @@ export default function ForgotPassword() {
                     autoFocus
                   />
 
-                  <Button
+                  <Turnstile onToken={setCaptchaToken} />
+              <Button
                     type="submit"
                     className="w-full h-11 text-base font-semibold shadow-lg shadow-primary-500/20"
                     loading={isLoading}

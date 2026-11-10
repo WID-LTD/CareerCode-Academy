@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { fail, statusOf } from '../route-utils';
 import { parseBody, field, storeOrLink } from '../uploads';
 import { mail } from '../email';
+import { verifyTurnstile } from '../turnstile';
 
 // Ported from backend/src/routes/application.routes.ts.
 // Multer/multipart is intentionally not implemented: send JSON. Optional
@@ -52,6 +53,9 @@ async function resolveUpload(env: Env, providedUrl: any, file: any, folder: stri
 applications.post('/instructor', async (c) => {
   try {
     const { fields, file } = await parseBody(c);
+
+    const captcha = await verifyTurnstile(c.env, field(fields, 'turnstileToken', 'cf-turnstile-response'), c.req.header('cf-connecting-ip'));
+    if (!captcha.ok) return fail(c, 400, captcha.error || 'Captcha verification failed');
 
     const fullName = field(fields, 'fullName', 'full_name', 'name');
     const email = String(field(fields, 'email') || '').trim().toLowerCase();

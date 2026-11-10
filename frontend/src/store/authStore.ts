@@ -28,8 +28,8 @@ interface AuthState {
   initialized: boolean;
   setUser: (user: User | null) => void;
   setTokens: (token: string, refreshToken: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: string) => Promise<void>;
+  login: (email: string, password: string, turnstileToken?: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: string, turnstileToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   fetchUser: () => Promise<void>;
@@ -73,10 +73,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      login: async (email, password) => {
+      login: async (email, password, turnstileToken) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post('/auth/login', { email, password });
+          const { data } = await api.post('/auth/login', { email, password, turnstileToken });
           const userData = data.data;
           set({
             user: {
@@ -99,10 +99,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (name, email, password, role) => {
+      register: async (name, email, password, role, turnstileToken) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post('/auth/register', { name, email, password, role });
+          const { data } = await api.post('/auth/register', { name, email, password, role, turnstileToken });
           const userData = data.data;
           set({
             user: {

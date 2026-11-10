@@ -22,6 +22,8 @@ export interface Env {
   // Transactional email: Cloudflare Email Service binding (send_email).
   EMAIL?: { send: (message: any) => Promise<any> };
   MAIL_FROM?: string;
+  // Cloudflare Turnstile
+  TURNSTILE_SECRET?: string;
   PAYSTACK_SECRET_KEY?: string;
   PAYSTACK_PUBLIC_KEY?: string;
   FLUTTERWAVE_SECRET_KEY?: string;

@@ -16,9 +16,9 @@ export function useAuth() {
     fetchUser,
   } = useAuthStore();
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, turnstileToken?: string) => {
     try {
-      await storeLogin(email, password);
+      await storeLogin(email, password, turnstileToken);
       toast.success('Welcome back!');
       const role = useAuthStore.getState().user?.role;
       if (role === 'admin' || role === 'super_admin') navigate('/admin/dashboard');
@@ -52,10 +52,11 @@ export function useAuth() {
     name: string,
     email: string,
     password: string,
-    role: string
+    role: string,
+    turnstileToken?: string
   ) => {
     try {
-      await storeRegister(name, email, password, role);
+      await storeRegister(name, email, password, role, turnstileToken);
       const state = useAuthStore.getState();
       const userEmail = state.user?.email || email;
       toast.success('Account created! Please verify your email.');

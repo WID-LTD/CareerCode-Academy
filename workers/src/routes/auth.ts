@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getDb } from '../db';
+import { verifyTurnstile } from '../turnstile';
 import { getCookie } from 'hono/cookie';
 import type { Env } from '../env';
 import {
@@ -55,6 +56,9 @@ auth.post('/register', async (c) => {
   if (password.length < 6 || password.length > 100) return err(c, 400, 'Validation failed', { errors: { password: ['Password must be at least 6 characters'] } });
   if (role !== 'student') return err(c, 400, 'Validation failed', { errors: { role: ['Invalid role'] } });
 
+  const captcha = await verifyTurnstile(c.env, body.turnstileToken, c.req.header('cf-connecting-ip'));
+  if (!captcha.ok) return err(c, 400, captcha.error || 'Captcha verification failed');
+
   try {
     const existing = await getUserByEmail(c.env, email);
     if (existing) return err(c, 409, 'Email already registered');
@@ -100,6 +104,9 @@ auth.post('/login', async (c) => {
   const password = String(body.password || '');
   if (!EMAIL_RE.test(email)) return err(c, 400, 'Validation failed', { errors: { email: ['Invalid email address'] } });
   if (!password) return err(c, 400, 'Validation failed', { errors: { password: ['Password is required'] } });
+
+  const captcha = await verifyTurnstile(c.env, body.turnstileToken, c.req.header('cf-connecting-ip'));
+  if (!captcha.ok) return err(c, 400, captcha.error || 'Captcha verification failed');
 
   const user = await getUserByEmail(c.env, email);
   if (!user || !(user as any).password) {
@@ -311,6 +318,8 @@ auth.post('/forgot-password', async (c) => {
   const body: any = await c.req.json().catch(() => ({}));
   const email = String(body.email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return err(c, 400, 'Validation failed', { errors: { email: ['Invalid email address'] } });
+  const captcha = await verifyTurnstile(c.env, body.turnstileToken, c.req.header('cf-connecting-ip'));
+  if (!captcha.ok) return err(c, 400, captcha.error || 'Captcha verification failed');
   try {
     const user = await getUserByEmail(c.env, email);
     const delay = new Promise((r) => setTimeout(r, 300));
