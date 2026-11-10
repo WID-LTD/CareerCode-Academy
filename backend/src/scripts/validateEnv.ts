@@ -60,16 +60,6 @@ function testJwt() {
 }
 
 function testBrevo() {
-  const key = process.env.BREVO_API_KEY || '';
-  const email = process.env.BREVO_SENDER_EMAIL || '';
-  const name = process.env.BREVO_SENDER_NAME || '';
-  if (!key.startsWith('xkeysib-')) add('BREVO_API_KEY', 'fail', 'Must start with xkeysib-');
-  else if (key.length < 50) add('BREVO_API_KEY', 'warn', `Suspiciously short (${key.length})`);
-  else add('BREVO_API_KEY', 'pass', `Length ${key.length} looks ok`, `${key.slice(0,12)}...${key.slice(-6)}`);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) add('BREVO_SENDER_EMAIL', 'fail', `Invalid email: ${email}`);
-  else add('BREVO_SENDER_EMAIL', 'pass', email);
-  if (!name || name.length < 2) add('BREVO_SENDER_NAME', 'fail', 'Too short');
-  else add('BREVO_SENDER_NAME', 'pass', name);
 }
 
 function testPaystack() {

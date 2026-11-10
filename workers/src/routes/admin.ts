@@ -3,7 +3,7 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, pageParams, requireRole, statusOf } from '../route-utils';
 import { hashPassword, randomToken, type TokenPayload } from '../auth-helpers';
-import { mail } from '../email';
+import { mail, sendEmail } from '../email';
 import * as M from '../admin/models';
 import * as A from '../admin/analytics';
 import { syncLearningPathForCourse } from '../admin/learning-path-sync';
@@ -254,6 +254,24 @@ admin.get('/dashboard', async (c) => {
 // ══════════════════════════════════════════════════════════════
 
 // GET /admin/users
+// POST /admin/email-test — verify the transactional email provider
+admin.post('/email-test', async (c) => {
+  try {
+    const body = await jsonBody(c);
+    const to = String(body.to || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return fail(c, 400, 'A valid "to" address is required');
+    const result = await sendEmail(c.env, {
+      to,
+      subject: 'CareerCode email service test',
+      html: '<p>This is a test from CareerCode Academy.</p>',
+      text: 'This is a test from CareerCode Academy.',
+    });
+    return c.json({ success: result.ok, data: result }, result.ok ? 200 : 502 as any);
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to send test email');
+  }
+});
+
 // POST /admin/users — create a user and email a set-password invite
 admin.post('/users', async (c) => {
   try {

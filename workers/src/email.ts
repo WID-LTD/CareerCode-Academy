@@ -2,12 +2,9 @@ import type { Env } from './env';
 
 // Single transactional-email entry point.
 //
-// Preferred: Cloudflare Email Service binding (`send_email` -> env.EMAIL).
-//   NOTE: outbound sending requires the Workers Paid plan on Cloudflare.
-// Fallback: Resend REST API (free tier) when RESEND_API_KEY is set.
-// If neither is configured the call is a logged no-op so flows never break.
-//
-// Brevo has been removed entirely.
+// Cloudflare Email Service only (`send_email` binding -> env.EMAIL).
+// If the binding is missing the call is a logged no-op so flows never break.
+// Brevo and Resend have been removed entirely.
 
 export interface MailAttachment {
   filename: string;
@@ -47,37 +44,6 @@ export async function sendEmail(env: Env, input: MailInput): Promise<{ ok: boole
     } catch (e: any) {
       console.error(JSON.stringify({ src: 'email', provider: 'cloudflare', error: e?.code || e?.message }));
       return { ok: false, provider: 'cloudflare', error: e?.message };
-    }
-  }
-
-  if (env.RESEND_API_KEY) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [input.to],
-          subject: input.subject,
-          html: input.html,
-          text: input.text,
-          reply_to: input.replyTo,
-          attachments: input.attachments?.map((a) => ({
-            filename: a.filename,
-            content: typeof a.content === 'string' ? a.content : undefined,
-            content_type: a.type,
-          })),
-        }),
-      });
-      const json: any = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.error(JSON.stringify({ src: 'email', provider: 'resend', status: res.status, error: json?.message }));
-        return { ok: false, provider: 'resend', error: json?.message };
-      }
-      return { ok: true, provider: 'resend', id: json?.id };
-    } catch (e: any) {
-      console.error(JSON.stringify({ src: 'email', provider: 'resend', error: e?.message }));
-      return { ok: false, provider: 'resend', error: e?.message };
     }
   }
 

@@ -20,9 +20,6 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
   // Brevo
-  BREVO_API_KEY: z.string().startsWith('xkeysib-', 'BREVO_API_KEY must start with xkeysib-'),
-  BREVO_SENDER_EMAIL: z.string().email(),
-  BREVO_SENDER_NAME: z.string().min(2),
 
   // Paystack
   PAYSTACK_SECRET_KEY: z.string().startsWith('sk_', 'PAYSTACK_SECRET_KEY must start with sk_'),

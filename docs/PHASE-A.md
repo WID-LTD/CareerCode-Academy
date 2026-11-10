@@ -46,12 +46,18 @@ Date: 2026-11-10
   idempotent payment 200, PWA assets served with correct MIME types
 - 0 external course images, 0 base64 resources
 
-## Open (needs decision)
+## Email (done)
 
-1. **Transactional email provider.** Cloudflare Email Sending requires the
-   Workers Paid plan ($5/mo, 3k emails/month). The code supports it via the
-   `EMAIL` binding, and falls back to Resend if `RESEND_API_KEY` is set.
-   Until one is configured, `sendEmail()` logs and no-ops (flows still work).
+- Cloudflare Email Service only — **Brevo and Resend removed everywhere**
+- `careercode.com.ng` onboarded as a sending domain (SPF, DKIM, DMARC auto-published)
+- Worker binding `send_email` (`EMAIL`), sender `noreply@careercode.com.ng`
+- Verified end-to-end: `POST /admin/email-test` returns
+  `{ok:true, provider:"cloudflare", id:"…@careercode.com.ng"}`
+- Details: `docs/EMAIL.md`
+
+## Open
+
+1. ~~Transactional email provider~~ — resolved (Cloudflare Email Service).
 2. Background Web Push (tab closed) still needs VAPID + subscription table.
 3. Full media UX (gallery uploads, image resizing) and portfolio templates are
    Phase C.
