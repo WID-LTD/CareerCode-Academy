@@ -1618,15 +1618,62 @@ admin.delete('/certificate-templates/:id', async (c) => {
   }
 });
 
-// File uploads (multer) are not available on Workers. These four endpoints
-// return 501 with instructions instead of pretending to store the file.
-const UPLOAD_501 =
-  'File uploads are not supported on the Workers deployment. Upload the image to your object storage and save the resulting URL instead.';
+// ── Uploads (R2) ──────────────────────────────────────────────────────────
+// The Express app used multer; here we accept multipart/form-data (or a JSON
+// base64 body) and store the object in the R2 media bucket.
+async function storeUpload(env: Env, file: File, folder: string): Promise<string> {
+  if (!env.R2) throw Object.assign(new Error('R2 is not configured'), { statusCode: 503 });
+  const safe = (file.name || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const key = `${folder}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
+  await env.R2.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: file.type || 'application/octet-stream' },
+  });
+  return `${(env.R2_PUBLIC_URL || '').replace(/\/$/, '')}/${key}`;
+}
 
-admin.post('/certificate-templates/:id/upload-stamp', (c) => fail(c, 501, UPLOAD_501));
-admin.post('/certificate-templates/:id/upload-signature', (c) => fail(c, 501, UPLOAD_501));
-admin.post('/certificate-templates/:id/upload-logo', (c) => fail(c, 501, UPLOAD_501));
-admin.post('/settings/upload-branding', (c) => fail(c, 501, UPLOAD_501));
+async function readUpload(c: any): Promise<File | null> {
+  const type = c.req.header('content-type') || '';
+  if (type.includes('application/json')) {
+    const body: any = await c.req.json().catch(() => ({}));
+    if (!body.data) return null;
+    const bytes = Uint8Array.from(atob(String(body.data)), (ch) => ch.charCodeAt(0));
+    return new File([bytes], body.fileName || body.name || 'upload', { type: body.contentType || 'application/octet-stream' });
+  }
+  const form = await c.req.formData().catch(() => null);
+  const file = form?.get('file') || form?.get('image') || form?.get('stamp') || form?.get('signature') || form?.get('logo');
+  return file instanceof File ? file : null;
+}
+
+async function uploadTemplateImage(c: any, column: 'stamp_url' | 'signature_url' | 'logo_url') {
+  try {
+    const file = await readUpload(c);
+    if (!file) return fail(c, 400, 'No file uploaded');
+    const url = await storeUpload(c.env, file, 'certificates');
+    const { rows } = await getDb(c.env).query<any>(
+      `UPDATE certificate_templates SET ${column} = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [url, c.req.param('id')]
+    );
+    if (!rows.length) return fail(c, 404, 'Template not found');
+    return c.json({ success: true, data: { url, template: rows[0] } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Upload failed');
+  }
+}
+
+admin.post('/certificate-templates/:id/upload-stamp', (c) => uploadTemplateImage(c, 'stamp_url'));
+admin.post('/certificate-templates/:id/upload-signature', (c) => uploadTemplateImage(c, 'signature_url'));
+admin.post('/certificate-templates/:id/upload-logo', (c) => uploadTemplateImage(c, 'logo_url'));
+
+admin.post('/settings/upload-branding', async (c) => {
+  try {
+    const file = await readUpload(c);
+    if (!file) return fail(c, 400, 'No file uploaded');
+    const url = await storeUpload(c.env, file, 'branding');
+    return c.json({ success: true, data: { url } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Upload failed');
+  }
+});
 
 // ══════════════════════════════════════════════════════════════
 // SUPER ADMIN ONLY
