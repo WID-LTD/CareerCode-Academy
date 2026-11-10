@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './env';
-import { getDb } from './db';
+import { getDb, dbBackend } from './db';
 import { AuthDO } from './crypto-do';
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
@@ -19,6 +19,11 @@ import moduleRoutes from './routes/modules';
 import progressRoutes from './routes/progress';
 import reviewRoutes from './routes/reviews';
 import wishlistRoutes from './routes/wishlists';
+import gamificationRoutes from './routes/gamification';
+import learningPathRoutes from './routes/learning-paths';
+import searchRoutes from './routes/search';
+import userRoutes from './routes/users';
+import resourceRoutes from './routes/resources';
 
 export { AuthDO };
 
@@ -59,14 +64,20 @@ app.get('/health', (c) =>
 );
 
 app.get('/db-health', async (c) => {
-  // D1 is the primary datastore; the binding is validated by an actual query.
+  // Reports which backend is active and proves it with a real query.
+  const backend = (() => { try { return dbBackend(c.env); } catch { return 'unconfigured'; } })();
   try {
     const db = getDb(c.env);
     const { rows } = await db.query<{ now: string }>('SELECT NOW() AS now');
-    return c.json({ success: true, message: 'D1 is connected', timestamp: rows[0]?.now });
+    return c.json({
+      success: true,
+      message: backend === 'd1' ? 'D1 is connected' : 'Neon is connected',
+      backend,
+      timestamp: rows[0]?.now,
+    });
   } catch (error: any) {
     return c.json(
-      { success: false, message: 'D1 connection failed', detail: error?.message },
+      { success: false, message: `${backend} connection failed`, backend, detail: error?.message },
       503
     );
   }
@@ -90,6 +101,11 @@ app.route('/api/v1/modules', moduleRoutes);
 app.route('/api/v1/progress', progressRoutes);
 app.route('/api/v1/reviews', reviewRoutes);
 app.route('/api/v1/wishlists', wishlistRoutes);
+app.route('/api/v1/gamification', gamificationRoutes);
+app.route('/api/v1/learning-paths', learningPathRoutes);
+app.route('/api/v1/search', searchRoutes);
+app.route('/api/v1/users', userRoutes);
+app.route('/api/v1/resources', resourceRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -146,6 +162,11 @@ app.all('/api/v1/*', async (c) => {
     '/api/v1/progress/', '/api/v1/progress',
     '/api/v1/reviews/', '/api/v1/reviews',
     '/api/v1/wishlists/', '/api/v1/wishlists',
+    '/api/v1/gamification/', '/api/v1/gamification',
+    '/api/v1/learning-paths/', '/api/v1/learning-paths',
+    '/api/v1/search/', '/api/v1/search',
+    '/api/v1/users/', '/api/v1/users',
+    '/api/v1/resources/', '/api/v1/resources',
   ];
   if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
     return c.json({ success: false, message: 'Route not found' }, 404);

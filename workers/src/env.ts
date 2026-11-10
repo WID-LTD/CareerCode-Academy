@@ -2,11 +2,14 @@
 // Secrets are injected via `wrangler secret put` / .dev.vars — never committed.
 
 export interface Env {
-  // Cloudflare D1 (primary datastore since the Neon -> D1 migration)
-  DB: D1Database;
-  // Legacy Neon connection string. Kept optional while the last proxied
-  // routes still run on Render; the worker itself no longer reads it.
+  // Primary datastore (Cloudflare D1).
+  DB?: D1Database;
+  // Neon fallback, used only when DB_BACKEND=neon.
   DATABASE_URL?: string;
+  // Manual switch: 'd1' (default) or 'neon'. Set as a worker secret/var.
+  DB_BACKEND?: 'd1' | 'neon';
+  // R2 bucket for database backups (see scripts/backup-d1.sh).
+  BACKUPS?: R2Bucket;
   FRONTEND_URL: string;
   CORS_ORIGINS?: string;
   JWT_SECRET: string;

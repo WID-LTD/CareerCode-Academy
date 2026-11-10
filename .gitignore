@@ -63,3 +63,6 @@ backend/uploads/
 
 # Package locks (regenerated on install)
 package-lock.json
+
+# local database dumps (remote copies live in R2)
+backups/

@@ -206,6 +206,23 @@ async function main() {
     ['POST /api/v1/wishlists', () => call('/api/v1/wishlists', { method: 'POST', token, body: { courseId: freeCourse.id } }), (r) => (r.status === 201 || r.status === 409 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['DELETE /api/v1/wishlists/:courseId', () => call(`/api/v1/wishlists/${freeCourse.id}`, { method: 'DELETE', token }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['POST /api/v1/courses/:id/enroll (already enrolled)', () => call(`/api/v1/courses/${enrolled.course_id}/enroll`, { method: 'POST', token }), (r) => (r.status === 409 ? null : `expected 409, got ${r.status}`)],
+    ['GET /api/v1/gamification/hearts', () => call('/api/v1/gamification/hearts', { token }), (r) => (r.json?.data?.maxHearts ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/gamification/daily-progress', () => call('/api/v1/gamification/daily-progress', { token }), (r) => (r.json?.data?.goal ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/gamification/xp-history', () => call('/api/v1/gamification/xp-history', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/gamification/balance', () => call('/api/v1/gamification/balance', { token }), (r) => (typeof r.json?.data?.available === 'number' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/gamification/discount-codes', () => call('/api/v1/gamification/discount-codes', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/gamification/xp-history-full', () => call('/api/v1/gamification/xp-history-full', { token }), (r) => (r.json?.data?.balance ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/learning-paths', () => call('/api/v1/learning-paths'), (r) => (Array.isArray(r.json?.data) && r.json.data.length ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/learning-paths/grouped-by-school', () => call('/api/v1/learning-paths/grouped-by-school'), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/learning-paths/:slug', async () => {
+      const slug = raw.prepare('SELECT slug FROM learning_paths LIMIT 1').get()!.slug;
+      return call(`/api/v1/learning-paths/${slug}`);
+    }, (r) => (r.json?.data?.slug ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/learning-paths/my/enrollments', () => call('/api/v1/learning-paths/my/enrollments', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/search', () => call('/api/v1/search?q=design&limit=3'), (r) => (r.json?.data?.courses ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/users/:id', () => call(`/api/v1/users/${user.id}`), (r) => (r.json?.data?.id === user.id ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/users (non-admin)', () => call('/api/v1/users', { token }), (r) => (r.status === 403 ? null : `expected 403, got ${r.status}`)],
+    ['GET /api/v1/resources/course/:id', () => call(`/api/v1/resources/course/${enrolled.course_id}`), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

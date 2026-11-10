@@ -7,7 +7,7 @@
 | Pages | Unlimited sites + bandwidth | None (no meter) | Zero risk |
 | Workers | 100k req/day | HARD STOP, no charge | Worst case = pause till 00:00 UTC, never a bill |
 | Durable Objects | 1M req, 5 GB storage | Billed | Auth logins only — thousands/day max |
-| R2 | 10 GB-month, 1M Class-A, 10M Class-B ops, zero egress | Billed | Videos accumulate — compress 720p, lifecycle temp cleanup |
+| R2 | 10 GB-month, 1M Class-A, 10M Class-B ops, zero egress | Billed | D1 backups (~3 MB gzipped/day, 90-day lifecycle) + course media |
 | Realtime SFU + TURN | 1,000 GB/mo shared | $0.05/GB after | Hundreds of classroom-hours before the line |
 | Workers AI | Daily free neurons | Billed | Per-user caps on study assistant |
 | **D1 (primary DB)** | 5 GB storage, **5M rows read/day**, **100k rows written/day** | Hard stop at daily cap (queries error until reset) | 106 tables, 45.8k rows, ~30 MB. Reads dominate; analytics is the only heavy writer |

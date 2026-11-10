@@ -37,6 +37,56 @@ Postgres constructs this codebase uses into SQLite at runtime:
 These column maps are generated from the live schema into
 `workers/src/schema-types.ts`.
 
+## Switching back to Neon (manual rollback)
+
+The worker supports both datastores behind the same `getDb()` interface. The
+switch is one variable — no code change, no redeploy of routes:
+
+```bash
+cd workers
+# rollback to Postgres
+npx wrangler secret put DB_BACKEND     # enter: neon
+# back to D1
+npx wrangler secret put DB_BACKEND     # enter: d1
+```
+
+`DB_BACKEND` also lives in `wrangler.toml` `[vars]` (default `d1`). Resolution
+order in `workers/src/db.ts`:
+
+1. `DB_BACKEND=neon` → `@neondatabase/serverless` with `DATABASE_URL`
+2. `DB_BACKEND=d1` → D1 binding `DB`
+3. unset → D1 if bound, otherwise Neon if `DATABASE_URL` exists
+
+`GET /db-health` reports the active backend (`{"backend":"d1"}`) and runs a real
+query, so a switch is verifiable in one request. Keep `DATABASE_URL` set as a
+secret while Neon remains a rollback option; the last proxied routes still use
+it on Render regardless.
+
+> Rollback caveat: writes made while on D1 do **not** flow back to Neon. A
+> rollback restores service from the last Neon state, so treat it as an
+> emergency lever, not a sync mechanism.
+
+## Backups (R2 / S3)
+
+D1 dumps go to the `careercode-backups` R2 bucket and to `backups/d1/` locally:
+
+```bash
+./scripts/backup-d1.sh
+# → backups/d1/careercode-<UTC>.sql.gz          (last 7 kept locally)
+# → r2://careercode-backups/d1/careercode-<UTC>.sql.gz
+```
+
+A lifecycle rule expires objects under `d1/` after 90 days. Restore:
+
+```bash
+gunzip -c backups/d1/<file>.sql.gz | \
+  npx wrangler d1 execute careercode-academy --remote --file=/dev/stdin
+```
+
+The worker also binds the bucket as `BACKUPS` (`R2Bucket`) for future
+in-worker exports. Schedule `scripts/backup-d1.sh` daily (cron/GitHub Action)
+once CI is enabled.
+
 ## Schema and data
 
 - D1 database: `careercode-academy`
@@ -91,6 +141,8 @@ node scripts/d1/gen-schema.cjs > workers/sql/d1_schema.sql
   `.catch(() => {})`. The page-view/click/scroll/journey handlers now create the
   `visitors` row first — without it the FK failed silently, which is why
   `page_views` had only 3 rows despite 40k visitors.
+- **Backups**: R2 copies are point-in-time SQL dumps; there is no automatic
+  restore. Test a restore into a scratch D1 before relying on one.
 - **Free plan writes**: 100k rows written/day, 5M rows read/day. Analytics is
   the main write source; monitor in the Cloudflare dashboard.
 - **Refresh tokens** now carry a random `jti`, because `refresh_tokens.token`

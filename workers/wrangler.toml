@@ -9,6 +9,9 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 
 [vars]
+# Datastore switch: "d1" (Cloudflare D1) or "neon" (Postgres fallback).
+# Override with `wrangler secret put DB_BACKEND` for a no-code rollback.
+DB_BACKEND = "d1"
 FRONTEND_URL = "https://careercode.com.ng"
 CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
 JWT_EXPIRES_IN = "15m"
@@ -22,7 +25,13 @@ binding = "DB"
 database_name = "careercode-academy"
 database_id = "1287fa42-8291-4192-a2c9-47b44b03001b"
 
-# --- Phase 3: R2 bucket binding (replaces access keys) ---
+# --- R2: database backups (S3-compatible object storage) ---
+# Bucket: careercode-backups. Backups are written by scripts/backup-d1.sh.
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "careercode-backups"
+
+# --- Phase 3: R2 bucket binding for course media (replaces access keys) ---
 # Create once: wrangler r2 bucket create career-code-academy
 # Then uncomment:
 #[[r2_buckets]]
