@@ -26,6 +26,17 @@ import userRoutes from './routes/users';
 import resourceRoutes from './routes/resources';
 import paymentRoutes from './routes/payments';
 import programRoutes from './routes/programs';
+import calendarRoutes from './routes/calendar';
+import guidedRoutes from './routes/guided';
+import careerRoutes from './routes/career';
+import portfolioRoutes from './routes/portfolio';
+import examRoutes from './routes/exams';
+import quizRoutes from './routes/quizzes';
+import assignmentRoutes from './routes/assignments';
+import challengeRoutes from './routes/challenges';
+import communityRoutes from './routes/community';
+import discussionRoutes from './routes/discussions';
+import forumRoutes from './routes/forum';
 
 export { AuthDO };
 
@@ -110,6 +121,17 @@ app.route('/api/v1/users', userRoutes);
 app.route('/api/v1/resources', resourceRoutes);
 app.route('/api/v1/payments', paymentRoutes);
 app.route('/api/v1/programs', programRoutes);
+app.route('/api/v1/calendar', calendarRoutes);
+app.route('/api/v1/guided', guidedRoutes);
+app.route('/api/v1/career', careerRoutes);
+app.route('/api/v1/portfolio', portfolioRoutes);
+app.route('/api/v1/exams', examRoutes);
+app.route('/api/v1/quizzes', quizRoutes);
+app.route('/api/v1/assignments', assignmentRoutes);
+app.route('/api/v1/challenges', challengeRoutes);
+app.route('/api/v1/community', communityRoutes);
+app.route('/api/v1/discussions', discussionRoutes);
+app.route('/api/v1/forum', forumRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -173,6 +195,17 @@ app.all('/api/v1/*', async (c) => {
     '/api/v1/resources/', '/api/v1/resources',
     '/api/v1/payments/', '/api/v1/payments',
     '/api/v1/programs/', '/api/v1/programs',
+    '/api/v1/calendar/', '/api/v1/calendar',
+    '/api/v1/guided/', '/api/v1/guided',
+    '/api/v1/career/', '/api/v1/career',
+    '/api/v1/portfolio/', '/api/v1/portfolio',
+    '/api/v1/exams/', '/api/v1/exams',
+    '/api/v1/quizzes/', '/api/v1/quizzes',
+    '/api/v1/assignments/', '/api/v1/assignments',
+    '/api/v1/challenges/', '/api/v1/challenges',
+    '/api/v1/community/', '/api/v1/community',
+    '/api/v1/discussions/', '/api/v1/discussions',
+    '/api/v1/forum/', '/api/v1/forum',
   ];
   if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
     return c.json({ success: false, message: 'Route not found' }, 404);
