@@ -354,4 +354,506 @@ student.get('/dashboard', async (c) => {
   }
 });
 
+
+// ── Analytics / badges / leaderboard / calendar / recommended ─────────────
+student.get('/analytics', async (c) => {
+  try {
+    const s = await authenticate(c);
+    return c.json({ success: true, data: await computeAnalytics(c.env, s.userId) });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load analytics'); }
+});
+
+student.get('/badges', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const { rows } = await db.query<any>(
+      `SELECT (SELECT COUNT(*)::int FROM enrollments WHERE user_id = $1) AS enrolled,
+        COALESCE((SELECT SUM(jsonb_array_length(completed_lessons))::int FROM enrollments WHERE user_id = $1), 0) AS lessons,
+        (SELECT COUNT(*)::int FROM enrollments WHERE user_id = $1 AND completed = true) AS completed_courses,
+        (SELECT COUNT(*)::int FROM certificates WHERE user_id = $1) AS certs`,
+      [s.userId]
+    );
+    const r = rows[0] || {};
+    const streak = await computeStreak(c.env, s.userId);
+    return c.json({
+      success: true,
+      data: computeBadges(s.userId, r, Number(r.enrolled) || 0, Number(r.lessons) || 0, Number(r.completed_courses) || 0, Number(r.certs) || 0, streak),
+    });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load badges'); }
+});
+
+student.get('/leaderboard', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT u.id, u.name, u.avatar,
+        (COALESCE((SELECT SUM(jsonb_array_length(completed_lessons)) FROM enrollments WHERE user_id = u.id), 0) * 10 +
+         COALESCE((SELECT COUNT(*) FROM certificates WHERE user_id = u.id), 0) * 100) as xp_points,
+        (SELECT COUNT(*) FROM user_badges WHERE user_id = u.id) as badges_count,
+        COALESCE((SELECT COUNT(*) FROM lesson_progress lp WHERE lp.user_id = u.id AND lp.completed = true
+          AND lp.completed_at >= NOW() - INTERVAL '7 days'), 0) as weekly_lessons
+       FROM users u WHERE u.role = 'student' ORDER BY xp_points DESC LIMIT 50`
+    );
+    const weeklySorted = [...rows].sort((a: any, b: any) => Number(b.weekly_lessons) - Number(a.weekly_lessons));
+    const weeklyRanks = new Map(weeklySorted.map((r: any, i: number) => [r.id, i + 1]));
+    const data = rows.map((r: any, i: number) => {
+      const currentRank = i + 1;
+      const weeklyRank = weeklyRanks.get(r.id) || currentRank;
+      return {
+        userId: r.id, name: r.name, avatar: r.avatar,
+        xpPoints: Number(r.xp_points) || 0, badges: Number(r.badges_count) || 0,
+        rank: currentRank,
+        rankChange: Math.max(-10, Math.min(10, weeklyRank - currentRank)),
+        isCurrentUser: r.id === s.userId,
+      };
+    });
+    return c.json({ success: true, data });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load leaderboard'); }
+});
+
+student.get('/calendar', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const [assignments, live, quizzes, exams, certs] = await Promise.all([
+      db.query<any>(`SELECT a.id, a.title, a.due_date as date, c.title as course_title, 'assignment' as type
+        FROM assignments a JOIN courses c ON c.id = a.course_id
+        WHERE a.due_date >= NOW() AND a.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
+        ORDER BY a.due_date ASC LIMIT 20`, [s.userId]),
+      db.query<any>(`SELECT lc.id, lc.title, lc.scheduled_at as date, c.title as course_title, 'live-class' as type
+        FROM live_classes lc JOIN courses c ON c.id = lc.course_id
+        WHERE lc.scheduled_at >= NOW() AND lc.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
+        ORDER BY lc.scheduled_at ASC LIMIT 20`, [s.userId]),
+      db.query<any>(`SELECT q.id, q.title, q.due_date as date, c.title as course_title, 'quiz' as type
+        FROM quizzes q JOIN courses c ON c.id = q.course_id
+        WHERE q.due_date IS NOT NULL AND q.due_date >= NOW() AND q.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
+        ORDER BY q.due_date ASC LIMIT 20`, [s.userId]),
+      db.query<any>(`SELECT e.id, e.title, e.starts_at as date, c.title as course_title, 'exam' as type
+        FROM exams e JOIN courses c ON c.id = e.course_id
+        WHERE e.starts_at >= NOW() AND e.is_published = true AND e.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
+        ORDER BY e.starts_at ASC LIMIT 20`, [s.userId]),
+      db.query<any>(`SELECT c.id, co.title || ' Certificate' as title, c.issued_at as date, co.title as course_title, 'certificate' as type
+        FROM certificates c JOIN courses co ON co.id = c.course_id
+        WHERE c.user_id = $1 AND c.issued_at >= NOW() - INTERVAL '30 days'
+        ORDER BY c.issued_at DESC LIMIT 20`, [s.userId]),
+    ]);
+    const events = [
+      ...assignments.rows, ...live.rows, ...quizzes.rows, ...exams.rows, ...certs.rows,
+    ].map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }))
+      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return c.json({ success: true, data: events });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load calendar'); }
+});
+
+student.get('/recommended', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT c.id, c.title, c.slug, c.thumbnail, c.duration, c.level as difficulty,
+        COALESCE(AVG(r.rating), 0) as rating, COUNT(DISTINCT e.id)::int as student_count,
+        c.category, u.name as instructor_name
+       FROM courses c JOIN users u ON u.id = c.instructor_id
+       LEFT JOIN reviews r ON r.course_id = c.id
+       LEFT JOIN enrollments e ON e.course_id = c.id
+       WHERE c.status = 'published' AND c.id NOT IN (SELECT course_id FROM enrollments WHERE user_id = $1)
+       GROUP BY c.id, u.name ORDER BY rating DESC, student_count DESC LIMIT 6`,
+      [s.userId]
+    );
+    return c.json({
+      success: true,
+      data: rows.map((x: any) => ({
+        id: x.id, title: x.title, slug: x.slug, thumbnail: x.thumbnail, duration: x.duration,
+        difficulty: x.difficulty, rating: Number(x.rating) || 0, studentCount: Number(x.student_count) || 0,
+        category: x.category, instructor_name: x.instructor_name,
+      })),
+    });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load recommendations'); }
+});
+
+student.get('/assignments', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
+    const offset = (page - 1) * limit;
+    const db = getDb(c.env);
+    const { rows } = await db.query<any>(
+      `SELECT a.id, a.title, a.description, a.due_date, a.max_score, a.course_id,
+        c.title as course, c.slug as course_slug,
+        CASE WHEN s.score IS NOT NULL THEN 'graded' WHEN s.id IS NOT NULL THEN 'submitted' ELSE 'not-started' END as status,
+        s.score as grade, s.feedback
+       FROM assignments a JOIN courses c ON c.id = a.course_id
+       LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = $1
+       WHERE a.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
+       ORDER BY a.due_date ASC LIMIT $2 OFFSET $3`,
+      [s.userId, limit, offset]
+    );
+    const total = await db.query<any>(
+      `SELECT COUNT(*)::int as total FROM assignments a
+       WHERE a.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)`,
+      [s.userId]
+    );
+    const totalN = Number(total.rows[0]?.total) || 0;
+    return c.json({
+      success: true,
+      data: rows.map((a: any) => ({
+        id: a.id, title: a.title, description: a.description, course: a.course, course_slug: a.course_slug,
+        due: a.due_date, status: a.status, grade: a.grade, feedback: a.feedback, max_score: a.max_score,
+      })),
+      pagination: { page, limit, total: totalN, pages: Math.ceil(totalN / limit) },
+    });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load assignments'); }
+});
+
+student.get('/challenges', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
+    const offset = (page - 1) * limit;
+    const db = getDb(c.env);
+    const { rows } = await db.query<any>(
+      `SELECT cc.*, l.title as lesson_title, c.title as course_title, c.slug as course_slug,
+        (SELECT cs.id FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_id,
+        (SELECT cs.code FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_code,
+        (SELECT cs.passed FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_passed,
+        (SELECT cs.score FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_score,
+        (SELECT cs.feedback FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_feedback,
+        (SELECT cs.submitted_at FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_at,
+        (SELECT cs.file_url FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_file_url,
+        (SELECT cs.text_answer FROM challenge_submissions cs WHERE cs.challenge_id = cc.id AND cs.user_id = $1 ORDER BY cs.submitted_at DESC LIMIT 1) as submission_text_answer
+       FROM coding_challenges cc
+       JOIN lessons l ON cc.lesson_id = l.id
+       JOIN courses c ON l.course_id = c.id
+       JOIN enrollments e ON e.course_id = c.id AND e.user_id = $1
+       ORDER BY cc.created_at DESC LIMIT $2 OFFSET $3`,
+      [s.userId, limit, offset]
+    );
+    const total = await db.query<any>(
+      `SELECT COUNT(*)::int as total FROM coding_challenges cc
+       JOIN lessons l ON cc.lesson_id = l.id JOIN courses c ON l.course_id = c.id
+       JOIN enrollments e ON e.course_id = c.id AND e.user_id = $1`,
+      [s.userId]
+    );
+    const totalN = Number(total.rows[0]?.total) || 0;
+    return c.json({
+      success: true,
+      data: rows.map((r: any) => ({
+        id: r.id, lesson_id: r.lesson_id, title: r.title, description: r.description,
+        instructions: r.instructions, type: r.type || 'code', starter_code: r.starter_code,
+        test_code: r.test_code, language: r.language, difficulty: r.difficulty,
+        submission_type: r.submission_type, allowed_file_types: r.allowed_file_types,
+        lesson_title: r.lesson_title, course_title: r.course_title, course_slug: r.course_slug,
+        submission: r.submission_id ? {
+          id: r.submission_id, code: r.submission_code, passed: r.submission_passed,
+          score: r.submission_score, feedback: r.submission_feedback, submitted_at: r.submission_at,
+          file_url: r.submission_file_url, text_answer: r.submission_text_answer,
+        } : null,
+      })),
+      pagination: { page, limit, total: totalN, pages: Math.ceil(totalN / limit) },
+    });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load challenges'); }
+});
+
+student.get('/courses/:slug/analytics', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const course = (await db.query<any>('SELECT id, title, slug FROM courses WHERE slug = $1', [c.req.param('slug')])).rows[0];
+    if (!course) return err(c, 404, 'Course not found');
+    const enr = (await db.query<any>(
+      'SELECT id, progress, completed, enrolled_at, completed_at FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [s.userId, course.id]
+    )).rows[0];
+    if (!enr) return err(c, 403, 'Not enrolled in this course');
+
+    const [total, done, weekly, quiz, assignment, challenge, watch] = await Promise.all([
+      db.query<any>('SELECT COUNT(*)::int as total FROM lessons WHERE course_id = $1', [course.id]),
+      db.query<any>('SELECT COUNT(*)::int as count FROM lesson_progress WHERE course_id = $1 AND user_id = $2 AND completed = true', [course.id, s.userId]),
+      db.query<any>(`SELECT DATE(lp.completed_at) as date, COUNT(*)::int as count FROM lesson_progress lp
+        WHERE lp.course_id = $1 AND lp.user_id = $2 AND lp.completed = true
+          AND lp.completed_at > NOW() - INTERVAL '7 days'
+        GROUP BY DATE(lp.completed_at) ORDER BY date ASC`, [course.id, s.userId]),
+      db.query<any>(`SELECT COUNT(*)::int as total_attempts, COALESCE(AVG(qa.score), 0) as avg_score
+        FROM quiz_attempts qa JOIN quizzes q ON qa.quiz_id = q.id WHERE q.course_id = $1 AND qa.user_id = $2`, [course.id, s.userId]),
+      db.query<any>(`SELECT COUNT(*)::int as submitted, COALESCE(AVG(s.score), 0) as avg_score
+        FROM submissions s JOIN assignments a ON s.assignment_id = a.id WHERE a.course_id = $1 AND s.student_id = $2`, [course.id, s.userId]),
+      db.query<any>(`SELECT COUNT(*)::int as submitted, COALESCE(AVG(cs.score), 0) as avg_score,
+        SUM(CASE WHEN cs.passed = true THEN 1 ELSE 0 END)::int as passed
+        FROM challenge_submissions cs JOIN coding_challenges cc ON cs.challenge_id = cc.id
+        JOIN lessons l ON cc.lesson_id = l.id WHERE l.course_id = $1 AND cs.user_id = $2`, [course.id, s.userId]),
+      db.query<any>('SELECT COALESCE(SUM(lp.watch_position), 0)::int as total_seconds FROM lesson_progress lp WHERE lp.course_id = $1 AND lp.user_id = $2', [course.id, s.userId]),
+    ]);
+
+    const totalLessons = Number(total.rows[0]?.total) || 0;
+    const completedLessons = Number(done.rows[0]?.count) || 0;
+    const weeklyMap = new Map(weekly.rows.map((r: any) => [String(r.date).slice(0, 10), Number(r.count)]));
+    const weeklyActivity = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      weeklyActivity.push({ date: key, label: d.toLocaleDateString(undefined, { weekday: 'short' }), lessons: weeklyMap.get(key) || 0 });
+    }
+    const seconds = Number(watch.rows[0]?.total_seconds) || 0;
+
+    return c.json({
+      success: true,
+      data: {
+        course: { id: course.id, title: course.title, slug: course.slug },
+        enrollment: { progress: enr.progress, completed: enr.completed, enrolledAt: enr.enrolled_at, completedAt: enr.completed_at },
+        lessons: { total: totalLessons, completed: completedLessons, completionRate: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0 },
+        weeklyActivity,
+        quizzes: { totalAttempts: Number(quiz.rows[0]?.total_attempts) || 0, averageScore: Math.round(Number(quiz.rows[0]?.avg_score) || 0) },
+        assignments: { submitted: Number(assignment.rows[0]?.submitted) || 0, averageScore: Math.round(Number(assignment.rows[0]?.avg_score) || 0) },
+        challenges: { submitted: Number(challenge.rows[0]?.submitted) || 0, passed: Number(challenge.rows[0]?.passed) || 0, averageScore: Math.round(Number(challenge.rows[0]?.avg_score) || 0) },
+        timeSpent: { totalSeconds: seconds, totalHours: Math.round((seconds / 3600) * 10) / 10 },
+      },
+    });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load course analytics'); }
+});
+
+// ── Direct messages ───────────────────────────────────────────────────────
+student.get('/messages/conversations', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT u.id, u.name, u.avatar, u.role,
+        COALESCE(SUM(CASE WHEN dm.is_read = false AND dm.receiver_id = $1 THEN 1 ELSE 0 END), 0)::int AS unread_count,
+        (SELECT content FROM direct_messages WHERE (sender_id = u.id AND receiver_id = $1) OR (sender_id = $1 AND receiver_id = u.id) ORDER BY created_at DESC LIMIT 1) AS last_message,
+        (SELECT created_at FROM direct_messages WHERE (sender_id = u.id AND receiver_id = $1) OR (sender_id = $1 AND receiver_id = u.id) ORDER BY created_at DESC LIMIT 1) AS last_message_at
+       FROM users u JOIN direct_messages dm ON (dm.sender_id = u.id OR dm.receiver_id = u.id)
+       WHERE (dm.sender_id = $1 OR dm.receiver_id = $1) AND u.id != $1
+       GROUP BY u.id, u.name, u.avatar, u.role
+       ORDER BY last_message_at DESC`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load conversations'); }
+});
+
+student.get('/messages/:userId', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT * FROM direct_messages
+       WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
+       ORDER BY created_at ASC`,
+      [s.userId, c.req.param('userId')]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load messages'); }
+});
+
+student.post('/messages', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    if (!body.receiver_id || !body.content) return err(c, 400, 'receiver_id and content are required');
+    const { rows } = await getDb(c.env).query<any>(
+      'INSERT INTO direct_messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *',
+      [s.userId, body.receiver_id, body.content]
+    );
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to send message'); }
+});
+
+student.put('/messages/read', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const { rows } = await getDb(c.env).query<any>(
+      'UPDATE direct_messages SET is_read = true WHERE sender_id = $1 AND receiver_id = $2 AND is_read = false RETURNING id',
+      [body.senderId, s.userId]
+    );
+    return c.json({ success: true, updated: rows.length });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to update messages'); }
+});
+
+student.put('/messages/read-all', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'UPDATE direct_messages SET is_read = true WHERE receiver_id = $1 AND is_read = false RETURNING id',
+      [s.userId]
+    );
+    return c.json({ success: true, updated: rows.length });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to update messages'); }
+});
+
+student.delete('/messages/:id', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'DELETE FROM direct_messages WHERE id = $1 AND sender_id = $2 RETURNING id',
+      [c.req.param('id'), s.userId]
+    );
+    if (!rows.length) return err(c, 404, 'Message not found or not yours');
+    return c.json({ success: true, message: 'Message deleted' });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to delete message'); }
+});
+
+student.get('/users', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const search = c.req.query('search');
+    const params: any[] = [s.userId];
+    let sql = `SELECT DISTINCT u.id, u.name, u.email, u.role, u.avatar FROM users u
+      WHERE u.id != $1 AND (
+        (u.role = 'instructor' AND u.id IN (SELECT c.instructor_id FROM courses c JOIN enrollments e ON e.course_id = c.id WHERE e.user_id = $1))
+        OR (u.role = 'student' AND u.id IN (SELECT e2.user_id FROM enrollments e2 WHERE e2.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)))
+      )`;
+    if (search) { params.push(`%${search}%`); sql += ` AND (u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`; }
+    sql += ' ORDER BY u.name ASC LIMIT 20';
+    const { rows } = await getDb(c.env).query<any>(sql, params);
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load users'); }
+});
+
+// ── Mentoring ─────────────────────────────────────────────────────────────
+student.get('/mentoring-slots', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT ms.*, u.name as instructor_name, u.avatar as instructor_avatar, c.title as course_title
+       FROM mentoring_slots ms JOIN courses c ON ms.course_id = c.id
+       JOIN enrollments e ON e.course_id = c.id AND e.user_id = $1
+       JOIN users u ON ms.instructor_id = u.id
+       WHERE ms.status = 'available' AND ms.start_time > NOW() ORDER BY ms.start_time ASC`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load slots'); }
+});
+
+student.post('/mentoring-slots/:id/book', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const slot = (await db.query<any>("SELECT * FROM mentoring_slots WHERE id = $1 AND status = 'available'", [c.req.param('id')])).rows[0];
+    if (!slot) return err(c, 404, 'Slot not available');
+    const { rows } = await db.query<any>(
+      `UPDATE mentoring_slots SET student_id = $1, status = 'booked', updated_at = NOW()
+       WHERE id = $2 AND status = 'available' RETURNING *`,
+      [s.userId, slot.id]
+    );
+    if (!rows.length) return err(c, 409, 'Slot was just taken');
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1, 'New Mentoring Booking', $2, 'info', $3)`,
+      [slot.instructor_id, 'A student has booked your mentoring slot.', '/instructor/mentoring']
+    );
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to book slot'); }
+});
+
+student.get('/my-mentoring-slots', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT ms.*, u.name as instructor_name, u.avatar as instructor_avatar, c.title as course_title
+       FROM mentoring_slots ms LEFT JOIN courses c ON ms.course_id = c.id
+       LEFT JOIN users u ON ms.instructor_id = u.id
+       WHERE ms.student_id = $1 ORDER BY ms.start_time DESC`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load bookings'); }
+});
+
+// ── Completed events / study plans / tickets alias ────────────────────────
+student.post('/completed-events/toggle', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    if (!body.event_id) return err(c, 400, 'event_id is required');
+    const db = getDb(c.env);
+    const existing = await db.query<any>('SELECT id FROM completed_events WHERE user_id = $1 AND event_id = $2', [s.userId, body.event_id]);
+    if (existing.rows.length) {
+      await db.query('DELETE FROM completed_events WHERE user_id = $1 AND event_id = $2', [s.userId, body.event_id]);
+      return c.json({ success: true, completed: false });
+    }
+    await db.query('INSERT INTO completed_events (user_id, event_id, event_type) VALUES ($1, $2, $3)', [s.userId, body.event_id, body.event_type || 'event']);
+    return c.json({ success: true, completed: true });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to update event'); }
+});
+
+student.get('/completed-events', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT event_id, event_type, completed_at FROM completed_events WHERE user_id = $1',
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load events'); }
+});
+
+student.get('/study-plans', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT * FROM study_plans WHERE student_id = $1 ORDER BY week_start DESC LIMIT 12',
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load study plans'); }
+});
+
+student.post('/study-plans', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const start = body.week_start || (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]; })();
+    const end = body.week_end || (() => { const d = new Date(); d.setDate(d.getDate() + (6 - d.getDay())); return d.toISOString().split('T')[0]; })();
+    const { rows } = await getDb(c.env).query<any>(
+      `INSERT INTO study_plans (student_id, week_start, week_end, goal_hours, goal_topics, notes)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (student_id, week_start)
+       DO UPDATE SET goal_hours = $4, goal_topics = $5, notes = $6, updated_at = NOW()
+       RETURNING *`,
+      [s.userId, start, end, body.goal_hours || 5, JSON.stringify(body.goal_topics || []), body.notes || null]
+    );
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to save study plan'); }
+});
+
+student.delete('/study-plans/:id', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'DELETE FROM study_plans WHERE id = $1 AND student_id = $2 RETURNING id',
+      [c.req.param('id'), s.userId]
+    );
+    if (!rows.length) return err(c, 404, 'Study plan not found');
+    return c.json({ success: true, message: 'Study plan deleted' });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to delete study plan'); }
+});
+
+// Frontend compatibility: Tickets page calls /student/tickets.
+student.get('/tickets', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT * FROM support_tickets WHERE user_id = $1 ORDER BY created_at DESC',
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load tickets'); }
+});
+
+student.post('/tickets', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    if (!body.subject || !body.message) return err(c, 400, 'subject and message are required');
+    const { rows } = await getDb(c.env).query<any>(
+      `INSERT INTO support_tickets (user_id, subject, message, category, priority, status)
+       VALUES ($1, $2, $3, $4, $5, 'open') RETURNING *`,
+      [s.userId, body.subject, body.message, body.category || 'general', body.priority || 'medium']
+    );
+    return c.json({ success: true, data: rows[0] }, 201 as any);
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to create ticket'); }
+});
+
 export default student;
+

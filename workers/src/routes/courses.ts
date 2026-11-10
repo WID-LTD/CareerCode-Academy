@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
-import { requireAuth } from '../route-utils';
+import { requireAuth, requireRole } from '../route-utils';
 
 const courses = new Hono<{ Bindings: Env }>();
 
@@ -199,4 +199,218 @@ courses.delete('/:id/enroll', async (c) => {
   }
 });
 
+
+// ── Course authoring ─────────────────────────────────────────────────────
+const STAFF = ['instructor', 'admin', 'super_admin'];
+const slugify = (v: string) => v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+async function uniqueSlug(env: Env, base: string, excludeId?: string): Promise<string> {
+  const db = getDb(env);
+  const root = slugify(base) || 'course';
+  let candidate = root;
+  for (let i = 1; i < 60; i++) {
+    const { rows } = await db.query<any>('SELECT id FROM courses WHERE slug = $1', [candidate]);
+    if (!rows.length || rows[0].id === excludeId) return candidate;
+    candidate = `${root}-${i}`;
+  }
+  return `${root}-${Date.now()}`;
+}
+
+// POST /api/v1/courses
+courses.post('/', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!b.title || !b.description || !b.category) return err(c, 400, 'title, description and category are required');
+    const level = ['beginner', 'intermediate', 'advanced'].includes(b.level || b.skill_level)
+      ? (b.level || b.skill_level)
+      : 'beginner';
+    const slug = await uniqueSlug(c.env, b.title);
+    const { rows } = await getDb(c.env).query<any>(
+      `INSERT INTO courses (title, description, thumbnail, banner_image, promo_video_url, price, category, instructor_id, level, duration, published, slug, learning_outcomes, program_id, reference_url, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,$12,$13,$14,'draft') RETURNING *`,
+      [
+        b.title, b.description, b.thumbnail || null, b.banner_image || null, b.promo_video_url || null,
+        Number(b.price) || 0, b.category, s.userId, level, Number(b.duration) || 1, slug,
+        JSON.stringify(b.learning_outcomes || b.learningOutcomes || []),
+        b.program_id || null, b.reference_url || null,
+      ]
+    );
+    return c.json({ success: true, data: rows[0] }, 201 as any);
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to create course');
+  }
+});
+
+// PUT /api/v1/courses/:id
+courses.put('/:id', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF);
+    const db = getDb(c.env);
+    const existing = (await db.query<any>('SELECT * FROM courses WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!existing) return err(c, 404, 'Course not found');
+    if (!['admin', 'super_admin'].includes(s.role) && existing.instructor_id !== s.userId) {
+      return err(c, 403, 'You can only edit your own courses');
+    }
+
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = [];
+    const values: any[] = [];
+    const push = (col: string, val: any) => { fields.push(`${col} = $${values.length + 1}`); values.push(val); };
+    for (const key of ['title', 'description', 'thumbnail', 'banner_image', 'promo_video_url', 'category', 'program_id', 'reference_url', 'status']) {
+      if (b[key] !== undefined) push(key, b[key]);
+    }
+    if (b.price !== undefined) push('price', Number(b.price));
+    if (b.duration !== undefined) push('duration', Number(b.duration));
+    if (b.level !== undefined || b.skill_level !== undefined) push('level', b.level || b.skill_level);
+    if (b.learning_outcomes !== undefined || b.learningOutcomes !== undefined) {
+      push('learning_outcomes', JSON.stringify(b.learning_outcomes || b.learningOutcomes || []));
+    }
+    if (b.published !== undefined) push('published', !!b.published);
+    if (b.title) push('slug', await uniqueSlug(c.env, b.title, existing.id));
+
+    if (!fields.length) return c.json({ success: true, data: existing });
+    fields.push('updated_at = NOW()');
+    values.push(existing.id);
+    const { rows } = await db.query<any>(
+      `UPDATE courses SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
+    );
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to update course');
+  }
+});
+
+// DELETE /api/v1/courses/:id
+courses.delete('/:id', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF);
+    const db = getDb(c.env);
+    const existing = (await db.query<any>('SELECT * FROM courses WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!existing) return err(c, 404, 'Course not found');
+    if (!['admin', 'super_admin'].includes(s.role) && existing.instructor_id !== s.userId) {
+      return err(c, 403, 'You can only delete your own courses');
+    }
+    await db.query('DELETE FROM courses WHERE id = $1', [existing.id]);
+    return c.json({ success: true, message: 'Course deleted successfully' });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to delete course');
+  }
+});
+
+// Publish / unpublish / archive
+for (const [action, published, status] of [
+  ['publish', true, 'published'],
+  ['unpublish', false, 'draft'],
+  ['archive', false, 'archived'],
+] as const) {
+  courses.put(`/:id/${action}`, async (c) => {
+    try {
+      const s = await requireRole(c, STAFF);
+      const db = getDb(c.env);
+      const existing = (await db.query<any>('SELECT * FROM courses WHERE id = $1', [c.req.param('id')])).rows[0];
+      if (!existing) return err(c, 404, 'Course not found');
+      if (!['admin', 'super_admin'].includes(s.role) && existing.instructor_id !== s.userId) {
+        return err(c, 403, 'You can only manage your own courses');
+      }
+      const { rows } = await db.query<any>(
+        'UPDATE courses SET published = $1, status = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+        [published, status, existing.id]
+      );
+      return c.json({ success: true, data: rows[0] });
+    } catch (e: any) {
+      return err(c, e?.statusCode || 500, e?.message || 'Failed to update course');
+    }
+  });
+}
+
+// POST /api/v1/courses/:id/duplicate
+courses.post('/:id/duplicate', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF);
+    const db = getDb(c.env);
+    const existing = (await db.query<any>('SELECT * FROM courses WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!existing) return err(c, 404, 'Course not found');
+    if (!['admin', 'super_admin'].includes(s.role) && existing.instructor_id !== s.userId) {
+      return err(c, 403, 'You can only duplicate your own courses');
+    }
+    const title = `${existing.title} (Copy)`;
+    const slug = await uniqueSlug(c.env, title);
+    const { rows } = await db.query<any>(
+      `INSERT INTO courses (title, description, thumbnail, banner_image, promo_video_url, price, category, instructor_id, level, duration, published, slug, learning_outcomes, program_id, reference_url, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,$12,$13,$14,'draft') RETURNING *`,
+      [
+        title, existing.description, existing.thumbnail, existing.banner_image, existing.promo_video_url,
+        existing.price, existing.category, s.userId, existing.level, existing.duration, slug,
+        existing.learning_outcomes, existing.program_id, existing.reference_url,
+      ]
+    );
+    return c.json({ success: true, data: rows[0] }, 201 as any);
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to duplicate course');
+  }
+});
+
+// GET /api/v1/courses/:id/lessons
+courses.get('/:id/lessons', async (c) => {
+  try {
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT * FROM lessons WHERE course_id = $1 ORDER BY order_index ASC',
+      [c.req.param('id')]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to load lessons');
+  }
+});
+
+// GET /api/v1/courses/:id/announcements
+courses.get('/:id/announcements', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const courseId = c.req.param('id');
+    const course = (await db.query<any>('SELECT id FROM courses WHERE id = $1', [courseId])).rows[0];
+    if (!course) return err(c, 404, 'Course not found');
+    const enrolled = await db.query<any>(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [s.userId, courseId]
+    );
+    if (!enrolled.rows.length && s.role === 'student') return err(c, 403, 'You are not enrolled in this course');
+    const { rows } = await db.query<any>(
+      `SELECT a.*, u.name as instructor_name FROM announcements a
+       JOIN users u ON a.instructor_id = u.id
+       WHERE a.course_id = $1 ORDER BY a.created_at DESC LIMIT 50`,
+      [courseId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to load announcements');
+  }
+});
+
+// POST /api/v1/courses/:id/announcements (instructor/admin)
+courses.post('/:id/announcements', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF);
+    const db = getDb(c.env);
+    const course = (await db.query<any>('SELECT * FROM courses WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!course) return err(c, 404, 'Course not found');
+    if (!['admin', 'super_admin'].includes(s.role) && course.instructor_id !== s.userId) {
+      return err(c, 403, 'You can only post announcements in your own courses');
+    }
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!b.title || !b.content) return err(c, 400, 'title and content are required');
+    const { rows } = await db.query<any>(
+      `INSERT INTO announcements (course_id, instructor_id, title, content) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [course.id, s.userId, b.title, b.content]
+    );
+    return c.json({ success: true, data: rows[0] }, 201 as any);
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to post announcement');
+  }
+});
+
 export default courses;
+

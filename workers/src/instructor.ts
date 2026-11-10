@@ -9,6 +9,7 @@
 // Only new file — no existing module is modified.
 
 import type { Env } from './env';
+import { sendEmail } from './email';
 import { getDb } from './db';
 
 /** Roles accepted by `authorize('instructor', 'admin', 'super_admin')`. */
@@ -96,31 +97,7 @@ export async function sendMail(
   env: Env,
   options: { to: string; subject: string; html: string; text?: string }
 ): Promise<void> {
-  const apiKey = env.BREVO_API_KEY;
-  if (!apiKey || apiKey === 'xkeysib-xxxxxxxxxxxx') return;
-
-  try {
-    const senderEmail = env.BREVO_SENDER_EMAIL || 'johndavidnzubechukwu008@gmail.com';
-    const senderName = env.BREVO_SENDER_NAME || 'CareerCode Academy';
-
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { email: senderEmail, name: senderName },
-        to: [{ email: options.to }],
-        subject: options.subject,
-        htmlContent: options.html,
-        ...(options.text ? { textContent: options.text } : {}),
-      }),
-    });
-  } catch {
-    /* email failures must never break the request */
-  }
+  await sendEmail(env, options);
 }
 
 /** `YYYY-MM` key for a date/date-string returned by either backend. */

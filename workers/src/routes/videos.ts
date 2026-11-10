@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
+import { parseBody, storeOrLink } from '../uploads';
 
 // Ported from backend/src/routes/video.routes.ts.
 // Multer/multipart is replaced by a JSON base64 body; the file is written to
@@ -90,32 +91,19 @@ videos.post('/upload/:lessonId', async (c) => {
       return fail(c, 403, 'You can only upload videos to your own lessons');
     }
 
-    const body: any = await c.req.json().catch(() => ({}));
-    const file = readFile(body);
-    if (!file) return fail(c, 400, 'No video file provided');
+    const { fields, file, url } = await parseBody(c);
+    const linked = await storeOrLink(c.env, file, url || (fields.videoUrl as string) || null, 'videos');
+    if (!linked) return fail(c, 400, 'No video file provided');
 
-    const stored = await putToR2(c.env, 'videos', file);
-    if (!stored) {
-      return fail(
-        c,
-        501,
-        'Video uploads are not configured on this deployment (R2 binding missing). Bind env.R2 or host the video externally and set video_url through the lesson editor.'
-      );
-    }
-
+    const provider = /youtube\.com|youtu\.be/i.test(linked) ? 'youtube' : /vimeo\.com/i.test(linked) ? 'vimeo' : 'r2';
     await db.query(
-      `UPDATE lessons SET video_url = $1, video_thumbnail = NULL WHERE id = $2`,
-      [stored.url, lessonId]
+      `UPDATE lessons SET video_url = $1, video_provider = $2, video_thumbnail = NULL WHERE id = $3`,
+      [linked, provider, lessonId]
     );
 
     return c.json({
       success: true,
-      data: {
-        video_url: stored.url,
-        streaming_url: null,
-        thumbnail: null,
-        filename: stored.filename,
-      },
+      data: { video_url: linked, streaming_url: null, thumbnail: null, filename: file?.name || null },
     });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to upload video');
@@ -127,7 +115,7 @@ videos.get('/stream/:lessonId', async (c) => {
   try {
     await requireAuth(c);
     const { rows } = await getDb(c.env).query<any>(
-      'SELECT id, video_url, video_thumbnail FROM lessons WHERE id = $1',
+      'SELECT id, video_url, video_provider, video_thumbnail FROM lessons WHERE id = $1',
       [c.req.param('lessonId')]
     );
     if (!rows.length) return fail(c, 404, 'Lesson not found');

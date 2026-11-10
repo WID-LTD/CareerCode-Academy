@@ -23,4 +23,25 @@ pub.get('/stats', async (c) => {
   return c.json({ success: true, data: { students, courses, certificates, alumni } });
 });
 
+// GET /api/v1/public/currency — platform currency for checkout/pricing
+pub.get('/currency', async (c) => {
+  try {
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT key, value FROM system_settings WHERE key IN ('platform_currency','platform_currency_symbol','platform_currency_locale')`
+    );
+    const map: Record<string, string> = {};
+    rows.forEach((r: any) => { map[r.key] = r.value; });
+    return c.json({
+      success: true,
+      data: {
+        code: map['platform_currency'] || 'NGN',
+        symbol: map['platform_currency_symbol'] || '₦',
+        locale: map['platform_currency_locale'] || 'en-NG',
+      },
+    });
+  } catch {
+    return c.json({ success: true, data: { code: 'NGN', symbol: '₦', locale: 'en-NG' } });
+  }
+});
+
 export default pub;

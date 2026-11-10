@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Loader, PageLoader } from '@/components/ui/Loader';
@@ -9,6 +9,7 @@ import { OnboardingProvider } from '@/guides/OnboardingContext';
 import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
+import { PwaBridge } from '@/components/pwa/PwaBridge';
 import { ScrollToTop, ErrorBoundary } from '@/components/ui';
 import { SkeletonLine, SkeletonBlock } from '@/components/ui/Skeleton';
 
@@ -32,6 +33,43 @@ function PageSkeleton() {
 // Mounts the browser-notification poller inside the router so it can deep-link.
 function NotificationBridge() {
   useBrowserNotifications();
+  return null;
+}
+
+// Watches for role changes (admin promotes/demotes the signed-in user) and
+// moves them to the matching dashboard without a manual reload.
+function RoleWatcher() {
+  const navigate = useNavigate();
+  const { token, fetchUser } = useAuthStore();
+
+  useEffect(() => {
+    if (!token) return;
+    let stopped = false;
+
+    const check = async () => {
+      const before = useAuthStore.getState().user?.role;
+      try { await fetchUser(); } catch { return; }
+      if (stopped) return;
+      const after = useAuthStore.getState().user?.role;
+      if (!before || !after || before === after) return;
+      const target = after === 'instructor'
+        ? '/instructor/dashboard'
+        : after === 'admin' || after === 'super_admin'
+          ? '/admin/dashboard'
+          : '/student/dashboard';
+      navigate(target, { replace: true });
+    };
+
+    const id = window.setInterval(check, 60_000);
+    const onFocus = () => { void check(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      stopped = true;
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [token, fetchUser, navigate]);
+
   return null;
 }
 
@@ -232,6 +270,8 @@ function App() {
     <OnboardingProvider>
       <AnalyticsTracker />
       <NotificationBridge />
+      <RoleWatcher />
+      <PwaBridge />
       <ScrollToTop />
       <Routes>
         <Route element={<ErrorBoundary><MainLayout /></ErrorBoundary>}>

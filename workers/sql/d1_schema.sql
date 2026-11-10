@@ -591,6 +591,8 @@ CREATE TABLE IF NOT EXISTS "courses" (
   "title" TEXT NOT NULL,
   "description" TEXT NOT NULL,
   "thumbnail" TEXT,
+  "banner_image" TEXT,
+  "promo_video_url" TEXT,
   "price" REAL NOT NULL DEFAULT 0,
   "category" TEXT NOT NULL,
   "instructor_id" TEXT NOT NULL,
@@ -1005,6 +1007,7 @@ CREATE TABLE IF NOT EXISTS "lessons" (
   "title" TEXT NOT NULL,
   "description" TEXT NOT NULL,
   "video_url" TEXT,
+  "video_provider" TEXT,
   "duration" INTEGER NOT NULL DEFAULT 0,
   "order_index" INTEGER NOT NULL DEFAULT 0,
   "resources" TEXT DEFAULT '[]',
@@ -2017,3 +2020,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS "live_participants_pkey" ON "live_participants
 CREATE UNIQUE INDEX IF NOT EXISTS "live_participants_session_id_user_id_key" ON "live_participants" (session_id, user_id);
 CREATE INDEX IF NOT EXISTS "idx_live_participants_session" ON "live_participants" (session_id);
 CREATE INDEX IF NOT EXISTS "idx_live_participants_user" ON "live_participants" (user_id);
+
+CREATE TABLE IF NOT EXISTS "media_assets" (
+  "id" TEXT PRIMARY KEY,
+  "entity_type" TEXT,
+  "entity_id" TEXT,
+  "source_url" TEXT,
+  "r2_key" TEXT,
+  "mime" TEXT,
+  "bytes" INTEGER,
+  "hash" TEXT,
+  "license" TEXT,
+  "author" TEXT,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);

@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, statusOf } from '../route-utils';
+import { parseBody, field, storeOrLink } from '../uploads';
+import { mail } from '../email';
 
 // Ported from backend/src/routes/application.routes.ts.
 // Multer/multipart is intentionally not implemented: send JSON. Optional
@@ -49,19 +51,43 @@ async function resolveUpload(env: Env, providedUrl: any, file: any, folder: stri
 // POST /api/v1/applications/instructor — public instructor application
 applications.post('/instructor', async (c) => {
   try {
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields, file } = await parseBody(c);
 
-    const resumeUrl = await resolveUpload(c.env, body.resumeUrl ?? body.resume_url, body.resume, 'resumes');
-    const profileImageUrl = await resolveUpload(
+    const fullName = field(fields, 'fullName', 'full_name', 'name');
+    const email = String(field(fields, 'email') || '').trim().toLowerCase();
+    if (!fullName) return fail(c, 400, 'Validation failed', { errors: { fullName: ['Full name is required'] } });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return fail(c, 400, 'Validation failed', { errors: { email: ['A valid email is required'] } });
+    }
+
+    // The form sends files as `resume` / `profileImage`; parseBody keeps the
+    // first File, so read them from the multipart form explicitly.
+    const contentType = c.req.header('content-type') || '';
+    let resumeFile: File | null = contentType.includes('multipart/form-data') ? null : file;
+    let profileFile: File | null = null;
+    if (contentType.includes('multipart/form-data')) {
+      // parseBody already consumed the body; re-read from fields when present.
+      const r = fields.resume;
+      const p = fields.profileImage ?? fields.profile_image;
+      if (r && typeof r !== 'string') resumeFile = r as unknown as File;
+      if (p && typeof p !== 'string') profileFile = p as unknown as File;
+    }
+
+    const resumeUrl = await storeOrLink(
       c.env,
-      body.profileImageUrl ?? body.profile_image_url,
-      body.profileImage ?? body.profile_image,
+      resumeFile,
+      typeof fields.resumeUrl === 'string' ? fields.resumeUrl : null,
+      'resumes'
+    );
+    const profileImageUrl = await storeOrLink(
+      c.env,
+      profileFile,
+      typeof fields.profileImageUrl === 'string' ? fields.profileImageUrl : null,
       'profiles'
     );
 
-    const interestedCourses = Array.isArray(body.interestedCourses)
-      ? body.interestedCourses.join(', ')
-      : body.interestedCourses ?? null;
+    const interested = fields.interestedCourses ?? fields.interested_courses;
+    const interestedCourses = Array.isArray(interested) ? interested.join(', ') : interested ?? null;
 
     const { rows } = await getDb(c.env).query<any>(
       `INSERT INTO instructor_applications (
@@ -72,26 +98,28 @@ applications.post('/instructor', async (c) => {
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
       ) RETURNING id`,
       [
-        body.fullName ?? body.full_name ?? null,
-        body.email ?? null,
-        body.phone ?? null,
-        body.country ?? null,
-        body.state ?? null,
-        body.professionalTitle ?? body.professional_title ?? null,
-        body.yearsExperience ?? body.years_experience ?? null,
-        body.specialization ?? null,
-        body.githubUrl ?? body.github_url ?? null,
-        body.linkedinUrl ?? body.linkedin_url ?? null,
-        body.portfolioUrl ?? body.portfolio_url ?? null,
+        String(fullName),
+        email,
+        field(fields, 'phone') ?? null,
+        field(fields, 'country') ?? null,
+        field(fields, 'state') ?? null,
+        field(fields, 'professionalTitle', 'professional_title') ?? null,
+        field(fields, 'yearsExperience', 'years_experience') ?? null,
+        field(fields, 'specialization') ?? null,
+        field(fields, 'githubUrl', 'github_url') ?? null,
+        field(fields, 'linkedinUrl', 'linkedin_url') ?? null,
+        field(fields, 'portfolioUrl', 'portfolio_url') ?? null,
         resumeUrl,
         profileImageUrl,
-        body.bio ?? null,
-        body.teachingExperience ?? body.teaching_experience ?? null,
+        field(fields, 'bio') ?? null,
+        field(fields, 'teachingExperience', 'teaching_experience') ?? null,
         interestedCourses,
-        body.availability ?? null,
-        body.motivation ?? null,
+        field(fields, 'availability') ?? null,
+        field(fields, 'motivation') ?? null,
       ]
     );
+
+    c.executionCtx.waitUntil(mail.applicationReceived(c.env, email, String(fullName)).catch(() => {}));
 
     return c.json(
       { success: true, message: 'Application submitted successfully', data: rows[0] },

@@ -61,13 +61,20 @@ export default function ExamTake() {
 
   // Face detection — pre-init when rules screen shows (not only after accept)
   const { faceDetectedRef, hasCamera, cameraError, cameraReady, cameraStarting, videoRef: cameraVideoRef, streamRef: cameraStreamRef, enableCamera } = useFaceDetection(wizardStep >= 1 || rulesAccepted);
-  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
+  // Two different <video> elements exist (rules screen + exam screen). Using a
+  // single ref made React point it at the element that was unmounting, which
+  // produced "play() interrupted because the media was removed" (AbortError).
+  const rulesVideoRef = useRef<HTMLVideoElement | null>(null);
+  const examVideoRef = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
-    if (cameraPreviewRef.current && cameraStreamRef.current) {
-      cameraPreviewRef.current.srcObject = cameraStreamRef.current;
-      cameraPreviewRef.current.play().catch(() => {});
+    const stream = cameraStreamRef.current;
+    if (!stream) return;
+    for (const video of [rulesVideoRef.current, examVideoRef.current]) {
+      if (!video) continue;
+      if (video.srcObject !== stream) video.srcObject = stream;
+      video.play().catch(() => {});
     }
-  }, [cameraReady, cameraStreamRef.current]);
+  }, [cameraReady, wizardStep]);
   const [faceMissingCountdown, setFaceMissingCountdown] = useState(0);
   const faceTimerRef = useRef<any>(null);
   const faceBeepRef = useRef<any>(null);
@@ -674,7 +681,7 @@ export default function ExamTake() {
                 {/* Camera preview */}
                 <div className="relative bg-gray-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-gray-700/50 max-h-[200px] sm:max-h-none">
                   {cameraReady ? (
-                    <video ref={cameraPreviewRef} className="w-full h-full object-cover" playsInline muted />
+                    <video ref={rulesVideoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
                   ) : cameraStarting ? (
                     <div className="text-center text-gray-400 p-4 sm:p-6">
                       <Loader className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 animate-spin opacity-50" />
@@ -768,7 +775,7 @@ export default function ExamTake() {
               <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
                 {/* Camera feed preview — same stream the admin sees */}
                 <div className="bg-gray-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-gray-700/50 max-h-[180px] sm:max-h-none">
-                  <video ref={cameraPreviewRef} className="w-full h-full object-cover" playsInline muted />
+                  <video ref={examVideoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
                 </div>
 
                 <div className="p-3 sm:p-4 rounded-xl bg-primary-500/5 border border-primary-500/20">

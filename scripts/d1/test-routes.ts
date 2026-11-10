@@ -81,11 +81,12 @@ async function call(pathname: string, opts: { token?: string; method?: string; b
   const headers: Record<string, string> = { Origin: 'https://careercode.com.ng' };
   if (opts.cookie) headers.Cookie = opts.cookie;
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
-  if (opts.body) headers['Content-Type'] = 'application/json';
+  const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+  if (opts.body && !isForm) headers['Content-Type'] = 'application/json';
   const res = await app.request(pathname, {
     method: opts.method || 'GET',
     headers,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    body: opts.body ? (isForm ? (opts.body as FormData) : JSON.stringify(opts.body)) : undefined,
   }, env, ctx);
   const text = await res.text();
   // waitUntil work (analytics writes) must finish before assertions run.
@@ -325,6 +326,46 @@ async function main() {
     ['GET /api/v1/instructor/dashboard/stats', () => call('/api/v1/instructor/dashboard/stats', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/instructor/students', () => call('/api/v1/instructor/students', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/blogs', () => call('/api/v1/blogs?limit=3'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/student/assignments', () => call('/api/v1/student/assignments?page=1&limit=5', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/student/mentoring-slots', () => call('/api/v1/student/mentoring-slots', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/student/my-mentoring-slots', () => call('/api/v1/student/my-mentoring-slots', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/student/tickets', () => call('/api/v1/student/tickets', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/enrollments/course/:id', () => call(`/api/v1/enrollments/course/${enrolled.course_id}`, { token }), (r) => (r.json?.data?.course_id === enrolled.course_id ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/courses/:id/announcements', () => call(`/api/v1/courses/${enrolled.course_id}/announcements`, { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/courses/:id/lessons', () => call(`/api/v1/courses/${enrolled.course_id}/lessons`), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/payments/initialize (already enrolled)', () => call('/api/v1/payments/initialize', { method: 'POST', token, body: { courseId: enrolled.course_id, provider: 'paystack', currency: 'NGN' } }), (r) => (r.json?.data?.alreadyEnrolled ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/courses (admin)', async () => {
+      const r = await call('/api/v1/courses', { method: 'POST', token: adminToken, body: { title: `D1 Test Course ${Date.now()}`, description: 'Temporary course created by the route suite', category: 'General', price: 0, level: 'beginner' } });
+      (globalThis as any).__newCourse = r.json?.data?.id;
+      return r;
+    }, (r) => (r.status === 201 && r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/courses/:id', async () => {
+      const id = (globalThis as any).__newCourse;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/courses/${id}`, { method: 'DELETE', token: adminToken });
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/admin/users', async () => {
+      const email = `created-${Date.now()}@example.com`;
+      const r = await call('/api/v1/admin/users', { method: 'POST', token: adminToken, body: { name: 'Created User', email, role: 'student', sendInvite: false } });
+      (globalThis as any).__createdId = r.json?.data?.id;
+      return r;
+    }, (r) => (r.status === 201 && r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/admin/users/:id (cleanup)', async () => {
+      const id = (globalThis as any).__createdId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/admin/users/${id}`, { method: 'DELETE', token: adminToken });
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/applications/instructor (multipart)', async () => {
+      const form = new FormData();
+      form.append('fullName', 'Multipart Applicant');
+      form.append('email', `applicant-${Date.now()}@example.com`);
+      form.append('phone', '+2348000000000');
+      form.append('country', 'Nigeria');
+      form.append('professionalTitle', 'Engineer');
+      form.append('yearsExperience', '5');
+      form.append('specialization', 'Web');
+      return call('/api/v1/applications/instructor', { method: 'POST', body: form });
+    }, (r) => (r.status === 201 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

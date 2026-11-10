@@ -78,7 +78,11 @@ export function useFaceDetection(enabled: boolean): FaceDetectionResult {
       videoEl.srcObject = stream;
       videoElRef.current = videoEl;
 
-      await videoEl.play();
+      await videoEl.play().catch((e) => {
+        // AbortError is benign: the element can be detached while the browser
+        // is still starting playback. The detection loop only needs frames.
+        if (e?.name !== 'AbortError') console.warn('Camera play() failed:', e?.name);
+      });
       console.log('Camera video element playing');
 
       setCameraReady(true);
@@ -127,7 +131,7 @@ export function useFaceDetection(enabled: boolean): FaceDetectionResult {
         streamRef.current = newStream;
         if (videoElRef.current) {
           videoElRef.current.srcObject = newStream;
-          await videoElRef.current.play();
+          await videoElRef.current.play().catch(() => {});
         }
         faceDetectedRef.current = true;
         setCameraReady(true);

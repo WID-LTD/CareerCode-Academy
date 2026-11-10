@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import UnderlineExt from '@tiptap/extension-underline';
 import HighlightExt from '@tiptap/extension-highlight';
 import PlaceholderExt from '@tiptap/extension-placeholder';
 import { api } from '../../lib/axios';
@@ -186,7 +185,6 @@ export default function CourseView() {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      UnderlineExt,
       HighlightExt,
       PlaceholderExt.configure({ placeholder: 'Write your notes for this lesson here...' }),
     ],
@@ -222,16 +220,14 @@ export default function CourseView() {
     if (!slug) return;
     setLoading(true);
     try {
-      const [courseRes, enrollmentRes] = await Promise.all([
-        api.get(`/courses/slug/${slug}`),
-        api.get('/enrollments'),
-      ]);
-
+      const courseRes = await api.get(`/courses/slug/${slug}`);
       const courseData = courseRes.data.data;
       setCourse(courseData);
 
-      const enrollmentData = enrollmentRes.data.data || [];
-      const myEnrollment = enrollmentData.find((e: any) => e.course_id === courseData.id);
+      // Look the enrollment up directly: the list endpoint is paginated and a
+      // user with many enrollments would not find this course on page 1.
+      const enrollmentRes = await api.get(`/enrollments/course/${courseData.id}`).catch(() => ({ data: { data: null } }));
+      const myEnrollment = enrollmentRes.data.data || null;
       setEnrollment(myEnrollment);
 
       const modulesRes = await api.get(`/modules/course/${courseData.id}`);
@@ -419,14 +415,16 @@ export default function CourseView() {
 
   const isModuleLocked = (modIdx: number) => {
     if (modIdx === 0) return false;
-    // check previous module progress via moduleProgress if available, else via computed
     const prevMod = modules[modIdx - 1];
     if (!prevMod) return false;
+    // An empty previous module (or the synthetic "ungrouped" bucket) must
+    // never lock the rest of the course.
+    const prevLessons = prevMod.lessons || [];
+    if (prevLessons.length === 0) return false;
+    if (prevMod.id === 'ungrouped') return false;
     const prog = moduleProgress.find((mp: any) => mp.id === prevMod.id);
-    if (prog) return prog.percentage < 100;
-    // fallback compute
-    const cnt = moduleCompletedCount(prevMod.lessons || []);
-    return cnt < (prevMod.lessons?.length || 0);
+    if (prog) return Number(prog.percentage) < 100;
+    return moduleCompletedCount(prevLessons) < prevLessons.length;
   };
 
   const getModuleStatus = (modIdx: number, mod: Module) => {

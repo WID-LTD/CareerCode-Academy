@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { fail, requireRole, statusOf } from '../route-utils';
+import { parseBody, storeOrLink } from '../uploads';
 
 // Ported from backend/src/routes/upload.routes.ts.
 // Multipart/multer is intentionally not implemented. Send JSON:
@@ -39,30 +40,14 @@ function readFile(body: any): { filename: string; contentType: string; data: str
   };
 }
 
-// POST /api/v1/upload — generic file upload returning a public URL
+// POST /api/v1/upload — multipart file, JSON base64, or { url }
 upload.post('/', async (c) => {
   try {
     await requireRole(c, UPLOAD_ROLES);
-
-    const body: any = await c.req.json().catch(() => ({}));
-    const file = readFile(body);
-    if (!file) return fail(c, 400, 'No file uploaded');
-
-    const r2 = (c.env as any).R2 as R2Bucket | undefined;
-    if (!r2) {
-      return fail(
-        c,
-        501,
-        'File uploads are not configured on this deployment (R2 binding missing). Bind env.R2, or host the file externally and submit its URL instead.'
-      );
-    }
-
-    const filename = safeName(file.filename);
-    const key = `uploads/${Date.now()}-${crypto.randomUUID()}-${filename}`;
-    await r2.put(key, base64Bytes(file.data), { httpMetadata: { contentType: file.contentType } });
-    const url = publicUrl(c.env, key);
-
-    return c.json({ success: true, data: { url, path: url } }, 201 as any);
+    const { fields, file, url } = await parseBody(c);
+    const linked = await storeOrLink(c.env, file, url || (fields.fileUrl as string) || null, 'uploads');
+    if (!linked) return fail(c, 400, 'No file uploaded');
+    return c.json({ success: true, data: { url: linked, path: linked } }, 201 as any);
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to upload file');
   }

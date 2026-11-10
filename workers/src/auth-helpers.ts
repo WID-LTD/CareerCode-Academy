@@ -3,6 +3,7 @@ import { setCookie, deleteCookie, getCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 import type { Env } from './env';
 import { getDb } from './db';
+import { mail } from './email';
 
 export interface TokenPayload {
   userId: string;
@@ -198,67 +199,17 @@ export function verificationCode(): string {
 }
 
 export async function sendVerificationEmail(env: Env, email: string, code: string): Promise<void> {
-  if (!env.BREVO_API_KEY) return;
-  const frontend = env.FRONTEND_URL || 'https://careercode.com.ng';
-  try {
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        sender: { email: env.BREVO_SENDER_EMAIL || 'johndavidnzubechukwu008@gmail.com', name: env.BREVO_SENDER_NAME || 'CareerCode Academy' },
-        to: [{ email }],
-        subject: `Your verification code: ${code} - CareerCode Academy`,
-        htmlContent: `<p>Welcome to CareerCode Academy! Your verification code is <strong>${code}</strong>.</p><p>Or verify instantly: <a href="${frontend}/verify-email/${code}">${frontend}/verify-email/${code}</a></p><p>This code expires in 24 hours.</p>`,
-      }),
-    });
-  } catch { /* email failures must not break registration */ }
-}
-
-// ── Password reset / welcome email ────────────────────────────────────────
-async function sendBrevo(env: Env, to: string, subject: string, htmlContent: string): Promise<void> {
-  if (!env.BREVO_API_KEY) return;
-  try {
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        sender: {
-          email: env.BREVO_SENDER_EMAIL || 'johndavidnzubechukwu008@gmail.com',
-          name: env.BREVO_SENDER_NAME || 'CareerCode Academy',
-        },
-        to: [{ email: to }],
-        subject,
-        htmlContent,
-      }),
-    });
-  } catch { /* email failures must never break the request */ }
+  await mail.verification(env, email, code);
 }
 
 export async function sendPasswordResetEmail(env: Env, email: string, token: string): Promise<void> {
-  const frontend = env.FRONTEND_URL || 'https://careercode.com.ng';
-  const link = `${frontend}/reset-password/${encodeURIComponent(token)}`;
-  await sendBrevo(
-    env,
-    email,
-    'Reset your CareerCode Academy password',
-    `<p>We received a request to reset your password.</p>
-     <p><a href="${link}">Reset password</a> (valid for 15 minutes).</p>
-     <p>If you didn't request this, you can safely ignore this email.</p>`
-  );
+  await mail.passwordReset(env, email, token);
 }
 
 export async function sendWelcomeEmail(env: Env, email: string, name: string): Promise<void> {
-  const frontend = env.FRONTEND_URL || 'https://careercode.com.ng';
-  await sendBrevo(
-    env,
-    email,
-    'Welcome to CareerCode Academy',
-    `<p>Hi ${name || 'there'},</p><p>Your email is verified — welcome aboard!</p>
-     <p><a href="${frontend}/dashboard">Start learning</a></p>`
-  );
+  await mail.welcome(env, email, name);
 }
 
-/** SHA-256 hex digest, used for password-reset tokens at rest. */
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');

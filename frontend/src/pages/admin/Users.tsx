@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, ChevronDown, ChevronUp, UserX, UserCheck,
   Ban, Trash2, Mail, Shield, ShieldOff, Loader2, AlertCircle, X,
-  Download, Eye, Calendar, BookOpen, Clock, Award, ChevronRight,
+  Download, Eye, Calendar, BookOpen, Clock, Award, ChevronRight, UserPlus,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import { useAdminStore } from '@/store/adminStore';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 const ROLES = ['all', 'student', 'instructor', 'admin', 'super_admin'];
 const STATUS_OPTIONS = ['all', 'active', 'suspended', 'verified', 'unverified'];
@@ -63,6 +65,12 @@ export default function AdminUsers() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: string; userId?: string; userName?: string; bulk?: boolean } | null>(null);
+  const [roleEdit, setRoleEdit] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', email: '', role: 'student', sendInvite: true });
+  const [createError, setCreateError] = useState('');
   const [bulkRoleTarget, setBulkRoleTarget] = useState('');
 
   useEffect(() => {
@@ -175,9 +183,14 @@ export default function AdminUsers() {
           <h1 className="text-2xl sm:text-3xl font-bold">Users</h1>
           <p className="text-gray-500 mt-1">{users.length} total users</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => exportCSV(sorted)} disabled={sorted.length === 0}>
-          <Download className="w-4 h-4 mr-2" /> Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => { setCreateError(''); setCreateOpen(true); }}>
+            <UserPlus className="w-4 h-4 mr-2" /> New user
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportCSV(sorted)} disabled={sorted.length === 0}>
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Stats Summary */}
@@ -339,7 +352,7 @@ export default function AdminUsers() {
                       <Button size="sm" variant="ghost" onClick={() => window.location.href = `mailto:${user.email}`} title="Send email">
                         <Mail className="w-3.5 h-3.5 text-gray-500" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setConfirmAction({ type: 'change-role', userId: user._id, userName: user.name })} title="Change role">
+                      <Button size="sm" variant="ghost" onClick={() => setRoleEdit({ id: user._id, name: user.name, role: user.role })} title="Change role">
                         {user.role === 'admin' || user.role === 'super_admin' ? <ShieldOff className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setConfirmAction({ type: user.is_suspended ? 'reactivate' : 'suspend', userId: user._id, userName: user.name })} disabled={actionLoading === user._id}>
@@ -399,7 +412,7 @@ export default function AdminUsers() {
                   <Button size="sm" variant="ghost" onClick={() => window.location.href = `mailto:${user.email}`} title="Send email">
                     <Mail className="w-3.5 h-3.5 text-gray-500" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmAction({ type: 'change-role', userId: user._id, userName: user.name })} title="Change role">
+                  <Button size="sm" variant="ghost" onClick={() => setRoleEdit({ id: user._id, name: user.name, role: user.role })} title="Change role">
                     {user.role === 'admin' || user.role === 'super_admin' ? <ShieldOff className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setConfirmAction({ type: user.is_suspended ? 'reactivate' : 'suspend', userId: user._id, userName: user.name })} disabled={actionLoading === user._id}>
@@ -530,6 +543,78 @@ export default function AdminUsers() {
         )}
       </AnimatePresence>
 
+      {/* Create user */}
+      {createOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-md p-6 rounded-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">Create user</h3>
+              <button onClick={() => setCreateOpen(false)}><X className="w-5 h-5" /></button>
+            </div>
+            {createError && <p className="text-sm text-danger-500 mb-3">{createError}</p>}
+            <div className="space-y-3">
+              <input className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-transparent px-3 py-2 text-sm" placeholder="Full name" value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })} />
+              <input className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-transparent px-3 py-2 text-sm" placeholder="Email address" type="email" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
+              <select className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-transparent px-3 py-2 text-sm" value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })}>
+                <option value="student">Student</option>
+                <option value="instructor">Instructor</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super admin</option>
+              </select>
+              <label className="flex items-center gap-2 text-sm text-gray-500">
+                <input type="checkbox" checked={createForm.sendInvite} onChange={e => setCreateForm({ ...createForm, sendInvite: e.target.checked })} />
+                Email a set-password invite
+              </label>
+            </div>
+            <div className="flex gap-2 justify-end mt-5">
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button disabled={creating} onClick={async () => {
+                setCreating(true); setCreateError('');
+                try {
+                  await api.post('/admin/users', createForm);
+                  toast.success('User created');
+                  setCreateOpen(false);
+                  setCreateForm({ name: '', email: '', role: 'student', sendInvite: true });
+                  fetchUsers();
+                } catch (e: any) {
+                  setCreateError(e?.response?.data?.message || 'Failed to create user');
+                } finally { setCreating(false); }
+              }}>{creating ? 'Creating…' : 'Create user'}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Change role */}
+      {roleEdit && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card w-full max-w-sm p-6 rounded-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">Change role</h3>
+              <button onClick={() => setRoleEdit(null)}><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm text-gray-500 mb-3">Set the role for <strong>{roleEdit.name}</strong>. They will be emailed and their dashboard will update automatically.</p>
+            <select className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-transparent px-3 py-2 text-sm" value={roleEdit.role} onChange={e => setRoleEdit({ ...roleEdit, role: e.target.value })}>
+              <option value="student">Student</option>
+              <option value="instructor">Instructor</option>
+              <option value="admin">Admin</option>
+              <option value="super_admin">Super admin</option>
+            </select>
+            <div className="flex gap-2 justify-end mt-5">
+              <Button variant="outline" onClick={() => setRoleEdit(null)}>Cancel</Button>
+              <Button disabled={roleSaving} onClick={async () => {
+                setRoleSaving(true);
+                try {
+                  await updateUserRole(roleEdit.id, roleEdit.role);
+                  toast.success('Role updated');
+                  setRoleEdit(null);
+                } finally { setRoleSaving(false); }
+              }}>{roleSaving ? 'Saving…' : 'Save role'}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Confirm Action Modal */}
       {confirmAction && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -551,10 +636,7 @@ export default function AdminUsers() {
                 variant={confirmAction.type === 'delete' ? 'danger' : 'primary'}
                 onClick={() => {
                   if (confirmAction.bulk) handleBulkAction(confirmAction.type);
-                  else if (confirmAction.type === 'change-role' && confirmAction.userId) {
-                    setActionLoading(confirmAction.userId);
-                    updateUserRole(confirmAction.userId, bulkRoleTarget || 'admin').finally(() => { setActionLoading(null); setConfirmAction(null); });
-                  } else handleAction(confirmAction.type, confirmAction.userId);
+                  else handleAction(confirmAction.type, confirmAction.userId);
                 }}
                 disabled={actionLoading !== null}
               >

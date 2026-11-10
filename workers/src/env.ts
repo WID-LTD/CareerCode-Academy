@@ -19,9 +19,10 @@ export interface Env {
   JWT_EXPIRES_IN?: string;
   JWT_REFRESH_SECRET: string;
   JWT_REFRESH_EXPIRES_IN?: string;
-  BREVO_API_KEY?: string;
-  BREVO_SENDER_EMAIL?: string;
-  BREVO_SENDER_NAME?: string;
+  // Transactional email: Cloudflare Email Service binding (Workers Paid) or Resend.
+  EMAIL?: { send: (message: any) => Promise<any> };
+  MAIL_FROM?: string;
+  RESEND_API_KEY?: string;
   PAYSTACK_SECRET_KEY?: string;
   PAYSTACK_PUBLIC_KEY?: string;
   FLUTTERWAVE_SECRET_KEY?: string;

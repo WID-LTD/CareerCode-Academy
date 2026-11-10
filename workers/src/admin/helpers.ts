@@ -1,4 +1,5 @@
 import type { Env } from '../env';
+import { sendEmail, mail } from '../email';
 import { getDb } from '../db';
 
 // Shared helpers for the ported admin routes. Mirrors the pieces of
@@ -54,33 +55,14 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-// ── Email (Brevo HTTP API; Workers cannot use SMTP) ──────────────────────
+// ── Email (Cloudflare Email Service / Resend via shared sender) ──────────
 async function sendMail(env: Env, to: string, subject: string, html: string): Promise<void> {
-  if (!env.BREVO_API_KEY) return;
-  try {
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': env.BREVO_API_KEY,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        sender: {
-          email: env.BREVO_SENDER_EMAIL || 'johndavidnzubechukwu008@gmail.com',
-          name: env.BREVO_SENDER_NAME || 'CareerCode Academy',
-        },
-        to: [{ email: to }],
-        subject,
-        htmlContent: html,
-      }),
-    });
-  } catch {
-    /* email failures must never break the request */
-  }
+  await sendEmail(env, { to, subject, html });
 }
 
 export async function sendInstructorApprovalEmail(env: Env, email: string, name: string, setupToken: string): Promise<void> {
+  await mail.applicationApproved(env, email, name, setupToken);
+  return;
   const frontend = env.FRONTEND_URL || 'https://careercode.com.ng';
   const setupUrl = `${frontend}/auth/set-password/${setupToken}`;
   await sendMail(

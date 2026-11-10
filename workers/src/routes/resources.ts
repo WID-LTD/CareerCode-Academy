@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireRole, statusOf } from '../route-utils';
+import { parseBody, storeOrLink, field } from '../uploads';
 
 const resources = new Hono<{ Bindings: Env }>();
 const STAFF = ['instructor', 'admin', 'super_admin'];
@@ -36,9 +37,14 @@ resources.get('/lesson/:lessonId', async (c) => {
 resources.post('/', async (c) => {
   try {
     const s = await requireRole(c, STAFF);
-    const body: any = await c.req.json().catch(() => ({}));
-    const { courseId, lessonId, title, fileUrl, fileType } = body;
+    const { fields, file } = await parseBody(c);
+    const courseId = field(fields, 'courseId', 'course_id');
+    const lessonId = field(fields, 'lessonId', 'lesson_id');
+    const title = field(fields, 'title');
+    const providedUrl = field(fields, 'fileUrl', 'file_url', 'url');
+    const fileType = field(fields, 'fileType', 'file_type');
     if (!courseId || !title) return fail(c, 400, 'courseId and title are required');
+    const storedUrl = await storeOrLink(c.env, file, providedUrl || null, 'resources');
 
     const db = getDb(c.env);
     const course = await db.query<any>('SELECT instructor_id FROM courses WHERE id = $1', [courseId]);
@@ -50,7 +56,7 @@ resources.post('/', async (c) => {
     const { rows } = await db.query<any>(
       `INSERT INTO resources (course_id, lesson_id, title, file_url, file_type)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [courseId, lessonId || null, title, fileUrl || '', fileType || '']
+      [courseId, lessonId || null, title, storedUrl || '', fileType || file?.type || '']
     );
     return c.json({ success: true, data: rows[0] }, 201);
   } catch (e: any) {

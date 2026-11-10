@@ -364,11 +364,12 @@ export async function createNotification(env: Env, input: {
   title: string;
   message: string;
   type?: string;
+  link?: string | null;
 }): Promise<any> {
   const { rows } = await getDb(env).query<any>(
-    `INSERT INTO notifications (user_id, title, message, type)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [input.user_id, input.title, input.message, input.type || 'info']
+    `INSERT INTO notifications (user_id, title, message, type, link)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [input.user_id, input.title, input.message, input.type || 'info', input.link || null]
   );
   return rows[0];
 }

@@ -45,6 +45,20 @@ enrollments.get('/', async (c) => {
   }
 });
 
+// GET /api/v1/enrollments/course/:courseId — access check for a single course
+enrollments.get('/course/:courseId', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT * FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [s.userId, c.req.param('courseId')]
+    );
+    return c.json({ success: true, data: rows[0] || null });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load enrollment');
+  }
+});
+
 // GET /api/v1/enrollments/:id
 enrollments.get('/:id', async (c) => {
   try {

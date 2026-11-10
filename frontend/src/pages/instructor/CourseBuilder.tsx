@@ -734,7 +734,9 @@ export default function CourseBuilder() {
     currentValue: string | null,
     onUpload: (file: File) => void,
     uploading: boolean,
-    type: 'image' | 'video'
+    type: 'image' | 'video',
+    onUrl?: (url: string) => void,
+    onClear?: () => void
   ) => (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
@@ -749,9 +751,7 @@ export default function CourseBuilder() {
           )}
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
             <button
-              onClick={() => {
-                if (type === 'image') setFormData((prev) => ({ ...prev, media: { ...prev.media, thumbnail: null } }));
-              }}
+              onClick={() => onClear?.()}
               className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
             >
               <Trash2 className="w-5 h-5" />
@@ -784,6 +784,14 @@ export default function CourseBuilder() {
           />
         </label>
       )}
+      {onUrl && (
+        <input
+          type="url"
+          placeholder="…or paste an image URL (https://…)"
+          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm"
+          onChange={(e) => { if (e.target.value.trim()) onUrl(e.target.value.trim()); }}
+        />
+      )}
     </div>
   );
 
@@ -795,7 +803,9 @@ export default function CourseBuilder() {
         formData.media.thumbnail,
         (file) => handleImageUpload(file, 'thumbnail'),
         uploadingThumbnail,
-        'image'
+        'image',
+        (url) => setFormData((prev) => ({ ...prev, media: { ...prev.media, thumbnail: url } })),
+        () => setFormData((prev) => ({ ...prev, media: { ...prev.media, thumbnail: null } }))
       )}
       {renderMediaUpload(
         'Banner Image',
@@ -803,7 +813,9 @@ export default function CourseBuilder() {
         formData.media.bannerImage,
         (file) => handleImageUpload(file, 'banner'),
         uploadingBanner,
-        'image'
+        'image',
+        (url) => setFormData((prev) => ({ ...prev, media: { ...prev.media, bannerImage: url } })),
+        () => setFormData((prev) => ({ ...prev, media: { ...prev.media, bannerImage: null } }))
       )}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Promo Video URL</label>

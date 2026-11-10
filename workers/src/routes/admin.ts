@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, pageParams, requireRole, statusOf } from '../route-utils';
 import { hashPassword, randomToken, type TokenPayload } from '../auth-helpers';
+import { mail } from '../email';
 import * as M from '../admin/models';
 import * as A from '../admin/analytics';
 import { syncLearningPathForCourse } from '../admin/learning-path-sync';
@@ -253,6 +254,57 @@ admin.get('/dashboard', async (c) => {
 // ══════════════════════════════════════════════════════════════
 
 // GET /admin/users
+// POST /admin/users — create a user and email a set-password invite
+admin.post('/users', async (c) => {
+  try {
+    const session = c.get('session');
+    const body = await jsonBody(c);
+    const name = String(body.name || '').trim();
+    const email = String(body.email || '').trim().toLowerCase();
+    const role = body.role || 'student';
+    if (!name) return fail(c, 400, 'Name is required');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(c, 400, 'A valid email is required');
+    if (!['student', 'instructor', 'admin', 'super_admin'].includes(role)) return fail(c, 400, 'Invalid role');
+
+    const db = getDb(c.env);
+    const existing = await db.query<any>('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length) return fail(c, 409, 'A user with that email already exists');
+
+    const setupToken = randomToken(24);
+    const password = await hashPassword(c.env, randomToken(24));
+    const { rows } = await db.query<any>(
+      `INSERT INTO users (name, email, password, role, is_verified, setup_token, setup_token_expires)
+       VALUES ($1, $2, $3, $4, false, $5, $6) RETURNING id, name, email, role, is_verified, created_at`,
+      [name, email, password, role, setupToken, new Date(Date.now() + 24 * 60 * 60 * 1000)]
+    );
+    const user = rows[0];
+
+    await M.createNotification(c.env, {
+      user_id: user.id,
+      title: 'Welcome to CareerCode',
+      message: `Your ${role.replace('_', ' ')} account has been created. Check your email to set a password.`,
+      type: 'info',
+    });
+
+    if (body.sendInvite !== false) {
+      c.executionCtx.waitUntil(mail.accountInvite(c.env, email, name, role, setupToken).catch(() => {}));
+    }
+
+    await logAudit(c.env, {
+      adminId: session.userId,
+      action: 'create_user',
+      resourceType: 'user',
+      resourceId: user.id,
+      details: `Created ${role} ${email}`,
+      ...AUDIT_META(c),
+    });
+
+    return c.json({ success: true, data: { ...user, inviteSent: body.sendInvite !== false } }, 201 as any);
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to create user');
+  }
+});
+
 admin.get('/users', async (c) => {
   try {
     const { page, limit, offset } = pageParams(c, 50);
@@ -319,12 +371,15 @@ admin.put('/users/:id/role', async (c) => {
     const user = await M.updateUser(c.env, id, { role });
     if (!user) return fail(c, 404, 'User not found');
 
+    const dash = role === 'instructor' ? '/instructor/dashboard' : ['admin', 'super_admin'].includes(role) ? '/admin/dashboard' : '/student/dashboard';
     await M.createNotification(c.env, {
       user_id: id,
       title: 'Role Updated',
-      message: `Your role has been updated to ${role}`,
+      message: `Your role has been updated to ${role.replace('_', ' ')}`,
       type: 'info',
+      link: dash,
     });
+    c.executionCtx.waitUntil(mail.roleChanged(c.env, user.email, user.name, role).catch(() => {}));
 
     await logAudit(c.env, {
       adminId: session.userId,

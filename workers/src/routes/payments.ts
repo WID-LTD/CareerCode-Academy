@@ -207,7 +207,14 @@ payments.post('/initialize', async (c) => {
       'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
       [s.userId, courseId]
     );
-    if (existing.rows.length) return fail(c, 409, 'Already enrolled in this course');
+    if (existing.rows.length) {
+      // Idempotent: the UI can safely call initialize for a course the user
+      // already owns (e.g. after a free promo or an admin enrollment).
+      return c.json({
+        success: true,
+        data: { alreadyEnrolled: true, amount: 0, course_slug: course.slug, message: 'Already enrolled' },
+      });
+    }
 
     const reference = `${provider}_${s.userId}_${courseId}_${Date.now()}`;
     const { rows: payRows } = await db.query<any>(
