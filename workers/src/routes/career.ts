@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
 import * as CareerModel from '../career';
+import { ingestJobs, jobsAreStale } from '../jobs-ingest';
 
 // Career Center routes ported from backend/src/routes/career.routes.ts.
 // Mounted at /api/v1/career.
@@ -31,9 +32,24 @@ function validation(c: any, errors: Record<string, string[]>) {
 // GET /career/jobs — active job listings
 career.get('/jobs', async (c) => {
   try {
-    return c.json({ success: true, data: await CareerModel.getActiveJobs(c.env) });
+    const jobs = await CareerModel.getActiveJobs(c.env);
+    // Refresh the board in the background at most every 6 hours.
+    c.executionCtx.waitUntil((async () => {
+      if (await jobsAreStale(c.env)) await ingestJobs(c.env);
+    })().catch(() => {}));
+    return c.json({ success: true, data: jobs });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to load jobs');
+  }
+});
+
+// POST /career/admin/jobs/ingest — force a refresh (admin)
+career.post('/admin/jobs/ingest', async (c) => {
+  try {
+    await requireRole(c, ADMIN);
+    return c.json({ success: true, data: await ingestJobs(c.env) });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to ingest jobs');
   }
 });
 

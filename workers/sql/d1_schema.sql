@@ -930,6 +930,9 @@ CREATE TABLE IF NOT EXISTS "jobs" (
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "skills" TEXT DEFAULT '[]',
+  "source" TEXT,
+  "external_id" TEXT,
+  "ingested_at" TEXT,
   PRIMARY KEY ("id"),
   FOREIGN KEY (posted_by) REFERENCES "users"(id) ON DELETE SET NULL
 );
