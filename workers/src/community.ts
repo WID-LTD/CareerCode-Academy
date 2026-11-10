@@ -594,11 +594,16 @@ export async function getCommunities(env: Env, userId: string): Promise<any[]> {
     `SELECT c.*,
        u.name AS creator_name, u.avatar AS creator_avatar,
        CASE WHEN cm.id IS NOT NULL THEN true ELSE false END AS is_member,
-       COALESCE(cm.role, 'none') AS my_role
+       COALESCE(cm.role, 'none') AS my_role,
+       (SELECT r.status FROM community_join_requests r
+        WHERE r.community_id = c.id AND r.user_id = $1
+        ORDER BY r.created_at DESC LIMIT 1) AS my_request_status
      FROM communities c
      JOIN users u ON u.id = c.created_by
      LEFT JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = $1
      WHERE c.is_archived = false
+       AND (c.visibility = 'public' OR c.created_by = $1 OR cm.id IS NOT NULL
+         OR EXISTS (SELECT 1 FROM community_join_requests r WHERE r.community_id = c.id AND r.user_id = $1))
      ORDER BY c.member_count DESC, c.created_at DESC`,
     [userId]
   );

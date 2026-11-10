@@ -65,6 +65,8 @@ function CommunityCard({ community, onJoin, onEnter }: {
           >
             Enter <ChevronRight size={16} />
           </button>
+        ) : community.my_request_status === 'pending' ? (
+          <span className="flex-1 text-center px-4 py-2 bg-amber-500/10 text-amber-400 rounded-xl text-sm border border-amber-500/20">Request pending</span>
         ) : community.join_policy === 'invite_only' ? (
           <span className="flex-1 text-center px-4 py-2 bg-white/5 text-gray-400 rounded-xl text-sm">Invite Only</span>
         ) : (
@@ -72,7 +74,7 @@ function CommunityCard({ community, onJoin, onEnter }: {
             onClick={() => onJoin(community.id)}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-xl text-sm font-medium transition-colors border border-white/10"
           >
-            Join Community
+            {community.join_policy === 'approval' ? 'Request to join' : 'Join Community'}
           </button>
         )}
       </div>

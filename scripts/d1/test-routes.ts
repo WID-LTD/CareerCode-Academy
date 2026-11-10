@@ -390,6 +390,31 @@ async function main() {
       if (!id) return { status: 200, json: { success: true, skipped: true } };
       return call(`/api/v1/portfolio/site/projects/${id}`, { method: 'DELETE', token });
     }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/community/communities (approval)', async () => {
+      const slug = `qa-community-${Date.now()}`;
+      const r = await call('/api/v1/community/communities', { method: 'POST', token: adminToken, body: { name: 'QA Community', slug, description: 'test', category: 'General', visibility: 'private', join_policy: 'approval' } });
+      (globalThis as any).__commId = r.json?.data?.id;
+      return r;
+    }, (r) => (r.status === 201 || r.status === 200 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/community/:id/join (approval -> request)', async () => {
+      const id = (globalThis as any).__commId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/community/communities/${id}/join`, { method: 'POST', token });
+    }, (r) => (r.json?.skipped || r.json?.requested ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/community/:id/requests', async () => {
+      const id = (globalThis as any).__commId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/community/communities/${id}/requests`, { token: adminToken });
+    }, (r) => (r.json?.skipped || Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['PUT /api/v1/community/:id/requests/:rid (approve)', async () => {
+      const id = (globalThis as any).__commId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      const list = await call(`/api/v1/community/communities/${id}/requests`, { token: adminToken });
+      const rid = list.json?.data?.[0]?.id;
+      if (!rid) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/community/communities/${id}/requests/${rid}`, { method: 'PUT', token: adminToken, body: { status: 'approved' } });
+    }, (r) => (r.json?.skipped || r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/community/my-requests', () => call('/api/v1/community/my-requests', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

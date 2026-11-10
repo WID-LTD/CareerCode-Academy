@@ -29,6 +29,7 @@ export interface CommunityChannel {
   category_name?: string;
   category_slug?: string;
   is_member?: boolean;
+  my_request_status?: string | null;
   my_role?: string;
   last_message_at?: string;
   last_message_content?: string;
@@ -95,6 +96,7 @@ export interface Community {
   creator_name?: string;
   creator_avatar?: string | null;
   is_member?: boolean;
+  my_request_status?: string | null;
   my_role?: string;
 }
 
@@ -599,9 +601,15 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 
   joinCommunity: async (id) => {
     try {
-      await api.post(`/community/communities/${id}/join`);
+      const { data } = await api.post(`/community/communities/${id}/join`);
+      if (data?.requested) {
+        set((state) => ({
+          communities: state.communities.map((c) => (c.id === id ? { ...c, my_request_status: 'pending' } : c)),
+        }));
+        return;
+      }
       set((state) => ({
-        communities: state.communities.map((c) => (c.id === id ? { ...c, member_count: c.member_count + 1, is_member: true } : c)),
+        communities: state.communities.map((c) => (c.id === id ? { ...c, member_count: c.member_count + 1, is_member: true, my_request_status: null } : c)),
       }));
     } catch (error) {
       console.error('Failed to join community', error);

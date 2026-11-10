@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
 import * as Community from '../community';
+import { mail } from '../email';
 
 // Community domain, ported from backend/src/routes/community.routes.ts.
 // Mount at /api/v1/community.
@@ -839,10 +840,129 @@ community.post('/communities/:id/join', async (c) => {
       return fail(c, 403, 'This community is invite only');
     }
 
+    if (found.join_policy === 'approval') {
+      const db = getDb(c.env);
+      const existingReq = (await db.query<any>(
+        'SELECT * FROM community_join_requests WHERE community_id = $1 AND user_id = $2',
+        [communityId, s.userId]
+      )).rows[0];
+      if (existingReq?.status === 'pending') {
+        return c.json({ success: true, requested: true, status: 'pending' });
+      }
+      await db.query(
+        `INSERT INTO community_join_requests (community_id, user_id, status)
+         VALUES ($1, $2, 'pending')
+         ON CONFLICT (community_id, user_id)
+         DO UPDATE SET status = 'pending', decided_by = NULL, decided_at = NULL, updated_at = NOW()`,
+        [communityId, s.userId]
+      );
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type, link)
+         VALUES ($1, 'Community join request', $2, 'info', $3)`,
+        [found.created_by, `A student requested to join "${found.name}".`, '/instructor/communities']
+      );
+      const creator = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [found.created_by])).rows[0];
+      if (creator?.email) {
+        c.executionCtx.waitUntil(mail.communityRequest(c.env, creator.email, creator.name, `${found.name} (new request)`, true).catch(() => {}));
+      }
+      return c.json({ success: true, requested: true, status: 'pending' });
+    }
+
     const member = await Community.joinCommunity(c.env, communityId, s.userId);
     return c.json({ success: true, data: member });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to join community');
+  }
+});
+
+// GET /api/v1/community/communities/:id/requests (owner/admin/moderator)
+community.get('/communities/:id/requests', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const found = await Community.getCommunityById(c.env, c.req.param('id'));
+    if (!found) return fail(c, 404, 'Community not found');
+    const membership = await Community.isCommunityMember(c.env, found.id, s.userId);
+    const canManage = found.created_by === s.userId || ['admin', 'super_admin'].includes(s.role) || ['owner', 'admin', 'moderator'].includes(membership?.role);
+    if (!canManage) return fail(c, 403, 'You do not have permission to review requests');
+
+    const { rows } = await db.query<any>(
+      `SELECT r.*, u.name, u.email, u.avatar FROM community_join_requests r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.community_id = $1 AND r.status = 'pending'
+       ORDER BY r.created_at ASC`,
+      [found.id]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load requests');
+  }
+});
+
+// PUT /api/v1/community/communities/:id/requests/:requestId
+community.put('/communities/:id/requests/:requestId', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    if (!['approved', 'rejected'].includes(body.status)) return fail(c, 400, 'status must be approved or rejected');
+    const db = getDb(c.env);
+    const found = await Community.getCommunityById(c.env, c.req.param('id'));
+    if (!found) return fail(c, 404, 'Community not found');
+    const membership = await Community.isCommunityMember(c.env, found.id, s.userId);
+    const canManage = found.created_by === s.userId || ['admin', 'super_admin'].includes(s.role) || ['owner', 'admin', 'moderator'].includes(membership?.role);
+    if (!canManage) return fail(c, 403, 'You do not have permission to review requests');
+
+    const request = (await db.query<any>(
+      'SELECT * FROM community_join_requests WHERE id = $1 AND community_id = $2',
+      [c.req.param('requestId'), found.id]
+    )).rows[0];
+    if (!request) return fail(c, 404, 'Request not found');
+
+    await db.query(
+      `UPDATE community_join_requests SET status = $1, decided_by = $2, decided_at = NOW(), updated_at = NOW() WHERE id = $3`,
+      [body.status, s.userId, request.id]
+    );
+
+    if (body.status === 'approved') {
+      await Community.joinCommunity(c.env, found.id, request.user_id);
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type, link)
+         VALUES ($1, 'Community request approved', $2, 'success', $3)`,
+        [request.user_id, `You're now a member of "${found.name}".`, '/student/community']
+      );
+    } else {
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type, link)
+         VALUES ($1, 'Community request declined', $2, 'info', $3)`,
+        [request.user_id, `Your request to join "${found.name}" was declined.`, '/student/community']
+      );
+    }
+
+    const requester = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [request.user_id])).rows[0];
+    if (requester?.email) {
+      c.executionCtx.waitUntil(
+        mail.communityRequest(c.env, requester.email, requester.name, found.name, body.status === 'approved').catch(() => {})
+      );
+    }
+    return c.json({ success: true, message: `Request ${body.status}` });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to update request');
+  }
+});
+
+// GET /api/v1/community/my-requests
+community.get('/my-requests', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT r.*, c.name AS community_name, c.slug AS community_slug
+       FROM community_join_requests r JOIN communities c ON c.id = r.community_id
+       WHERE r.user_id = $1 ORDER BY r.created_at DESC`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load requests');
   }
 });
 

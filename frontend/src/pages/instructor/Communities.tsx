@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useCommunityStore } from '@/store/communityStore';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/axios';
 import type { Community } from '@/store/communityStore';
 
 const CATEGORIES = ['General', 'Tech', 'Design', 'Business', 'Other'];
@@ -18,6 +19,9 @@ export default function InstructorCommunities() {
   const [showForm, setShowForm] = useState(false);
   const [editingCommunity, setEditingCommunity] = useState<Community | null>(null);
   const [form, setForm] = useState({ name: '', slug: '', description: '', category: 'General', visibility: 'public', join_policy: 'open' });
+  const [requestsFor, setRequestsFor] = useState<Community | null>(null);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; id: string; name: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('mine');
@@ -127,6 +131,13 @@ export default function InstructorCommunities() {
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
+                      {canEdit(community as Community) && (
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          setRequestsFor(community as Community); setRequestsLoading(true);
+                          try { const { data } = await api.get(`/community/communities/${community.id}/requests`); setRequests(data.data || []); }
+                          catch { setRequests([]); } finally { setRequestsLoading(false); }
+                        }} icon={<Users className="w-3.5 h-3.5" />}>Requests</Button>
+                      )}
                       {canDelete(community as Community) && <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300" onClick={() => setConfirmAction({ type: 'delete', id: community.id, name: community.name })} icon={<Trash2 className="w-3.5 h-3.5" />}>Delete</Button>}
                       {!isOwn && activeTab === 'all' && <Button variant="ghost" size="sm" onClick={() => window.location.assign(`/community/${community.id}`)} icon={<BookOpen className="w-3.5 h-3.5" />}>View</Button>}
                       {isOwn && <Button variant="ghost" size="sm" onClick={() => setConfirmAction({ type: 'archive', id: community.id, name: community.name })} icon={community.is_archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}>{community.is_archived ? 'Unarchive' : 'Archive'}</Button>}
@@ -140,7 +151,43 @@ export default function InstructorCommunities() {
       )}
 
       <AnimatePresence>
-        {confirmAction && (
+        {requestsFor && (
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="max-w-lg mx-auto my-10 rounded-2xl bg-gray-900 border border-gray-800 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">Join requests · {requestsFor.name}</h3>
+              <button onClick={() => setRequestsFor(null)} className="text-gray-400">✕</button>
+            </div>
+            {requestsLoading ? <p className="text-sm text-gray-400">Loading…</p> : requests.length === 0 ? (
+              <p className="text-sm text-gray-400">No pending requests.</p>
+            ) : (
+              <div className="space-y-3">
+                {requests.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-gray-800 p-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{r.name}</p>
+                      <p className="text-xs text-gray-400">{r.email}</p>
+                      {r.message && <p className="text-xs text-gray-500 mt-1">{r.message}</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={async () => {
+                        await api.put(`/community/communities/${requestsFor.id}/requests/${r.id}`, { status: 'approved' });
+                        setRequests((x) => x.filter((i) => i.id !== r.id));
+                      }}>Approve</Button>
+                      <Button size="sm" variant="ghost" className="text-red-400" onClick={async () => {
+                        await api.put(`/community/communities/${requestsFor.id}/requests/${r.id}`, { status: 'rejected' });
+                        setRequests((x) => x.filter((i) => i.id !== r.id));
+                      }}>Reject</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {confirmAction && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setConfirmAction(null)}>
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-md w-full">
               <h3 className="font-semibold">{confirmAction.type === 'delete' ? 'Delete Community' : 'Archive Community'}</h3>

@@ -2081,3 +2081,16 @@ CREATE TABLE IF NOT EXISTS "portfolio_views" (
   "referrer" TEXT,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+
+CREATE TABLE IF NOT EXISTS "community_join_requests" (
+  "id" TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+  "community_id" TEXT NOT NULL,
+  "user_id" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'pending',
+  "message" TEXT,
+  "decided_by" TEXT,
+  "decided_at" TEXT,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(community_id, user_id)
+);
