@@ -162,11 +162,6 @@ export function hourLabel(value: any): string | null {
 }
 
 /** YYYY-MM-DD (the shape SQLite's DATE() returns). */
-export function dateOnly(value: any): string | null {
-  const d = asDate(value);
-  if (!d) return null;
-  return d.toISOString().slice(0, 10);
-}
 
 /** Postgres returned NUMERIC aggregates as strings; normalise for maths. */
 export function num(value: any, fallback = 0): number {
@@ -267,7 +262,8 @@ export function validateCoursePayload(body: any, rules: CoursePayloadRules): Rec
 /** body parser that tolerates empty/invalid JSON, like Express' body parser. */
 export async function jsonBody(c: any): Promise<any> {
   try {
-    return await c.req.json();
+    const parsed = await c.req.json();
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
   }

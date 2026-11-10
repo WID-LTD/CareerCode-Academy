@@ -11,7 +11,7 @@
 | Realtime SFU + TURN | 1,000 GB/mo shared | $0.05/GB after | Hundreds of classroom-hours before the line |
 | Workers AI | Daily free neurons | Billed | Per-user caps on study assistant |
 | **D1 (primary DB)** | 5 GB storage, **5M rows read/day**, **100k rows written/day** | Hard stop at daily cap (queries error until reset) | 106 tables, 45.8k rows, ~30 MB. Reads dominate; analytics is the only heavy writer |
-| Neon Postgres | ~0.5 GB, ~100 CU-h/mo | Throttled/cold | **Legacy only** — remaining proxied routes. Retire once ported |
+| Neon Postgres | ~0.5 GB, ~100 CU-h/mo | Throttled/cold | **Idle** — kept only as the `DB_BACKEND=neon` rollback target |
 | Hyperdrive | Included all plans | — | Not used |
 
 ## Forbidden (would create bills)

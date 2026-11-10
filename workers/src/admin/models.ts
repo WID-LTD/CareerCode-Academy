@@ -12,8 +12,8 @@ const PUBLIC_USER_COLS =
 export async function countUsers(env: Env, role?: string): Promise<number> {
   const db = getDb(env);
   const { rows } = role
-    ? await db.query<{ count: any }>('SELECT COUNT(*) FROM users WHERE role = $1', [role])
-    : await db.query<{ count: any }>('SELECT COUNT(*) FROM users');
+    ? await db.query<{ count: any }>('SELECT COUNT(*) as count FROM users WHERE role = $1', [role])
+    : await db.query<{ count: any }>('SELECT COUNT(*) as count FROM users');
   return parseInt(String(rows[0]?.count ?? 0), 10);
 }
 
@@ -213,8 +213,8 @@ export async function deleteCourse(env: Env, id: string): Promise<boolean> {
 export async function countCourses(env: Env, published?: boolean): Promise<number> {
   const db = getDb(env);
   const { rows } = published !== undefined
-    ? await db.query<{ count: any }>('SELECT COUNT(*) FROM courses WHERE published = $1', [published])
-    : await db.query<{ count: any }>('SELECT COUNT(*) FROM courses');
+    ? await db.query<{ count: any }>('SELECT COUNT(*) as count FROM courses WHERE published = $1', [published])
+    : await db.query<{ count: any }>('SELECT COUNT(*) as count FROM courses');
   return parseInt(String(rows[0]?.count ?? 0), 10);
 }
 
@@ -288,7 +288,7 @@ export async function deleteCategory(env: Env, id: string): Promise<boolean> {
 }
 
 export async function countCategories(env: Env): Promise<number> {
-  const { rows } = await getDb(env).query<{ count: any }>('SELECT COUNT(*) FROM categories');
+  const { rows } = await getDb(env).query<{ count: any }>('SELECT COUNT(*) as count FROM categories');
   return parseInt(String(rows[0]?.count ?? 0), 10);
 }
 
@@ -312,8 +312,8 @@ export async function getAllEnrollmentsPaginated(env: Env, limit: number, offset
 export async function countEnrollments(env: Env, courseId?: string): Promise<number> {
   const db = getDb(env);
   const { rows } = courseId
-    ? await db.query<{ count: any }>('SELECT COUNT(*) FROM enrollments WHERE course_id = $1', [courseId])
-    : await db.query<{ count: any }>('SELECT COUNT(*) FROM enrollments');
+    ? await db.query<{ count: any }>('SELECT COUNT(*) as count FROM enrollments WHERE course_id = $1', [courseId])
+    : await db.query<{ count: any }>('SELECT COUNT(*) as count FROM enrollments');
   return parseInt(String(rows[0]?.count ?? 0), 10);
 }
 
@@ -388,7 +388,7 @@ export async function getAllCertificates(env: Env, limit = 50, offset = 0): Prom
 }
 
 export async function countCertificates(env: Env): Promise<number> {
-  const { rows } = await getDb(env).query<{ count: any }>('SELECT COUNT(*) FROM certificates');
+  const { rows } = await getDb(env).query<{ count: any }>('SELECT COUNT(*) as count FROM certificates');
   return parseInt(String(rows[0]?.count ?? 0), 10);
 }
 

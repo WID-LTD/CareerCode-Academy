@@ -57,6 +57,9 @@ const cases = [
      WHERE user_id = $1 AND completed = true AND completed_at >= date_trunc('year', NOW())
      GROUP BY TO_CHAR(completed_at, 'Mon'), EXTRACT(MONTH FROM completed_at)
      ORDER BY EXTRACT(MONTH FROM completed_at)`, params: ['u1'] },
+  { name: 'date_trunc column month', sql: `SELECT date_trunc('month', created_at) AS m FROM notifications WHERE user_id = $1`, params: ['u1'] },
+  { name: 'date_trunc column week', sql: `SELECT date_trunc('week', created_at) AS w FROM notifications WHERE user_id = $1`, params: ['u1'] },
+  { name: 'date_trunc column year', sql: `SELECT date_trunc('year', created_at) AS y FROM notifications WHERE user_id = $1`, params: ['u1'] },
   { name: 'round avg cast', sql: 'SELECT ROUND(AVG(progress))::int as current FROM enrollments WHERE user_id = $1', params: ['u1'] },
   { name: 'current_date join', sql: `SELECT d.xp_earned, d.goal_reached, u.daily_xp_goal FROM daily_xp_log d
      RIGHT JOIN users u ON u.id = d.user_id AND d.date = CURRENT_DATE WHERE u.id = $1`, params: ['u1'] },

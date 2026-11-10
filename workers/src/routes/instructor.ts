@@ -310,23 +310,23 @@ instructor.get('/dashboard/stats', async (c) => {
 
     // Recent activity (enrollments, submissions, reviews)
     const recentActivityRes = await db.query<any>(
-      `(SELECT 'enrollment' as type, c.title as details, e.enrolled_at as time
-        FROM enrollments e
-        JOIN courses c ON e.course_id = c.id
-        WHERE c.instructor_id = $1)
-       UNION ALL
-       (SELECT 'submission' as type, a.title as details, s.submitted_at as time
-        FROM submissions s
-        JOIN assignments a ON s.assignment_id = a.id
-        JOIN courses c ON a.course_id = c.id
-        WHERE c.instructor_id = $1)
-       UNION ALL
-       (SELECT 'review' as type, c.title as details, r.created_at as time
-        FROM reviews r
-        JOIN courses c ON r.course_id = c.id
-        WHERE c.instructor_id = $1)
-       ORDER BY time DESC
-       LIMIT 10`,
+      `SELECT * FROM (
+         SELECT 'enrollment' as type, c.title as details, e.enrolled_at as time
+         FROM enrollments e
+         JOIN courses c ON e.course_id = c.id
+         WHERE c.instructor_id = $1
+         UNION ALL
+         SELECT 'submission' as type, a.title as details, s.submitted_at as time
+         FROM submissions s
+         JOIN assignments a ON s.assignment_id = a.id
+         JOIN courses c ON a.course_id = c.id
+         WHERE c.instructor_id = $1
+         UNION ALL
+         SELECT 'review' as type, c.title as details, r.created_at as time
+         FROM reviews r
+         JOIN courses c ON r.course_id = c.id
+         WHERE c.instructor_id = $1
+       ) activity ORDER BY time DESC LIMIT 10`,
       [instructorId]
     );
 

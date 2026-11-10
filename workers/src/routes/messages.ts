@@ -89,7 +89,12 @@ messages.post('/', async (c) => {
           : undefined;
 
     const attachment = body.attachment;
-    const attachmentData = attachment && (attachment.data || attachment.base64 || attachment.fileData);
+    if (!attachmentUrl && typeof attachment === 'string' && /^https?:\/\//i.test(attachment)) {
+      attachmentUrl = attachment;
+    }
+    const attachmentData = attachment && typeof attachment === 'object'
+      ? (attachment.data || attachment.base64 || attachment.fileData)
+      : undefined;
     if (!attachmentUrl && attachmentData) {
       const r2 = (c.env as any).R2 as R2Bucket | undefined;
       if (!r2) {

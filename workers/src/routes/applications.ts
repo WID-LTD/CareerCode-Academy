@@ -31,6 +31,7 @@ function publicUrl(env: Env, key: string): string {
 async function resolveUpload(env: Env, providedUrl: any, file: any, folder: string): Promise<string | null> {
   if (typeof providedUrl === 'string' && providedUrl) return providedUrl;
   if (!file) return null;
+  if (typeof file === 'string' && /^https?:\/\//i.test(file)) return file;
 
   const data = typeof file === 'string' ? file : file.data || file.base64 || file.fileData;
   if (!data) return null;

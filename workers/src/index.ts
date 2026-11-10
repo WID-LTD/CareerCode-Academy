@@ -37,6 +37,20 @@ import challengeRoutes from './routes/challenges';
 import communityRoutes from './routes/community';
 import discussionRoutes from './routes/discussions';
 import forumRoutes from './routes/forum';
+import adminRoutes from './routes/admin';
+import instructorRoutes from './routes/instructor';
+import pageRoutes from './routes/pages';
+import promotionRoutes from './routes/promotions';
+import applicationRoutes from './routes/applications';
+import ticketRoutes from './routes/tickets';
+import videoRoutes from './routes/videos';
+import showcaseVideoRoutes from './routes/showcase-videos';
+import uploadRoutes from './routes/upload';
+import pathwayFinderRoutes from './routes/pathway-finder';
+import messageRoutes from './routes/messages';
+import payoutRoutes from './routes/payouts';
+import boardRoutes from './routes/board';
+import blogRoutes from './routes/blogs';
 
 export { AuthDO };
 
@@ -132,153 +146,28 @@ app.route('/api/v1/challenges', challengeRoutes);
 app.route('/api/v1/community', communityRoutes);
 app.route('/api/v1/discussions', discussionRoutes);
 app.route('/api/v1/forum', forumRoutes);
+app.route('/api/v1/admin', adminRoutes);
+app.route('/api/v1/instructor', instructorRoutes);
+app.route('/api/v1/pages', pageRoutes);
+app.route('/api/v1/promotions', promotionRoutes);
+app.route('/api/v1/applications', applicationRoutes);
+app.route('/api/v1/tickets', ticketRoutes);
+app.route('/api/v1/videos', videoRoutes);
+app.route('/api/v1/showcase-videos', showcaseVideoRoutes);
+app.route('/api/v1/upload', uploadRoutes);
+app.route('/api/v1/pathway-finder', pathwayFinderRoutes);
+app.route('/api/v1/messages', messageRoutes);
+app.route('/api/v1/payouts', payoutRoutes);
+app.route('/api/v1/board', boardRoutes);
+app.route('/api/v1/blogs', blogRoutes);
 
-// ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
-// transparently forwarded to the legacy Express API so the new domain is
-// fully functional during the port. Mounted LAST among /api/v1 routes —
-// every app.route('/api/v1/...') added above takes precedence over it.
-// TODO(port): remove once all routes are native.
-const LEGACY_API = 'https://careercode-academy.onrender.com';
-
-// Paths safe for short edge caching: public, unauthenticated GETs only.
-// Authenticated requests (Authorization header) are NEVER cached.
-const CACHEABLE_PREFIXES = [
-  '/api/v1/courses',
-  '/api/v1/public/',
-  '/api/v1/blogs',
-  '/api/v1/schools',
-  '/api/v1/career/jobs',
-  '/api/v1/career/internships',
-  '/api/v1/career/alumni',
-  '/api/v1/search',
-];
-const CACHE_TTL_SECONDS = 60;
-
-function isCacheable(c: any): boolean {
-  if (c.req.method.toUpperCase() !== 'GET') return false;
-  if (c.req.header('authorization')) return false;
-  const path = new URL(c.req.url).pathname;
-  return CACHEABLE_PREFIXES.some((p) => path === p || path.startsWith(p));
-}
-
-async function fetchLegacy(c: any, target: string, init: RequestInit, timeoutMs = 25000): Promise<Response> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-  const started = Date.now();
-  try {
-    const resp = await fetch(target, { ...init, signal: controller.signal, redirect: 'manual' });
-    console.log(JSON.stringify({ src: 'edge-proxy', method: init.method, target: target.replace('https://careercode-academy.onrender.com', 'legacy'), status: resp.status, ms: Date.now() - started }));
-    return resp;
-  } catch (err: any) {
-    console.error(JSON.stringify({ src: 'edge-proxy', method: init.method, target: target.replace('https://careercode-academy.onrender.com', 'legacy'), error: err?.name || 'fetch-failed', ms: Date.now() - started }));
-    throw err;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-app.all('/api/v1/*', async (c) => {
-  const url = new URL(c.req.url);
-  // Deterministic native-precedence guard (independent of router ordering):
-  // anything under a natively-ported namespace must never reach the proxy.
-  const NATIVE_PREFIXES = ['/api/v1/auth/', '/api/v1/auth', '/api/v1/analytics/', '/api/v1/public/', '/api/v1/live/', '/api/v1/courses/', '/api/v1/courses', '/api/v1/schools/', '/api/v1/schools', '/api/v1/student/', '/api/v1/notifications/', '/api/v1/notifications', '/api/v1/certificates/', '/api/v1/certificates', '/api/v1/career-goals/',
-    '/api/v1/enrollments/', '/api/v1/enrollments',
-    '/api/v1/lessons/', '/api/v1/lessons',
-    '/api/v1/modules/', '/api/v1/modules',
-    '/api/v1/progress/', '/api/v1/progress',
-    '/api/v1/reviews/', '/api/v1/reviews',
-    '/api/v1/wishlists/', '/api/v1/wishlists',
-    '/api/v1/gamification/', '/api/v1/gamification',
-    '/api/v1/learning-paths/', '/api/v1/learning-paths',
-    '/api/v1/search/', '/api/v1/search',
-    '/api/v1/users/', '/api/v1/users',
-    '/api/v1/resources/', '/api/v1/resources',
-    '/api/v1/payments/', '/api/v1/payments',
-    '/api/v1/programs/', '/api/v1/programs',
-    '/api/v1/calendar/', '/api/v1/calendar',
-    '/api/v1/guided/', '/api/v1/guided',
-    '/api/v1/career/', '/api/v1/career',
-    '/api/v1/portfolio/', '/api/v1/portfolio',
-    '/api/v1/exams/', '/api/v1/exams',
-    '/api/v1/quizzes/', '/api/v1/quizzes',
-    '/api/v1/assignments/', '/api/v1/assignments',
-    '/api/v1/challenges/', '/api/v1/challenges',
-    '/api/v1/community/', '/api/v1/community',
-    '/api/v1/discussions/', '/api/v1/discussions',
-    '/api/v1/forum/', '/api/v1/forum',
-  ];
-  if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
-    return c.json({ success: false, message: 'Route not found' }, 404);
-  }
-  const target = `${LEGACY_API}${url.pathname}${url.search}`;
-  const headers = new Headers();
-  c.req.raw.headers.forEach((value: string, key: string) => {
-    const k = key.toLowerCase();
-    if (k !== 'host' && k !== 'content-length' && k !== 'connection') headers.set(key, value);
-  });
-  const method = c.req.method.toUpperCase();
-  const init: RequestInit = {
-    method,
-    headers,
-    body: method === 'GET' || method === 'HEAD' ? undefined : c.req.raw.body,
-  };
-
-  // 1) Edge cache for safe public GETs (absorbs origin/DB blips for reads).
-  // Cache key is the URL alone: cookies/Authorization never vary it, and
-  // isCacheable() already excluded authenticated requests entirely.
-  if (isCacheable(c)) {
-    const cache = caches.default;
-    const cacheKey = new Request(url.toString(), { method: 'GET' });
-    const cached = await cache.match(cacheKey).catch(() => undefined);
-    // Retry loop: a flaky origin often succeeds on the second attempt.
-    // Never pass a raw origin 5xx to the client for safe reads — serve
-    // stale cache, else an honest 502.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const fresh = await fetchLegacy(c, target, { ...init, method: 'GET', body: undefined });
-        if (fresh.ok) {
-          // `new Response` detaches the body from `fresh`; cache a clone of the
-          // new response and return the new response itself (fresh is consumed).
-          const res = new Response(fresh.body, fresh);
-          res.headers.set('Cache-Control', `public, max-age=${CACHE_TTL_SECONDS}`);
-          c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
-          return res;
-        }
-        if (fresh.status >= 500 && attempt === 0) {
-          await new Promise((r) => setTimeout(r, 800));
-          continue; // retry once on origin 5xx
-        }
-        if (cached) return cached; // origin error -> serve stale
-        return fresh;
-      } catch {
-        if (attempt === 0) {
-          await new Promise((r) => setTimeout(r, 800));
-          continue; // retry once on network failure
-        }
-        if (cached) return cached; // origin unreachable -> serve stale
-        return c.json({ success: false, source: 'edge', message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
-      }
-    }
-    if (cached) return cached;
-    return c.json({ success: false, source: 'edge', message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
-  }
-
-  // 2) Mutations + authenticated reads: no cache, one retry, honest 502.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      return await fetchLegacy(c, target, init);
-    } catch (err: any) {
-      if (attempt === 1) {
-        return c.json(
-          { success: false, message: 'Upstream service temporarily unavailable. Please retry.' },
-          502
-        );
-      }
-      await new Promise((r) => setTimeout(r, 800));
-    }
-  }
-  return c.json({ success: false, source: 'edge', message: 'Upstream service temporarily unavailable. Please retry.' }, 502);
-});
+// ── No legacy fallback ────────────────────────────────────────────────────
+// Every route group is now served natively from D1. An unmatched /api/v1 path
+// returns a JSON 404 instead of proxying to Render, so Neon is not reachable
+// from the request path at all.
+app.all('/api/v1/*', (c) =>
+  c.json({ success: false, message: 'Route not found' }, 404)
+);
 
 // ── 404 + errors (same envelope as Express API) ──────────
 app.notFound((c) => c.json({ success: false, message: 'Route not found' }, 404));

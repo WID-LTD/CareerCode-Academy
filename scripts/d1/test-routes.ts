@@ -29,9 +29,14 @@ class Stmt {
   constructor(private sql: string, private params: any[] = []) {}
   bind(...params: any[]) { return new Stmt(this.sql, params); }
   async all() {
-    const stmt = raw.prepare(this.sql);
-    const rows = this.params.length ? stmt.all(...this.params) : stmt.all();
-    return { success: true, results: rows, meta: {} } as any;
+    try {
+      const stmt = raw.prepare(this.sql);
+      const rows = this.params.length ? stmt.all(...this.params) : stmt.all();
+      return { success: true, results: rows, meta: {} } as any;
+    } catch (e: any) {
+      if (process.env.DEBUG_SQL) console.error('SQLFAIL:', e.message, '\n', this.sql.replace(/\s+/g, ' ').slice(0, 500));
+      throw e;
+    }
   }
   async run() { return this.all(); }
   async first() { const r = await this.all(); return r.results[0] ?? null; }
@@ -303,6 +308,23 @@ async function main() {
     ['GET /api/v1/community/channels', () => call('/api/v1/community/channels', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/discussions', () => call('/api/v1/discussions'), (r) => (Array.isArray(r.json?.data) || r.json?.data?.discussions ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/forum/course/:id', () => call(`/api/v1/forum/course/${enrolled.course_id}`, { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/pages/:slug', () => call('/api/v1/pages/about'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/promotions/active', () => call('/api/v1/promotions/active'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/board/members', () => call('/api/v1/board/members'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/board/policies', () => call('/api/v1/board/policies'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/pathway-finder', () => call('/api/v1/pathway-finder', { token }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/messages/conversations', () => call('/api/v1/messages/conversations', { token }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/showcase-videos/all (admin)', () => call('/api/v1/showcase-videos/all', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/videos/stream/:lessonId', () => call(`/api/v1/videos/stream/${anyLesson.id}`, { token }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/payouts/instructor', () => call('/api/v1/payouts/instructor', { token }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/admin/users (admin)', () => call('/api/v1/admin/users?limit=3', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/analytics (admin)', () => call('/api/v1/admin/analytics', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/courses (admin)', () => call('/api/v1/admin/courses?limit=3', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/payments (admin)', () => call('/api/v1/admin/payments?limit=3', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/settings (admin)', () => call('/api/v1/admin/settings', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/instructor/dashboard/stats', () => call('/api/v1/instructor/dashboard/stats', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/instructor/students', () => call('/api/v1/instructor/students', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/blogs', () => call('/api/v1/blogs?limit=3'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

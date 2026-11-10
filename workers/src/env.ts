@@ -10,6 +10,9 @@ export interface Env {
   DB_BACKEND?: 'd1' | 'neon';
   // R2 bucket for database backups (see scripts/backup-d1.sh).
   BACKUPS?: R2Bucket;
+  // R2 bucket for course media / uploads.
+  R2?: R2Bucket;
+  R2_PUBLIC_URL?: string;
   FRONTEND_URL: string;
   CORS_ORIGINS?: string;
   JWT_SECRET: string;

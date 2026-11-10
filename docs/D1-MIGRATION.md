@@ -7,8 +7,8 @@ longer used by any native worker route.
 
 | Layer | Datastore | Notes |
 |---|---|---|
-| Worker native routes (`/api/v1/auth`, `analytics`, `public`, `live`, `courses`, `schools`, `student`, `notifications`, `certificates`, `career-goals`) | **D1** | `workers/src/db.ts` |
-| Routes still proxied to Render (payments, admin, community, quizzes, …) | Neon | Removed as each route is ported |
+| **All** `/api/v1/*` routes (49 groups, 318 frontend-visible paths) | **D1** | `workers/src/db.ts` |
+| Render / Neon | **Not in the request path** | Unmatched paths return a native JSON 404 |
 
 ## Why a compatibility layer
 
@@ -64,7 +64,9 @@ it on Render regardless.
 
 > Rollback caveat: writes made while on D1 do **not** flow back to Neon. A
 > rollback restores service from the last Neon state, so treat it as an
-> emergency lever, not a sync mechanism.
+> emergency lever, not a sync mechanism. Neon still holds the pre-migration
+> snapshot and receives the `notifications.link` migration, so `DB_BACKEND=neon`
+> works for every ported route.
 
 ## Backups (R2 / S3)
 

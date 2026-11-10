@@ -193,7 +193,7 @@ export async function getSourceAnalytics(env: Env, range = '7d') {
     `SELECT
        COALESCE(NULLIF(referral_source, ''), 'Direct') as source,
        COUNT(*)::int as visitors,
-       SUM(CASE WHEN visit_count > 1 THEN 1 ELSE 0 END)::int as returning
+       SUM(CASE WHEN visit_count > 1 THEN 1 ELSE 0 END)::int as returning_count
      FROM visitors
      WHERE created_at > NOW() - INTERVAL '${interval}'
      GROUP BY source
@@ -202,11 +202,17 @@ export async function getSourceAnalytics(env: Env, range = '7d') {
 
   const total = sources.rows.reduce((acc: number, r: any) => acc + num(r.visitors), 0);
 
-  return sources.rows.map((r: any) => ({
-    ...r,
-    percentage: total > 0 ? Math.round((num(r.visitors) / total) * 100) : 0,
-    returningRate: num(r.visitors) > 0 ? Math.round((num(r.returning) / num(r.visitors)) * 100) : 0,
-  }));
+  return sources.rows.map((r: any) => {
+    const visitors = num(r.visitors);
+    const returning = num(r.returning_count);
+    return {
+      source: r.source,
+      visitors,
+      returning,
+      percentage: total > 0 ? Math.round((visitors / total) * 100) : 0,
+      returningRate: visitors > 0 ? Math.round((returning / visitors) * 100) : 0,
+    };
+  });
 }
 
 export async function getConversionFunnel(env: Env, range = '7d') {

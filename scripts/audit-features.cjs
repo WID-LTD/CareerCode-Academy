@@ -51,9 +51,21 @@ const dead = rows.filter((r) => !r.backend && !r.native);
 const proxied = rows.filter((r) => r.backend && !r.native);
 const native = rows.filter((r) => r.native);
 
-// dashboard pages
-const dashboards = walk(FE).filter((f) => /pages\/(student|instructor|admin)\//.test(f))
-  .map((f) => path.relative(FE, f));
+// dashboard pages + their API dependencies
+const dashboards = walk(FE).filter((f) => /pages\/(student|instructor|admin)\//.test(f));
+const pageRows = dashboards.map((f) => {
+  const src = fs.readFileSync(f, 'utf8');
+  const paths = new Set();
+  for (const m of src.matchAll(/\bapi\.(?:get|post|put|patch|delete)\(\s*(?:`([^`]+)`|'([^']+)'|"([^"]+)")/g)) {
+    let p = (m[1] || m[2] || m[3] || '').trim();
+    if (!p.startsWith('/')) continue;
+    p = norm(p.split('?')[0].replace(/\$\{[^}]+\}/g, ':x'));
+    paths.add(p);
+  }
+  const arr = [...paths];
+  const proxiedPaths = arr.filter((p) => matchMount(p, backendMounts) && !matchMount(p, nativeMounts));
+  return { page: path.relative(FE, f), total: arr.length, proxied: proxiedPaths };
+});
 
 const out = `# Feature audit
 
@@ -80,7 +92,9 @@ ${dead.length ? dead.map((r) => `- \`${r.path}\` — ${r.usedBy.join(', ')}`).jo
 
 ## Dashboard pages
 
-${dashboards.map((d) => `- \`${d}\``).join('\n')}
+| Page | API calls | Still proxied |
+|---|---|---|
+${pageRows.sort((a, b) => b.proxied.length - a.proxied.length).map((r) => `| \`${r.page}\` | ${r.total} | ${r.proxied.length ? r.proxied.slice(0, 4).map((p) => `\`${p}\``).join(', ') + (r.proxied.length > 4 ? ` +${r.proxied.length - 4}` : '') : '—'} |`).join('\n')}
 `;
 
 fs.writeFileSync(path.join(ROOT, 'docs/FEATURE-AUDIT.md'), out);

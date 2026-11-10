@@ -14,6 +14,8 @@ compatibility_date = "2025-09-01"
 DB_BACKEND = "d1"
 FRONTEND_URL = "https://careercode.com.ng"
 CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
+# Public base URL for objects in the R2 media bucket.
+R2_PUBLIC_URL = "https://pub-a2269f45348a44958044822fb0428bb7.r2.dev"
 JWT_EXPIRES_IN = "15m"
 JWT_REFRESH_EXPIRES_IN = "7d"
 
@@ -31,12 +33,10 @@ database_id = "1287fa42-8291-4192-a2c9-47b44b03001b"
 binding = "BACKUPS"
 bucket_name = "careercode-backups"
 
-# --- Phase 3: R2 bucket binding for course media (replaces access keys) ---
-# Create once: wrangler r2 bucket create career-code-academy
-# Then uncomment:
-#[[r2_buckets]]
-#binding = "R2"
-#bucket_name = "career-code-academy"
+# --- R2: course media / uploads (same bucket the Express app used) ---
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "career-code-academy"
 
 # --- Durable Objects: AuthDO handles bcrypt (30s CPU budget) ---
 [durable_objects]
@@ -49,6 +49,8 @@ new_sqlite_classes = ["AuthDO"]
 [env.production.vars]
 FRONTEND_URL = "https://careercode.com.ng"
 CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
+# Public base URL for objects in the R2 media bucket.
+R2_PUBLIC_URL = "https://pub-a2269f45348a44958044822fb0428bb7.r2.dev"
 
 # --- Custom domain (Phase 1 cutover): api.careercode.com.ng ---
 [[routes]]

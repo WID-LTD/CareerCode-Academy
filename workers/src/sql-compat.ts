@@ -129,7 +129,15 @@ function translateDateTrunc(sql: string): string {
     if (/^now$/i.test(expr.replace(/[\s()]/g, ''))) {
       return unit.toLowerCase() === 'week' ? WEEK_START : unit.toLowerCase() === 'month' ? MONTH_START : YEAR_START;
     }
-    return `strftime('%Y-%m-%dT%H:%M:%fZ', ${expr}, 'start of day')`;
+    // Truncate an arbitrary timestamp expression to the start of its
+    // week/month/year (Postgres semantics: weeks start Monday).
+    if (unit.toLowerCase() === 'week') {
+      return `strftime('%Y-%m-%dT%H:%M:%fZ', ${expr}, '-' || ((CAST(strftime('%w', ${expr}) AS INTEGER) + 6) % 7) || ' days', 'start of day')`;
+    }
+    if (unit.toLowerCase() === 'month') {
+      return `strftime('%Y-%m-01T00:00:00.000Z', ${expr})`;
+    }
+    return `strftime('%Y-01-01T00:00:00.000Z', ${expr})`;
   });
 }
 
