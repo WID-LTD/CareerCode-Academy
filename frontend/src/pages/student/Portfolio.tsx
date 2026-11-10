@@ -111,6 +111,9 @@ export default function PortfolioPage() {
               {data.portfolio_public ? <ShieldCheck className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
               {data.portfolio_public ? 'Public' : 'Private'}
             </Button>
+            <Link to="/student/portfolio/site">
+              <Button size="sm" icon={<Globe className="w-4 h-4" />}>Portfolio website</Button>
+            </Link>
             <Button size="sm" variant="ghost" onClick={copyLink} title="Copy public profile link">
               {copied ? <CheckInline /> : <Copy className="w-4 h-4" />} /u/{data.username}
             </Button>

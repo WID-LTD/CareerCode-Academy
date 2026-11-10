@@ -366,6 +366,30 @@ async function main() {
       form.append('specialization', 'Web');
       return call('/api/v1/applications/instructor', { method: 'POST', body: form });
     }, (r) => (r.status === 201 ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/portfolio/templates', () => call('/api/v1/portfolio/templates'), (r) => (Array.isArray(r.json?.data) && r.json.data.length >= 6 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/portfolio/site', () => call('/api/v1/portfolio/site', { token }), (r) => (r.json?.data?.site ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['PUT /api/v1/portfolio/site', () => call('/api/v1/portfolio/site', { method: 'PUT', token, body: { template: 'terminal', headline: 'QA Engineer', theme: { accent: '#22c55e' } } }), (r) => (r.json?.data?.template === 'terminal' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/portfolio/site/projects', async () => {
+      const r = await call('/api/v1/portfolio/site/projects', { method: 'POST', token, body: { title: `Portfolio QA ${Date.now()}`, summary: 'test', tech: ['React'], demo_url: 'https://example.com' } });
+      (globalThis as any).__pfProject = r.json?.data?.id;
+      return r;
+    }, (r) => (r.status === 201 && r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['PUT /api/v1/portfolio/site/projects/:id', async () => {
+      const id = (globalThis as any).__pfProject;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/portfolio/site/projects/${id}`, { method: 'PUT', token, body: { featured: true, cover_url: 'https://pub-a2269f45348a44958044822fb0428bb7.r2.dev/courses/79d896eb-aeb8-4086-9861-8abef8b0863f-2acfb5505d.jpg' } });
+    }, (r) => (r.json?.skipped || r.json?.data?.featured ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/portfolio/site/publish', () => call('/api/v1/portfolio/site/publish', { method: 'POST', token }), (r) => (r.json?.data?.is_published ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/portfolio/site/:username (public)', async () => {
+      const username = raw.prepare('SELECT username FROM users WHERE id = ?').get(user.id)?.username;
+      return call(`/api/v1/portfolio/site/${username}`);
+    }, (r) => (r.json?.data?.site ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/portfolio/site/analytics', () => call('/api/v1/portfolio/site/analytics', { token }), (r) => (typeof r.json?.data?.views === 'number' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['DELETE /api/v1/portfolio/site/projects/:id', async () => {
+      const id = (globalThis as any).__pfProject;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/portfolio/site/projects/${id}`, { method: 'DELETE', token });
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

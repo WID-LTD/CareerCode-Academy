@@ -115,7 +115,7 @@ const CareerCenter = lazy(() => import('@/pages/public/CareerCenter'));
 const JobBoard = lazy(() => import('@/pages/public/JobBoard'));
 const InternshipsPage = lazy(() => import('@/pages/public/InternshipsPage'));
 const AlumniDirectory = lazy(() => import('@/pages/public/AlumniDirectory'));
-const PublicProfile = lazy(() => import('@/pages/public/PublicProfile'));
+const PublicProfile = lazy(() => import('@/pages/public/PortfolioSite'));
 const FAQ = lazy(() => import('@/pages/FAQ'));
 const Careers = lazy(() => import('@/pages/Careers'));
 const Partners = lazy(() => import('@/pages/Partners'));
@@ -153,6 +153,7 @@ const StudentMentorship = lazy(() => import('@/pages/student/Mentorship'));
 const StudentSkillTree = lazy(() => import('@/pages/student/SkillTree'));
 const StudentApplications = lazy(() => import('@/pages/student/Applications'));
 const StudentPortfolio = lazy(() => import('@/pages/student/Portfolio'));
+const StudentPortfolioBuilder = lazy(() => import('@/pages/student/PortfolioBuilder'));
 const StudentGuidedMode = lazy(() => import('@/pages/student/GuidedMode'));
 const StudentLiveRoom = lazy(() => import('@/pages/student/LiveRoom'));
 const StudentPathwayFinder = lazy(() => import('@/pages/student/PathwayFinder'));
@@ -309,6 +310,7 @@ function App() {
           <Route path="/career/internships" element={<SuspenseWrapper><InternshipsPage /></SuspenseWrapper>} />
           <Route path="/career/alumni" element={<SuspenseWrapper><AlumniDirectory /></SuspenseWrapper>} />
           <Route path="/u/:username" element={<SuspenseWrapper><PublicProfile /></SuspenseWrapper>} />
+          <Route path="/u/:username/:projectSlug" element={<SuspenseWrapper><PublicProfile /></SuspenseWrapper>} />
           <Route path="/faq" element={<SuspenseWrapper><FAQ /></SuspenseWrapper>} />
           <Route path="/careers" element={<SuspenseWrapper><Careers /></SuspenseWrapper>} />
           <Route path="/partners" element={<SuspenseWrapper><Partners /></SuspenseWrapper>} />
@@ -348,6 +350,7 @@ function App() {
           <Route path="skill-tree/:courseId" element={<SuspenseWrapper><StudentSkillTree /></SuspenseWrapper>} />
           <Route path="applications" element={<SuspenseWrapper><StudentApplications /></SuspenseWrapper>} />
           <Route path="portfolio" element={<SuspenseWrapper><StudentPortfolio /></SuspenseWrapper>} />
+          <Route path="portfolio/site" element={<SuspenseWrapper><StudentPortfolioBuilder /></SuspenseWrapper>} />
           <Route path="guided" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
           <Route path="guided/:slug" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
           <Route path="live/:sessionId" element={<SuspenseWrapper><StudentLiveRoom /></SuspenseWrapper>} />

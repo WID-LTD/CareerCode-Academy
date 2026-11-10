@@ -2034,3 +2034,50 @@ CREATE TABLE IF NOT EXISTS "media_assets" (
   "author" TEXT,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+
+CREATE TABLE IF NOT EXISTS "portfolio_sites" (
+  "id" TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+  "user_id" TEXT NOT NULL UNIQUE,
+  "template" TEXT NOT NULL DEFAULT 'minimal',
+  "theme" TEXT DEFAULT '{}',
+  "headline" TEXT,
+  "about" TEXT,
+  "location" TEXT,
+  "availability" TEXT,
+  "contact_email" TEXT,
+  "socials" TEXT DEFAULT '{}',
+  "sections" TEXT DEFAULT '[]',
+  "seo" TEXT DEFAULT '{}',
+  "is_published" INTEGER DEFAULT 0,
+  "views" INTEGER DEFAULT 0,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS "portfolio_projects" (
+  "id" TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+  "site_id" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "slug" TEXT NOT NULL,
+  "summary" TEXT,
+  "description" TEXT,
+  "cover_url" TEXT,
+  "gallery" TEXT DEFAULT '[]',
+  "tech" TEXT DEFAULT '[]',
+  "role" TEXT,
+  "duration" TEXT,
+  "repo_url" TEXT,
+  "demo_url" TEXT,
+  "preview_image_url" TEXT,
+  "featured" INTEGER DEFAULT 0,
+  "sort_order" INTEGER DEFAULT 0,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(site_id, slug)
+);
+CREATE TABLE IF NOT EXISTS "portfolio_views" (
+  "id" TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+  "site_id" TEXT,
+  "path" TEXT,
+  "referrer" TEXT,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);

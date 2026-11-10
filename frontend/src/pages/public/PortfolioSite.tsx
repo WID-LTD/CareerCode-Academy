@@ -1,0 +1,348 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import {
+  ArrowUpRight, Github, Globe, Linkedin, Mail, MapPin, Twitter,
+  ExternalLink, ArrowLeft, Loader,
+} from 'lucide-react';
+import api from '@/lib/axios';
+
+interface Project {
+  id: string;
+  title: string;
+  slug: string;
+  summary?: string | null;
+  description?: string | null;
+  cover_url?: string | null;
+  gallery?: string[];
+  tech?: string[];
+  role?: string | null;
+  duration?: string | null;
+  repo_url?: string | null;
+  demo_url?: string | null;
+  preview_image_url?: string | null;
+  featured?: boolean;
+}
+
+interface Site {
+  template: string;
+  theme: { accent?: string; mode?: 'light' | 'dark' };
+  headline?: string | null;
+  about?: string | null;
+  location?: string | null;
+  availability?: string | null;
+  contact_email?: string | null;
+  socials?: Record<string, string>;
+}
+
+const accentOf = (site: Site) => site.theme?.accent || '#6366f1';
+
+function Socials({ site, dark }: { site: Site; dark?: boolean }) {
+  const s = site.socials || {};
+  const items = [
+    { href: s.github, icon: Github, label: 'GitHub' },
+    { href: s.linkedin, icon: Linkedin, label: 'LinkedIn' },
+    { href: s.twitter, icon: Twitter, label: 'Twitter' },
+    { href: s.website, icon: Globe, label: 'Website' },
+    { href: site.contact_email ? `mailto:${site.contact_email}` : undefined, icon: Mail, label: 'Email' },
+  ].filter((i) => i.href);
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {items.map(({ href, icon: Icon, label }) => (
+        <a key={label} href={href} target="_blank" rel="noreferrer" aria-label={label}
+          className={`p-2 rounded-xl border transition-colors ${dark ? 'border-white/10 hover:border-white/30 text-gray-300' : 'border-gray-200 hover:border-gray-400 text-gray-600'}`}>
+          <Icon className="w-4 h-4" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function Tech({ tech, accent, dark }: { tech: string[]; accent: string; dark?: boolean }) {
+  if (!tech?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tech.map((t) => (
+        <span key={t} className="text-[11px] px-2 py-0.5 rounded-full"
+          style={{ background: `${accent}1a`, color: accent, border: `1px solid ${accent}33` }}>
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ProjectCard({ project, accent, dark, onOpen }: { project: Project; accent: string; dark?: boolean; onOpen: () => void }) {
+  return (
+    <button onClick={onOpen} className={`group text-left rounded-2xl overflow-hidden border transition-all hover:-translate-y-0.5 ${dark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200 shadow-sm'}`}>
+      {project.cover_url && (
+        <div className="aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
+          <img src={project.cover_url} alt={project.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        </div>
+      )}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold">{project.title}</h3>
+          <ArrowUpRight className="w-4 h-4 opacity-40 group-hover:opacity-100" style={{ color: accent }} />
+        </div>
+        {project.summary && <p className={`text-sm mt-1 line-clamp-2 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{project.summary}</p>}
+        <div className="mt-3"><Tech tech={project.tech || []} accent={accent} dark={dark} /></div>
+      </div>
+    </button>
+  );
+}
+
+export default function PortfolioSite() {
+  const { username, projectSlug } = useParams();
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  useEffect(() => {
+    setData(null); setError(false);
+    api.get(`/portfolio/site/${username}`)
+      .then(({ data }) => setData(data.data))
+      .catch(() => setError(true));
+  }, [username]);
+
+  const project = useMemo(() => {
+    if (!projectSlug || !data) return null;
+    return (data.projects || []).find((p: Project) => p.slug === projectSlug) || null;
+  }, [projectSlug, data]);
+
+  useEffect(() => {
+    if (data) document.title = `${data.user.name}${project ? ` · ${project.title}` : ''} — Portfolio`;
+  }, [data, project]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-gray-950 text-gray-200 p-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Portfolio not found</h1>
+          <p className="text-gray-400 mb-5">This portfolio may be private or the link is wrong.</p>
+          <Link to="/" className="text-indigo-400">Back to CareerCode</Link>
+        </div>
+      </div>
+    );
+  }
+  if (!data) return <div className="min-h-screen grid place-items-center bg-gray-950"><Loader className="text-indigo-400" /></div>;
+
+  const { user, site, projects } = data as { user: any; site: Site; projects: Project[] };
+  const accent = accentOf(site);
+  const dark = site.template === 'terminal' || site.template === 'gradient' || site.theme?.mode === 'dark';
+
+  // ── Project detail ────────────────────────────────────────────────────
+  if (projectSlug && project) {
+    return (
+      <div className={dark ? 'min-h-screen bg-gray-950 text-gray-100' : 'min-h-screen bg-white text-gray-900'}>
+        <div className="max-w-4xl mx-auto px-5 py-10">
+          <Link to={`/u/${username}`} className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100">
+            <ArrowLeft className="w-4 h-4" /> {user.name}
+          </Link>
+          <h1 className="text-3xl sm:text-4xl font-bold mt-6">{project.title}</h1>
+          {project.summary && <p className="mt-3 text-lg opacity-70">{project.summary}</p>}
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm opacity-70">
+            {project.role && <span>{project.role}</span>}
+            {project.duration && <span>· {project.duration}</span>}
+          </div>
+          <div className="mt-4"><Tech tech={project.tech || []} accent={accent} dark={dark} /></div>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            {project.demo_url && (
+              <a href={project.demo_url} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold" style={{ background: accent }}>
+                <ExternalLink className="w-4 h-4" /> Live site
+              </a>
+            )}
+            {project.repo_url && (
+              <a href={project.repo_url} target="_blank" rel="noreferrer"
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm border ${dark ? 'border-white/15' : 'border-gray-300'}`}>
+                <Github className="w-4 h-4" /> Source
+              </a>
+            )}
+          </div>
+
+          {(project.gallery?.length ? project.gallery : project.cover_url ? [project.cover_url] : []).map((src: string, i: number) => (
+            <img key={i} src={src} alt={`${project.title} ${i + 1}`} loading="lazy" className="mt-6 w-full rounded-2xl border border-black/10" />
+          ))}
+
+          {project.demo_url && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold">Website preview</h2>
+                {!showPreview && (
+                  <button onClick={() => setShowPreview(true)} className="text-sm px-3 py-1.5 rounded-lg border" style={{ borderColor: accent, color: accent }}>
+                    Load live preview
+                  </button>
+                )}
+              </div>
+              {showPreview ? (
+                <div className="mt-3 rounded-2xl overflow-hidden border" style={{ borderColor: `${accent}44` }}>
+                  <iframe
+                    src={project.demo_url}
+                    title={`${project.title} live preview`}
+                    className="w-full h-[70vh] bg-white"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 rounded-2xl overflow-hidden border border-dashed p-6 text-center text-sm opacity-60">
+                  Previews load on demand for safety and speed.
+                </div>
+              )}
+            </div>
+          )}
+
+          {project.description && (
+            <div className="mt-8 prose dark:prose-invert max-w-none whitespace-pre-line">{project.description}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const shell = dark ? 'min-h-screen bg-gray-950 text-gray-100' : 'min-h-screen bg-white text-gray-900';
+
+  // ── Terminal ──────────────────────────────────────────────────────────
+  if (site.template === 'terminal') {
+    return (
+      <div className={`${shell} font-mono`}>
+        <div className="max-w-4xl mx-auto px-5 py-12">
+          <p className="text-emerald-400 text-sm">~/portfolio $ whoami</p>
+          <h1 className="text-3xl sm:text-5xl font-bold mt-3">{user.name}</h1>
+          {site.headline && <p className="text-emerald-300 mt-2">{site.headline}</p>}
+          <p className="mt-4 text-gray-400 whitespace-pre-line max-w-2xl">{site.about}</p>
+          <div className="mt-4"><Socials site={site} dark /></div>
+          <p className="mt-10 text-emerald-400 text-sm">~/portfolio $ ls projects</p>
+          <div className="mt-4 space-y-3">
+            {projects.map((p) => (
+              <Link key={p.id} to={`/u/${username}/${p.slug}`} className="block rounded-xl border border-white/10 p-4 hover:border-emerald-400/50 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{p.title}</span>
+                  <span className="text-xs text-gray-500">{(p.tech || []).join(' · ')}</span>
+                </div>
+                {p.summary && <p className="text-sm text-gray-400 mt-1">{p.summary}</p>}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Grid ──────────────────────────────────────────────────────────────
+  if (site.template === 'grid') {
+    return (
+      <div className={shell}>
+        <div className="max-w-6xl mx-auto px-5 py-12">
+          <header className="mb-10">
+            <h1 className="text-4xl sm:text-5xl font-bold">{user.name}</h1>
+            {site.headline && <p className="mt-2 text-lg opacity-70">{site.headline}</p>}
+            <div className="mt-4"><Socials site={site} dark={dark} /></div>
+          </header>
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 [&>*]:mb-4">
+            {projects.map((p) => (
+              <div key={p.id} className="break-inside-avoid">
+                <ProjectCard project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Split ─────────────────────────────────────────────────────────────
+  if (site.template === 'split') {
+    return (
+      <div className={shell}>
+        <div className="max-w-6xl mx-auto px-5 py-10 grid lg:grid-cols-[320px_1fr] gap-10">
+          <aside className="lg:sticky lg:top-10 self-start">
+            {user.avatar && <img src={user.avatar} alt={user.name} className="w-24 h-24 rounded-2xl object-cover mb-4" />}
+            <h1 className="text-3xl font-bold">{user.name}</h1>
+            {site.headline && <p className="mt-2 text-sm" style={{ color: accent }}>{site.headline}</p>}
+            {site.location && <p className="mt-3 text-sm opacity-60 inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{site.location}</p>}
+            <p className="mt-4 text-sm opacity-75 whitespace-pre-line">{site.about}</p>
+            <div className="mt-4"><Socials site={site} dark={dark} /></div>
+            {site.availability && <p className="mt-4 text-xs px-2 py-1 rounded-lg inline-block" style={{ background: `${accent}1a`, color: accent }}>{site.availability}</p>}
+          </aside>
+          <main className="grid sm:grid-cols-2 gap-4">
+            {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Timeline ──────────────────────────────────────────────────────────
+  if (site.template === 'timeline') {
+    return (
+      <div className={shell}>
+        <div className="max-w-3xl mx-auto px-5 py-12">
+          <h1 className="text-4xl font-bold">{user.name}</h1>
+          {site.headline && <p className="mt-2 text-lg opacity-70">{site.headline}</p>}
+          <div className="mt-4"><Socials site={site} dark={dark} /></div>
+          <div className="mt-10 relative border-l pl-6" style={{ borderColor: `${accent}44` }}>
+            {projects.map((p) => (
+              <div key={p.id} className="relative mb-8">
+                <span className="absolute -left-[31px] top-1.5 w-3 h-3 rounded-full" style={{ background: accent }} />
+                <Link to={`/u/${username}/${p.slug}`} className="group">
+                  <h3 className="font-semibold group-hover:underline">{p.title}</h3>
+                  {p.summary && <p className="text-sm opacity-70 mt-1">{p.summary}</p>}
+                  <div className="mt-2"><Tech tech={p.tech || []} accent={accent} dark={dark} /></div>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Gradient ──────────────────────────────────────────────────────────
+  if (site.template === 'gradient') {
+    return (
+      <div className={shell}>
+        <div className="px-5 py-16 text-center" style={{ background: `linear-gradient(135deg, ${accent}33, transparent 60%)` }}>
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-4xl sm:text-6xl font-extrabold">{user.name}</h1>
+            {site.headline && <p className="mt-3 text-lg opacity-80">{site.headline}</p>}
+            <div className="mt-5 flex justify-center"><Socials site={site} dark={dark} /></div>
+          </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-5 py-10 grid sm:grid-cols-2 gap-4">
+          {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Minimal (default) ─────────────────────────────────────────────────
+  return (
+    <div className={shell}>
+      <div className="max-w-3xl mx-auto px-5 py-14">
+        <header className="mb-12">
+          <div className="flex items-center gap-4">
+            {user.avatar && <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full object-cover" />}
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold">{user.name}</h1>
+              {site.headline && <p className="text-sm mt-1" style={{ color: accent }}>{site.headline}</p>}
+            </div>
+          </div>
+          {site.about && <p className="mt-5 opacity-75 leading-relaxed whitespace-pre-line">{site.about}</p>}
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <Socials site={site} dark={dark} />
+            {site.location && <span className="text-sm opacity-60 inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{site.location}</span>}
+          </div>
+        </header>
+        <section>
+          <h2 className="text-xs uppercase tracking-widest opacity-50 mb-4">Selected work</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
+          </div>
+        </section>
+        <footer className="mt-14 text-xs opacity-40">Built with CareerCode Academy</footer>
+      </div>
+    </div>
+  );
+}
