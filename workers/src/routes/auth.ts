@@ -172,7 +172,7 @@ auth.post('/refresh-token', async (c) => {
     setAuthCookies(c, newToken, newRefreshToken);
     return c.json({ success: true, data: { token: newToken, refreshToken: newRefreshToken } });
   } catch (e: any) {
-    if (e?.code === '23505') {
+    if (e?.code === '23505' || /unique constraint/i.test(e?.message || '')) {
       try {
         const d2 = await verifyRefreshToken(c.env, body.refreshToken || getCookie(c, 'refreshToken') || '');
         await deleteAllRefreshTokensForUser(c.env, d2.userId);

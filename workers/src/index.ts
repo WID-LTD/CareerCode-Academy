@@ -53,23 +53,14 @@ app.get('/health', (c) =>
 );
 
 app.get('/db-health', async (c) => {
-  if (!c.env.DATABASE_URL) {
-    return c.json(
-      {
-        success: false,
-        message: 'DATABASE_URL is not configured',
-        hint: 'wrangler secret put DATABASE_URL',
-      },
-      503
-    );
-  }
+  // D1 is the primary datastore; the binding is validated by an actual query.
   try {
     const db = getDb(c.env);
     const { rows } = await db.query<{ now: string }>('SELECT NOW() AS now');
-    return c.json({ success: true, message: 'Database is connected', timestamp: rows[0]?.now });
+    return c.json({ success: true, message: 'D1 is connected', timestamp: rows[0]?.now });
   } catch (error: any) {
     return c.json(
-      { success: false, message: 'Database connection failed', detail: error?.message },
+      { success: false, message: 'D1 connection failed', detail: error?.message },
       503
     );
   }

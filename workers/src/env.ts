@@ -2,7 +2,11 @@
 // Secrets are injected via `wrangler secret put` / .dev.vars — never committed.
 
 export interface Env {
-  DATABASE_URL: string;
+  // Cloudflare D1 (primary datastore since the Neon -> D1 migration)
+  DB: D1Database;
+  // Legacy Neon connection string. Kept optional while the last proxied
+  // routes still run on Render; the worker itself no longer reads it.
+  DATABASE_URL?: string;
   FRONTEND_URL: string;
   CORS_ORIGINS?: string;
   JWT_SECRET: string;

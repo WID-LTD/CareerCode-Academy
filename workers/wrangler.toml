@@ -14,12 +14,13 @@ CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
 JWT_EXPIRES_IN = "15m"
 JWT_REFRESH_EXPIRES_IN = "7d"
 
-# --- Phase 2+: Neon via Hyperdrive (connection pooling). ---
-# Create once: wrangler hyperdrive create careercode-neon --connection-string="$DATABASE_URL"
-# Then uncomment:
-#[[hyperdrive]]
-#binding = "HYPERDRIVE"
-#id = "PASTE_HYPERDRIVE_ID_HERE"
+# --- Primary datastore: Cloudflare D1 (SQLite) ---
+# Created with: wrangler d1 create careercode-academy
+# Schema + data migration tooling lives in scripts/d1/.
+[[d1_databases]]
+binding = "DB"
+database_name = "careercode-academy"
+database_id = "1287fa42-8291-4192-a2c9-47b44b03001b"
 
 # --- Phase 3: R2 bucket binding (replaces access keys) ---
 # Create once: wrangler r2 bucket create career-code-academy

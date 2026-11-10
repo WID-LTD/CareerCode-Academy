@@ -27,7 +27,9 @@ export async function generateToken(env: Env, payload: TokenPayload): Promise<st
 
 export async function generateRefreshToken(env: Env, payload: TokenPayload): Promise<string> {
   const exp = Math.floor(Date.now() / 1000) + parseDuration(env.JWT_REFRESH_EXPIRES_IN, 604800);
-  return sign({ ...payload, exp }, env.JWT_REFRESH_SECRET);
+  // A random id keeps tokens unique: refresh_tokens.token is UNIQUE and two
+  // logins inside the same second would otherwise produce identical JWTs.
+  return sign({ ...payload, exp, jti: crypto.randomUUID() }, env.JWT_REFRESH_SECRET);
 }
 
 export async function verifyToken(env: Env, token: string): Promise<TokenPayload> {

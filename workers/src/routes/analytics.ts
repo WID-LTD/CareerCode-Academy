@@ -98,6 +98,18 @@ async function touchVisitor(env: Env, visitor: string, uid: string | null): Prom
   await db.query('INSERT INTO visitors (visitor_id, user_id) VALUES ($1, $2)', [visitor, uid]);
 }
 
+// Event rows FK to visitors(visitor_id). Without this, every page-view/click/
+// scroll/journey insert fails the constraint and (because the write runs in
+// waitUntil with .catch) disappears silently — which is why analytics had
+// almost no rows.
+async function ensureVisitor(env: Env, visitor: string, uid: string | null): Promise<void> {
+  await getDb(env).query(
+    `INSERT INTO visitors (visitor_id, user_id) VALUES ($1, $2)
+     ON CONFLICT (visitor_id) DO UPDATE SET user_id = COALESCE(EXCLUDED.user_id, visitors.user_id)`,
+    [visitor, uid]
+  );
+}
+
 const ok = (c: any) => c.json({ success: true });
 
 // NOTE: upsertVisitor full-parity (device/browser/os columns) happens on the
@@ -114,13 +126,13 @@ analytics.post('/track/page-view', async (c) => {
   pageViewDedup.set(key, now);
   const uid = await userId(c);
   c.executionCtx.waitUntil(
-    insertPageView(c.env, {
+    ensureVisitor(c.env, vid, uid).then(() => insertPageView(c.env, {
       visitor_id: vid, user_id: uid,
       page_url: String(body.page_url).substring(0, 1000),
       route_name: body.route_name ? String(body.route_name).substring(0, 255) : null,
       time_spent_sec: Math.min(Math.max(Number(body.time_spent_sec) || 0, 0), 86400),
       is_exit_page: !!body.is_exit_page,
-    }).catch(() => {})
+    })).catch(() => {})
   );
   return ok(c);
 });
@@ -132,13 +144,13 @@ analytics.post('/track/click', async (c) => {
   if (!body.page_url || !body.element_text) return ok(c);
   const uid = await userId(c);
   c.executionCtx.waitUntil(
-    insertClickEvent(c.env, {
+    ensureVisitor(c.env, vid, uid).then(() => insertClickEvent(c.env, {
       visitor_id: vid, user_id: uid,
       page_url: String(body.page_url).substring(0, 1000),
       element_selector: body.element_selector ? String(body.element_selector).substring(0, 500) : null,
       element_text: String(body.element_text).substring(0, 500),
       element_type: body.element_type ? String(body.element_type).substring(0, 100) : null,
-    }).catch(() => {})
+    })).catch(() => {})
   );
   return ok(c);
 });
@@ -151,13 +163,13 @@ analytics.post('/track/scroll', async (c) => {
   const depthNum = Number(body.depth) || 0;
   const uid = await userId(c);
   c.executionCtx.waitUntil(
-    upsertScrollEvent(c.env, {
+    ensureVisitor(c.env, vid, uid).then(() => upsertScrollEvent(c.env, {
       visitor_id: vid, user_id: uid,
       page_url: String(body.page_url).substring(0, 1000),
       depth_25: depthNum >= 25, depth_50: depthNum >= 50,
       depth_75: depthNum >= 75, depth_100: depthNum >= 100,
       max_depth: Math.min(Math.max(Number(body.max_depth) || depthNum, depthNum), 100),
-    }).catch(() => {})
+    })).catch(() => {})
   );
   return ok(c);
 });
@@ -169,13 +181,13 @@ analytics.post('/track/journey', async (c) => {
   if (!body.page_url) return ok(c);
   const uid = await userId(c);
   c.executionCtx.waitUntil(
-    upsertUserJourney(c.env, {
+    ensureVisitor(c.env, vid, uid).then(() => upsertUserJourney(c.env, {
       visitor_id: vid, user_id: uid,
       page_url: String(body.page_url).substring(0, 1000),
       conversion_type: body.conversion_type ? String(body.conversion_type).substring(0, 50) : null,
       converted: !!body.converted,
       enrolled_course_id: body.enrolled_course_id || null,
-    }).catch(() => {})
+    })).catch(() => {})
   );
   return ok(c);
 });
