@@ -166,9 +166,9 @@ courses.post('/:id/enroll', async (c) => {
     );
 
     await db.query(
-      `INSERT INTO notifications (user_id, title, message, type)
-       VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
-      [course.instructor_id, `A new student enrolled in "${course.title}"`]
+      `INSERT INTO notifications (user_id, title, message, type, link)
+       VALUES ($1, 'New Enrollment', $2, 'enrollment', $3)`,
+      [course.instructor_id, `A new student enrolled in "${course.title}"`, '/instructor/students']
     );
 
     return c.json({ success: true, data: enrollment.rows[0] }, 201);

@@ -10,6 +10,7 @@ import { sign } from 'hono/jwt';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 
@@ -150,11 +151,13 @@ async function main() {
       (globalThis as any).__email = email;
       return r;
     }, (r) => (r.json?.success || r.status === 201 ? null : JSON.stringify(r.json).slice(0, 200))],
-    ['POST /api/v1/auth/login', async () => {
-      // Skip the email-verification gate the same way an inbox click would.
-      raw.prepare('UPDATE users SET is_verified = 1 WHERE email = ?').run((globalThis as any).__email);
-      return call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'Test1234!' } });
-    }, (r) => {
+    ['POST /api/v1/auth/verify-email', async () => {
+      const row: any = raw.prepare('SELECT verification_token FROM users WHERE email = ?').get((globalThis as any).__email);
+      return call('/api/v1/auth/verify-email', {
+        method: 'POST', body: { email: (globalThis as any).__email, code: row.verification_token },
+      });
+    }, (r) => (r.json?.data?.token ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/auth/login', async () => call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'Test1234!' } }), (r) => {
       const t = r.json?.data?.token || r.json?.token;
       if (!t) return JSON.stringify(r.json).slice(0, 200);
       (globalThis as any).__token = t;
@@ -249,6 +252,30 @@ async function main() {
       const enr: any = raw.prepare('SELECT COUNT(*) AS c FROM enrollments WHERE user_id = ? AND course_id = ?').get(user.id, courseId);
       return enr.c === 1 ? null : 'payment completed but enrollment missing';
     }],
+    ['PUT /api/v1/auth/profile', () => call('/api/v1/auth/profile', { method: 'PUT', token: (globalThis as any).__token, body: { name: 'D1 Smoke Renamed', headline: 'QA' } }), (r) => (r.json?.data?.name === 'D1 Smoke Renamed' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/forgot-password', () => call('/api/v1/auth/forgot-password', { method: 'POST', body: { email: (globalThis as any).__email } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/reset-password', async () => {
+      const known = 'known-reset-token-123';
+      const hashed = createHash('sha256').update(known).digest('hex');
+      raw.prepare('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE email = ?')
+        .run(hashed, new Date(Date.now() + 600000).toISOString(), (globalThis as any).__email);
+      return call('/api/v1/auth/reset-password', { method: 'POST', body: { token: known, password: 'NewPass1234!' } });
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/login (new password)', () => call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'NewPass1234!' } }), (r) => (r.json?.data?.token ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/change-password', async () => {
+      const login = await call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'NewPass1234!' } });
+      const tok = login.json?.data?.token;
+      return call('/api/v1/auth/change-password', { method: 'POST', token: tok, body: { currentPassword: 'NewPass1234!', newPassword: 'FinalPass1234!' } });
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/auth/google (unconfigured)', () => call('/api/v1/auth/google'), (r) => (r.status === 503 || r.status === 302 ? null : `unexpected ${r.status}`)],
+    ['POST /api/v1/auth/oauth/exchange (bad code)', () => call('/api/v1/auth/oauth/exchange', { method: 'POST', body: { code: 'nope' } }), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
+    ['GET /api/v1/notifications exposes deep links', async () => {
+      raw.prepare('INSERT INTO notifications (user_id, title, message, type, link) VALUES (?,?,?,?,?)')
+        .run(user.id, 'Deep link test', 'body', 'certificate', '/student/certificates');
+      const r = await call('/api/v1/notifications?limit=5', { token });
+      const row = (r.json?.data || []).find((n: any) => n.title === 'Deep link test');
+      return { ...r, __link: row?.link };
+    }, (r) => (r.__link === '/student/certificates' ? null : `link missing (${r.__link})`)],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

@@ -7,6 +7,11 @@ import {
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/store/themeStore';
+import {
+  browserNotificationSupport,
+  browserNotificationsEnabled,
+  setBrowserNotificationsEnabled,
+} from '@/lib/notifications';
 
 const settingsSections = [
   {
@@ -19,6 +24,7 @@ const settingsSections = [
   {
     title: 'Notifications',
     items: [
+      { icon: Bell, label: 'Browser Notifications', description: 'Desktop alerts for new activity', type: 'browser' },
       { icon: Bell, label: 'Course Updates', description: 'New lessons, announcements', type: 'toggle', defaultOn: true },
       { icon: Bell, label: 'Assignment Reminders', description: 'Upcoming deadlines', type: 'toggle', defaultOn: true },
       { icon: Bell, label: 'Certificate Awards', description: 'When you earn a certificate', type: 'toggle', defaultOn: true },
@@ -37,6 +43,33 @@ const settingsSections = [
 
 export default function Settings() {
   const { darkMode, toggleDarkMode } = useThemeStore();
+  const [browserEnabled, setBrowserEnabled] = useState<boolean>(() => browserNotificationsEnabled());
+  const [permission, setPermission] = useState<string>(() =>
+    browserNotificationSupport() ? Notification.permission : 'unsupported'
+  );
+
+  const toggleBrowserNotifications = async () => {
+    const next = !browserEnabled;
+    if (next) {
+      if (!browserNotificationSupport()) {
+        alert('This browser does not support desktop notifications.');
+        return;
+      }
+      const result = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      setPermission(result);
+      if (result !== 'granted') {
+        setBrowserEnabled(false);
+        setBrowserNotificationsEnabled(false);
+        return;
+      }
+    }
+    setBrowserEnabled(next);
+    setBrowserNotificationsEnabled(next);
+    window.dispatchEvent(new Event('careercode:browser-notifications-changed'));
+  };
+
   const [toggles, setToggles] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem('careercode-settings');
@@ -90,7 +123,20 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  {item.type === 'toggle' ? (
+                  {item.type === 'browser' ? (
+                    <div className="flex items-center gap-2">
+                      {permission === 'denied' && (
+                        <span className="text-[10px] text-red-500">Blocked in browser</span>
+                      )}
+                      <button
+                        onClick={toggleBrowserNotifications}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${browserEnabled && permission === 'granted' ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                        aria-label="Toggle Browser Notifications"
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${browserEnabled && permission === 'granted' ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                  ) : item.type === 'toggle' ? (
                     <button
                       onClick={() => toggle(item.label)}
                       className={`relative w-11 h-6 rounded-full transition-colors ${toggles[item.label] ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'}`}

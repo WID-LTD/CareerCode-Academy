@@ -1127,6 +1127,7 @@ CREATE TABLE IF NOT EXISTS "notifications" (
   "title" TEXT NOT NULL,
   "message" TEXT NOT NULL,
   "type" TEXT NOT NULL DEFAULT 'info',
+  "link" TEXT,
   "read" INTEGER DEFAULT 0,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   PRIMARY KEY ("id"),

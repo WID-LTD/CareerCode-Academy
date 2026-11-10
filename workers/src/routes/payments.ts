@@ -86,9 +86,9 @@ async function enrollIfMissing(env: Env, userId: string, courseId: string): Prom
   const course = await db.query<any>('SELECT title, instructor_id FROM courses WHERE id = $1', [courseId]);
   if (course.rows[0]) {
     await db.query(
-      `INSERT INTO notifications (user_id, title, message, type)
-       VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
-      [course.rows[0].instructor_id, `A student enrolled in "${course.rows[0].title}" (paid)`]
+      `INSERT INTO notifications (user_id, title, message, type, link)
+       VALUES ($1, 'New Enrollment', $2, 'enrollment', $3)`,
+      [course.rows[0].instructor_id, `A student enrolled in "${course.rows[0].title}" (paid)`, '/instructor/students']
     );
   }
 }

@@ -84,7 +84,8 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error' | string;
+  link?: string | null;
   read: boolean;
   created_at: string;
 }

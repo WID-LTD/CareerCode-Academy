@@ -303,9 +303,9 @@ export async function enrollInPath(env: Env, userId: string, path: any) {
     );
     enrolledCourseIds.push(course.id);
     await db.query(
-      `INSERT INTO notifications (user_id, title, message, type)
-       VALUES ($1, 'New Enrollment', $2, 'enrollment')`,
-      [course.instructor_id, `A new student enrolled in "${course.title}"`]
+      `INSERT INTO notifications (user_id, title, message, type, link)
+       VALUES ($1, 'New Enrollment', $2, 'enrollment', $3)`,
+      [course.instructor_id, `A new student enrolled in "${course.title}"`, '/instructor/students']
     );
   }
   return { enrollment: rows[0], enrolledCourseIds, paidCourses };

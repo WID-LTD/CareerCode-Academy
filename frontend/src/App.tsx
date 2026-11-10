@@ -8,6 +8,7 @@ import api from '@/lib/axios';
 import { OnboardingProvider } from '@/guides/OnboardingContext';
 import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { ScrollToTop, ErrorBoundary } from '@/components/ui';
 import { SkeletonLine, SkeletonBlock } from '@/components/ui/Skeleton';
 
@@ -26,6 +27,12 @@ function PageSkeleton() {
       </div>
     </div>
   );
+}
+
+// Mounts the browser-notification poller inside the router so it can deep-link.
+function NotificationBridge() {
+  useBrowserNotifications();
+  return null;
 }
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
@@ -224,6 +231,7 @@ function App() {
   return (
     <OnboardingProvider>
       <AnalyticsTracker />
+      <NotificationBridge />
       <ScrollToTop />
       <Routes>
         <Route element={<ErrorBoundary><MainLayout /></ErrorBoundary>}>

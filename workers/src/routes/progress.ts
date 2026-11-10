@@ -137,9 +137,9 @@ progress.post('/', async (c) => {
         const courseInfo = await db.query<any>('SELECT title FROM courses WHERE id = $1', [courseId]);
         const courseTitle = courseInfo.rows[0]?.title || 'Course';
         await db.query(
-          `INSERT INTO notifications (user_id, title, message, type)
-           VALUES ($1, 'Certificate Earned!', $2, 'certificate')`,
-          [s.userId, `Congratulations! You earned a certificate for "${courseTitle}"`]
+          `INSERT INTO notifications (user_id, title, message, type, link)
+           VALUES ($1, 'Certificate Earned!', $2, 'certificate', $3)`,
+          [s.userId, `Congratulations! You earned a certificate for "${courseTitle}"`, '/student/certificates']
         );
         await awardXp(c.env, s.userId, 50, 'course_complete', `Completed course: ${courseTitle}`);
       }

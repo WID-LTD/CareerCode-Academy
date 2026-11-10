@@ -213,3 +213,87 @@ export async function sendVerificationEmail(env: Env, email: string, code: strin
     });
   } catch { /* email failures must not break registration */ }
 }
+
+// ── Password reset / welcome email ────────────────────────────────────────
+async function sendBrevo(env: Env, to: string, subject: string, htmlContent: string): Promise<void> {
+  if (!env.BREVO_API_KEY) return;
+  try {
+    await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        sender: {
+          email: env.BREVO_SENDER_EMAIL || 'johndavidnzubechukwu008@gmail.com',
+          name: env.BREVO_SENDER_NAME || 'CareerCode Academy',
+        },
+        to: [{ email: to }],
+        subject,
+        htmlContent,
+      }),
+    });
+  } catch { /* email failures must never break the request */ }
+}
+
+export async function sendPasswordResetEmail(env: Env, email: string, token: string): Promise<void> {
+  const frontend = env.FRONTEND_URL || 'https://careercode.com.ng';
+  const link = `${frontend}/reset-password/${encodeURIComponent(token)}`;
+  await sendBrevo(
+    env,
+    email,
+    'Reset your CareerCode Academy password',
+    `<p>We received a request to reset your password.</p>
+     <p><a href="${link}">Reset password</a> (valid for 15 minutes).</p>
+     <p>If you didn't request this, you can safely ignore this email.</p>`
+  );
+}
+
+export async function sendWelcomeEmail(env: Env, email: string, name: string): Promise<void> {
+  const frontend = env.FRONTEND_URL || 'https://careercode.com.ng';
+  await sendBrevo(
+    env,
+    email,
+    'Welcome to CareerCode Academy',
+    `<p>Hi ${name || 'there'},</p><p>Your email is verified — welcome aboard!</p>
+     <p><a href="${frontend}/dashboard">Start learning</a></p>`
+  );
+}
+
+/** SHA-256 hex digest, used for password-reset tokens at rest. */
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function randomToken(bytes = 32): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Short-lived signed code used to hand OAuth results to the SPA. */
+export async function signOAuthExchange(env: Env, userId: string, role: string): Promise<string> {
+  return sign(
+    { userId, role, typ: 'oauth_exchange', exp: Math.floor(Date.now() / 1000) + 120 },
+    env.JWT_SECRET
+  );
+}
+
+export async function verifyOAuthExchange(env: Env, code: string): Promise<TokenPayload> {
+  const decoded = (await verify(code, env.JWT_SECRET, 'HS256')) as any;
+  if (decoded?.typ !== 'oauth_exchange' || !decoded.userId) throw new Error('Invalid OAuth code');
+  return { userId: decoded.userId, role: decoded.role };
+}
+
+/** OAuth `state`: signed so it cannot be forged, no cookie required. */
+export async function signOAuthState(env: Env, intent: string): Promise<string> {
+  return sign(
+    { intent, n: crypto.randomUUID(), typ: 'oauth_state', exp: Math.floor(Date.now() / 1000) + 300 },
+    env.JWT_SECRET
+  );
+}
+
+export async function verifyOAuthState(env: Env, state: string): Promise<{ intent: string }> {
+  const decoded = (await verify(state, env.JWT_SECRET, 'HS256')) as any;
+  if (decoded?.typ !== 'oauth_state') throw new Error('Invalid OAuth state');
+  return { intent: decoded.intent === 'signup' ? 'signup' : 'login' };
+}

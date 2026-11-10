@@ -73,9 +73,9 @@ export async function celebrateCompletedLearningPaths(env: Env, userId: string):
   const completedPaths = await recalculateLearningPathProgress(env, userId);
   for (const path of completedPaths) {
     await db.query(
-      `INSERT INTO notifications (user_id, title, message, type)
-       VALUES ($1, 'Pathway Completed!', $2, 'pathway_complete')`,
-      [userId, `Congratulations! You completed the "${path.title}" learning pathway.`]
+      `INSERT INTO notifications (user_id, title, message, type, link)
+       VALUES ($1, 'Pathway Completed!', $2, 'pathway_complete', $3)`,
+      [userId, `Congratulations! You completed the "${path.title}" learning pathway.`, '/student/learning-paths']
     );
     await awardXp(env, userId, 150, 'pathway_complete', `Completed learning pathway: ${path.title}`);
     await upsertAlumni(env, userId);

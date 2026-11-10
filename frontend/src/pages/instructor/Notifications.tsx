@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Bell, UserPlus, Star, Upload, MessageCircle, Calendar, Award, CheckCheck } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -9,6 +10,7 @@ import { useInstructorStore } from '@/store/instructorStore';
 import toast from 'react-hot-toast';
 import SEO from '@/components/seo/SEO';
 import { cn } from '@/lib/utils';
+import { notificationLink } from '@/lib/notifications';
 
 const notificationConfig: Record<string, { icon: React.ElementType; bg: string }> = {
   enrollment: { icon: UserPlus, bg: 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' },
@@ -36,6 +38,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const { notifications, isLoading, error, fetchNotifications, markNotificationRead, markAllNotificationsRead } = useInstructorStore();
 
@@ -151,7 +154,10 @@ export default function Notifications() {
                       'p-4 relative',
                       !notification.read && 'cursor-pointer'
                     )}
-                    onClick={() => !notification.read && handleMarkRead(notification.id)}
+                    onClick={() => {
+                      if (!notification.read) handleMarkRead(notification.id);
+                      navigate(notificationLink({ type: notification.type, link: (notification as any).link }));
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       {!notification.read && (

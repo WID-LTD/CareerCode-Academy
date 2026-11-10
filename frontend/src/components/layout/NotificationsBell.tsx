@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, CheckCircle, Info, AlertCircle, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useStudentStore } from '@/store/studentStore';
+import { notificationLink } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 
 export function NotificationsBell() {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const { notifications, fetchNotifications, markNotificationRead } = useStudentStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +79,8 @@ export function NotificationsBell() {
                     )}
                     onClick={() => {
                       if (!notification.read) markNotificationRead(notification.id);
+                      setIsOpen(false);
+                      navigate(notificationLink(notification));
                     }}
                   >
                     <div className="flex gap-3">

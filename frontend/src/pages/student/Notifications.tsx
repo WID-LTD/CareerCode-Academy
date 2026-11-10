@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Bell, CheckCircle, Info, AlertCircle, AlertTriangle,
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
 import { useStudentStore } from '@/store/studentStore';
+import { notificationLink } from '@/lib/notifications';
 
 const typeStyles: Record<string, { icon: any; color: string; bg: string }> = {
   success: { icon: CheckCircle, color: 'text-success-500', bg: 'bg-success-500/10' },
@@ -21,6 +23,7 @@ const filterOptions = ['all', 'unread', 'info', 'success', 'warning'];
 
 export default function Notifications() {
   const { notifications, notificationsPagination, fetchNotifications, markNotificationRead, markAllNotificationsRead } = useStudentStore();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -104,11 +107,19 @@ export default function Notifications() {
                     'rounded-2xl border border-gray-200/60 dark:border-gray-800/50 bg-white/70 dark:bg-gray-900/70 shadow-lg shadow-black/5 backdrop-blur-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5',
                     !notification.read ? 'border-l-4 border-l-primary-500' : ''
                   )}
-                  onClick={() => { if (!notification.read) markNotificationRead(notification.id); }}
+                  onClick={() => {
+                    if (!notification.read) markNotificationRead(notification.id);
+                    navigate(notificationLink(notification));
+                  }}
                   role="button"
                   tabIndex={0}
                   aria-label={`${notification.title}. ${notification.read ? 'Read' : 'Unread'}`}
-                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') markNotificationRead(notification.id); }}
+                  onKeyDown={(e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter') {
+                      if (!notification.read) markNotificationRead(notification.id);
+                      navigate(notificationLink(notification));
+                    }
+                  }}
                 >
                   <div className="flex items-start gap-4">
                     <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', style.bg)}>
