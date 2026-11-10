@@ -192,6 +192,14 @@ export const mail = {
       text: `Set your password: ${link}`,
     });
   },
+  mentoringBooked(env: Env, to: string, name: string, when: string, instructor: string) {
+    return sendEmail(env, {
+      to,
+      subject: 'Mentoring session booked',
+      html: wrap('Mentoring confirmed', `<p>Hi ${name || 'there'}, your 1-on-1 session with <strong>${instructor}</strong> is booked for <strong>${when}</strong>.</p>
+        <p><a href="${env.FRONTEND_URL}/student/mentoring" style="color:#4f46e5">View your sessions</a></p>`),
+    });
+  },
   communityRequest(env: Env, to: string, name: string, community: string, approved: boolean) {
     return sendEmail(env, {
       to,

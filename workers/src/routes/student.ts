@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { authenticate } from '../auth-helpers';
+import { mail } from '../email';
 
 const student = new Hono<{ Bindings: Env }>();
 
@@ -742,6 +743,11 @@ student.post('/mentoring-slots/:id/book', async (c) => {
       `INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1, 'New Mentoring Booking', $2, 'info', $3)`,
       [slot.instructor_id, 'A student has booked your mentoring slot.', '/instructor/mentoring']
     );
+    const instructor = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [slot.instructor_id])).rows[0];
+    const student = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [s.userId])).rows[0];
+    const when = new Date(slot.start_time).toUTCString();
+    if (instructor?.email) c.executionCtx.waitUntil(mail.mentoringBooked(c.env, instructor.email, instructor.name, when, student?.name || 'A student').catch(() => {}));
+    if (student?.email) c.executionCtx.waitUntil(mail.mentoringBooked(c.env, student.email, student.name, when, instructor?.name || 'your instructor').catch(() => {}));
     return c.json({ success: true, data: rows[0] });
   } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to book slot'); }
 });
