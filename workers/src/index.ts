@@ -25,6 +25,7 @@ import searchRoutes from './routes/search';
 import userRoutes from './routes/users';
 import resourceRoutes from './routes/resources';
 import paymentRoutes from './routes/payments';
+import programRoutes from './routes/programs';
 
 export { AuthDO };
 
@@ -108,6 +109,7 @@ app.route('/api/v1/search', searchRoutes);
 app.route('/api/v1/users', userRoutes);
 app.route('/api/v1/resources', resourceRoutes);
 app.route('/api/v1/payments', paymentRoutes);
+app.route('/api/v1/programs', programRoutes);
 
 // ── Strangler proxy: any /api/v1/* path not (yet) implemented above is
 // transparently forwarded to the legacy Express API so the new domain is
@@ -170,6 +172,7 @@ app.all('/api/v1/*', async (c) => {
     '/api/v1/users/', '/api/v1/users',
     '/api/v1/resources/', '/api/v1/resources',
     '/api/v1/payments/', '/api/v1/payments',
+    '/api/v1/programs/', '/api/v1/programs',
   ];
   if (NATIVE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'))) {
     return c.json({ success: false, message: 'Route not found' }, 404);

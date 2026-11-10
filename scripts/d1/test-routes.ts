@@ -276,6 +276,17 @@ async function main() {
       const row = (r.json?.data || []).find((n: any) => n.title === 'Deep link test');
       return { ...r, __link: row?.link };
     }, (r) => (r.__link === '/student/certificates' ? null : `link missing (${r.__link})`)],
+    ['GET /api/v1/programs (admin)', () => call('/api/v1/programs?limit=3', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/programs/:id', async () => {
+      const id = raw.prepare('SELECT id FROM programs LIMIT 1').get()!.id;
+      return call(`/api/v1/programs/${id}`, { token: adminToken });
+    }, (r) => (r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/programs/:id/cohorts', async () => {
+      const id = raw.prepare('SELECT id FROM programs LIMIT 1').get()!.id;
+      return call(`/api/v1/programs/${id}/cohorts`, { token: adminToken });
+    }, (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/programs/me/cohorts', () => call('/api/v1/programs/me/cohorts', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/programs/purchase/verify (bad ref)', () => call('/api/v1/programs/purchase/verify/nope', { token }), (r) => (r.status === 404 ? null : `expected 404, got ${r.status}`)],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];
