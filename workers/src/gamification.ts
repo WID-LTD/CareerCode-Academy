@@ -268,3 +268,10 @@ export async function getUserDiscountCodes(env: Env, userId: string) {
   );
   return rows;
 }
+
+export async function markDiscountCodeUsed(env: Env, codeId: string, paymentId?: string): Promise<void> {
+  await getDb(env).query(
+    `UPDATE discount_codes SET status='used', used_at=NOW(), used_payment_id=$2 WHERE id=$1`,
+    [codeId, paymentId || null]
+  );
+}

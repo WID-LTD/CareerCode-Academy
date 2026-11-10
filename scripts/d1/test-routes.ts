@@ -223,6 +223,32 @@ async function main() {
     ['GET /api/v1/users/:id', () => call(`/api/v1/users/${user.id}`), (r) => (r.json?.data?.id === user.id ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/users (non-admin)', () => call('/api/v1/users', { token }), (r) => (r.status === 403 ? null : `expected 403, got ${r.status}`)],
     ['GET /api/v1/resources/course/:id', () => call(`/api/v1/resources/course/${enrolled.course_id}`), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/payments/history', () => call('/api/v1/payments/history', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/payments/validate-discount (bad code)', () => call('/api/v1/payments/validate-discount', { method: 'POST', token, body: { code: 'NOPE-123' } }), (r) => (r.status === 400 ? null : `expected 400, got ${r.status}`)],
+    ['POST /api/v1/payments/initialize (paid course)', async () => {
+      const paid: any = raw.prepare(
+        `SELECT id FROM courses WHERE price > 0 AND published = 1
+         AND id NOT IN (SELECT course_id FROM enrollments WHERE user_id = ?) LIMIT 1`
+      ).get(user.id);
+      if (!paid) return { status: 200, json: { success: true, skipped: true } };
+      const r = await call('/api/v1/payments/initialize', {
+        method: 'POST', token, body: { courseId: paid.id, provider: 'paystack', currency: 'NGN' },
+      });
+      (globalThis as any).__paidCourse = paid.id;
+      (globalThis as any).__reference = r.json?.data?.reference;
+      return r;
+    }, (r) => (r.json?.skipped || r.json?.data?.reference ? null : JSON.stringify(r.json).slice(0, 220))],
+    ['GET /api/v1/payments/verify/:reference', async () => {
+      const ref = (globalThis as any).__reference;
+      if (!ref) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/payments/verify/${ref}`, { token });
+    }, (r) => {
+      if (r.json?.skipped) return null;
+      if (r.json?.data?.status !== 'completed') return JSON.stringify(r.json).slice(0, 220);
+      const courseId = (globalThis as any).__paidCourse;
+      const enr: any = raw.prepare('SELECT COUNT(*) AS c FROM enrollments WHERE user_id = ? AND course_id = ?').get(user.id, courseId);
+      return enr.c === 1 ? null : 'payment completed but enrollment missing';
+    }],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];
