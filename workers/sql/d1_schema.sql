@@ -611,6 +611,7 @@ CREATE TABLE IF NOT EXISTS "courses" (
   "discount_percentage" REAL NOT NULL DEFAULT 0,
   "program_id" TEXT,
   "reference_url" TEXT,
+  "rules" TEXT,
   PRIMARY KEY ("id"),
   UNIQUE (slug),
   FOREIGN KEY (reviewed_by) REFERENCES "users"(id) ON DELETE SET NULL,
@@ -1087,6 +1088,8 @@ CREATE TABLE IF NOT EXISTS "mentoring_slots" (
   "end_time" TEXT NOT NULL,
   "status" TEXT NOT NULL DEFAULT 'available',
   "meeting_url" TEXT,
+  "reminder_24_sent" INTEGER DEFAULT 0,
+  "reminder_1_sent" INTEGER DEFAULT 0,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   PRIMARY KEY ("id"),
@@ -1401,6 +1404,8 @@ CREATE TABLE IF NOT EXISTS "recurring_events" (
   "start_date" TEXT NOT NULL,
   "end_date" TEXT,
   "meeting_url" TEXT,
+  "reminder_24_sent" INTEGER DEFAULT 0,
+  "reminder_1_sent" INTEGER DEFAULT 0,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   PRIMARY KEY ("id"),
@@ -2102,4 +2107,14 @@ CREATE TABLE IF NOT EXISTS "user_preferences" (
   "user_id" TEXT PRIMARY KEY,
   "data" TEXT DEFAULT '{}',
   "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+  "id" TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+  "user_id" TEXT NOT NULL,
+  "endpoint" TEXT NOT NULL UNIQUE,
+  "p256dh" TEXT NOT NULL,
+  "auth" TEXT NOT NULL,
+  "user_agent" TEXT,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );

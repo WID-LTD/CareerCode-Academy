@@ -3,6 +3,8 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { authenticate } from '../auth-helpers';
 import { mail } from '../email';
+import { sendPushToUser } from '../push';
+import { sendMentoringReminders } from '../mentoring-reminders';
 
 const student = new Hono<{ Bindings: Env }>();
 
@@ -743,6 +745,11 @@ student.post('/mentoring-slots/:id/book', async (c) => {
       `INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1, 'New Mentoring Booking', $2, 'info', $3)`,
       [slot.instructor_id, 'A student has booked your mentoring slot.', '/instructor/mentoring']
     );
+    c.executionCtx.waitUntil(sendPushToUser(c.env, slot.instructor_id, {
+      title: 'New mentoring booking',
+      body: 'A student booked one of your mentoring slots.',
+      url: '/instructor/mentoring',
+    }));
     const instructor = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [slot.instructor_id])).rows[0];
     const student = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [s.userId])).rows[0];
     const when = new Date(slot.start_time).toUTCString();
@@ -775,6 +782,11 @@ student.post('/mentoring-slots/:id/cancel', async (c) => {
        VALUES ($1, 'Mentoring booking cancelled', $2, 'info', $3)`,
       [slot.instructor_id, 'A student cancelled their mentoring booking. The slot is available again.', '/instructor/mentoring']
     );
+    c.executionCtx.waitUntil(sendPushToUser(c.env, slot.instructor_id, {
+      title: 'New mentoring booking',
+      body: 'A student booked one of your mentoring slots.',
+      url: '/instructor/mentoring',
+    }));
     const instructor = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [slot.instructor_id])).rows[0];
     if (instructor?.email) {
       c.executionCtx.waitUntil(mail.mentoringBooked(c.env, instructor.email, instructor.name, `${new Date(slot.start_time).toUTCString()} (cancelled)`, 'a student').catch(() => {}));
@@ -786,6 +798,7 @@ student.post('/mentoring-slots/:id/cancel', async (c) => {
 student.get('/my-mentoring-slots', async (c) => {
   try {
     const s = await authenticate(c);
+    c.executionCtx.waitUntil(sendMentoringReminders(c.env, s.userId));
     const { rows } = await getDb(c.env).query<any>(
       `SELECT ms.*, u.name as instructor_name, u.avatar as instructor_avatar, c.title as course_title
        FROM mentoring_slots ms LEFT JOIN courses c ON ms.course_id = c.id

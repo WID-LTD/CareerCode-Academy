@@ -396,7 +396,7 @@ export default function BoardOversight() {
               <div><label className="text-xs font-medium text-gray-500">Avatar URL</label>
                 <input value={memberForm.avatar_url} onChange={(e) => setMemberForm({ ...memberForm, avatar_url: e.target.value })} placeholder="https://…"
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-500">Sort order</label>
                   <input type="number" value={memberForm.sort_order} onChange={(e) => setMemberForm({ ...memberForm, sort_order: Number(e.target.value) })}
                     className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none" /></div>
@@ -426,7 +426,7 @@ export default function BoardOversight() {
               <div><label className="text-xs font-medium text-gray-500">Title *</label>
                 <input value={policyForm.title} onChange={(e) => setPolicyForm({ ...policyForm, title: e.target.value })} placeholder="Anti-Discrimination Policy"
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-500">Category</label>
                   <select value={policyForm.category} onChange={(e) => setPolicyForm({ ...policyForm, category: e.target.value })}
                     className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none capitalize">
@@ -494,7 +494,7 @@ export default function BoardOversight() {
               <div><label className="text-xs font-medium text-gray-500">Details</label>
                 <textarea value={resolutionForm.body} onChange={(e) => setResolutionForm({ ...resolutionForm, body: e.target.value })} rows={3}
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-500">Meeting date</label>
                   <input type="date" value={resolutionForm.meeting_date} onChange={(e) => setResolutionForm({ ...resolutionForm, meeting_date: e.target.value })}
                     className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none" /></div>

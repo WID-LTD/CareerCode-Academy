@@ -205,6 +205,10 @@ const TEMPLATES = [
   { id: 'split', name: 'Split', description: 'Profile on the left, work on the right.', accent: '#0ea5e9' },
   { id: 'timeline', name: 'Timeline', description: 'Chronological story of your journey.', accent: '#f59e0b' },
   { id: 'gradient', name: 'Gradient', description: 'Bold colour blocks for creatives.', accent: '#8b5cf6' },
+  { id: 'magazine', name: 'Magazine', description: 'Editorial layout with a large feature story.', accent: '#dc2626' },
+  { id: 'compact', name: 'Compact', description: 'Dense one-page list for minimalists.', accent: '#0f766e' },
+  { id: 'showcase', name: 'Showcase', description: 'Full-bleed project covers, image first.', accent: '#ea580c' },
+  { id: 'resume', name: 'Resume', description: 'Two-column CV with skills and contact.', accent: '#334155' },
 ];
 
 const siteSlug = (v: string) => v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'project';

@@ -493,7 +493,7 @@ export default function AdminUsers() {
                 )}
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                   <div className="p-3 rounded-xl bg-blue-500/10 text-center">
                     <BookOpen className="w-4 h-4 text-blue-500 mx-auto mb-1" />
                     <p className="text-lg font-bold text-blue-600">{(userDetail as any).enrolled_courses_count ?? '—'}</p>

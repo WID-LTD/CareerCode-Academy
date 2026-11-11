@@ -549,12 +549,12 @@ export default function AdminCourses() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input label="Price" type="number" min={0} value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} />
                   <Input label="Duration (minutes)" type="number" min={1} value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
                     <select
@@ -581,7 +581,7 @@ export default function AdminCourses() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input label="Thumbnail URL" value={formData.thumbnail} onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })} placeholder="https://..." />
                   <div className="space-y-1.5">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
@@ -703,7 +703,7 @@ export default function AdminCourses() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Starter Code</label>
                       <textarea value={challengeFormData.starterCode} onChange={(e) => setChallengeFormData({ ...challengeFormData, starterCode: e.target.value })} rows={4} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-500/50" placeholder="// Initial code for the student" />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input label="Expected Output" value={challengeFormData.expectedOutput} onChange={(e) => setChallengeFormData({ ...challengeFormData, expectedOutput: e.target.value })} placeholder="Hello, World!" />
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
@@ -714,7 +714,7 @@ export default function AdminCourses() {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
                         <select value={challengeFormData.difficulty} onChange={(e) => setChallengeFormData({ ...challengeFormData, difficulty: e.target.value })} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50">

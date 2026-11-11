@@ -336,7 +336,7 @@ export default function AdminCourseProposals() {
                   </div>
 
                   {selectedProposal.status === 'pending' && (
-                    <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
                       <Button 
                         variant="outline" 
                         className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-900/20"

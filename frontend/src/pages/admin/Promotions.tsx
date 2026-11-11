@@ -308,7 +308,7 @@ export default function Promotions() {
                 <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-500">Discount % *</label>
                   <input type="number" min={0.01} max={100} value={form.discount_percent} onChange={(e) => setForm({ ...form, discount_percent: Number(e.target.value) })}
@@ -322,7 +322,7 @@ export default function Promotions() {
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500">Scope *</label>
-                <div className="mt-1 grid grid-cols-3 gap-2">
+                <div className="mt-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {(['all', 'category', 'course'] as const).map((s) => (
                     <button key={s} onClick={() => setForm({ ...form, scope: s })} type="button"
                       className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors capitalize ${form.scope === s ? 'bg-primary-500/10 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}>
@@ -351,7 +351,7 @@ export default function Promotions() {
                   </select>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-500">Starts *</label>
                   <input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })}

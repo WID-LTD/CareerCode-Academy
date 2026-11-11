@@ -13,6 +13,8 @@ compatibility_date = "2025-09-01"
 # Override with `wrangler secret put DB_BACKEND` for a no-code rollback.
 DB_BACKEND = "d1"
 MAIL_FROM = "CareerCode Academy <noreply@careercode.com.ng>"
+VAPID_PUBLIC_KEY = "BOuBtoIywA3pMlggk60CZjANpKFJZJS4SdSLIzP24vw0MI2Q2lI18tFonLa1ikDbpZLf6gNbfxKFpjw_ytcGJmw"
+VAPID_SUBJECT = "mailto:contact@careercode.com.ng"
 FRONTEND_URL = "https://careercode.com.ng"
 CORS_ORIGINS = "https://careercode.com.ng,https://www.careercode.com.ng"
 # Public base URL for objects in the R2 media bucket.

@@ -8,6 +8,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/store/themeStore';
 import api from '@/lib/axios';
+import { disablePush, enablePush, sendTestPush } from '@/lib/push';
 import toast from 'react-hot-toast';
 import {
   browserNotificationSupport,
@@ -69,6 +70,16 @@ export default function Settings() {
     }
     setBrowserEnabled(next);
     setBrowserNotificationsEnabled(next);
+    try {
+      if (next) {
+        const ok = await enablePush();
+        if (!ok) toast.error('Push permission was not granted');
+      } else {
+        await disablePush();
+      }
+    } catch {
+      toast.error('Could not update push subscription');
+    }
     window.dispatchEvent(new Event('careercode:browser-notifications-changed'));
   };
 
@@ -189,6 +200,12 @@ export default function Settings() {
                       >
                         <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${browserEnabled && permission === 'granted' ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
                       </button>
+                      {browserEnabled && permission === 'granted' && (
+                        <button onClick={async () => { try { await sendTestPush(); toast.success('Test push sent'); } catch { toast.error('Push failed'); } }}
+                          className="text-[11px] px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500">
+                          Test
+                        </button>
+                      )}
                     </div>
                   ) : item.type === 'toggle' ? (
                     <button

@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
 import * as Community from '../community';
 import { mail } from '../email';
+import { sendPushToUser } from '../push';
 
 // Community domain, ported from backend/src/routes/community.routes.ts.
 // Mount at /api/v1/community.
@@ -861,6 +862,11 @@ community.post('/communities/:id/join', async (c) => {
          VALUES ($1, 'Community join request', $2, 'info', $3)`,
         [found.created_by, `A student requested to join "${found.name}".`, '/instructor/communities']
       );
+      c.executionCtx.waitUntil(sendPushToUser(c.env, found.created_by, {
+        title: 'Community join request',
+        body: `Someone asked to join "${found.name}".`,
+        url: '/instructor/communities',
+      }));
       const creator = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [found.created_by])).rows[0];
       if (creator?.email) {
         c.executionCtx.waitUntil(mail.communityRequest(c.env, creator.email, creator.name, `${found.name} (new request)`, true).catch(() => {}));
@@ -938,6 +944,11 @@ community.put('/communities/:id/requests/:requestId', async (c) => {
       );
     }
 
+    c.executionCtx.waitUntil(sendPushToUser(c.env, request.user_id, {
+      title: body.status === 'approved' ? 'Community request approved' : 'Community request declined',
+      body: `Your request to join "${found.name}" was ${body.status}.`,
+      url: '/student/community',
+    }));
     const requester = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [request.user_id])).rows[0];
     if (requester?.email) {
       c.executionCtx.waitUntil(

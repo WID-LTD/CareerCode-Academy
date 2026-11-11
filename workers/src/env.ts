@@ -26,6 +26,10 @@ export interface Env {
   TURNSTILE_SECRET?: string;
   // Workers AI binding
   AI?: { run: (model: string, input: any) => Promise<any> };
+  // Web Push (VAPID)
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
   PAYSTACK_SECRET_KEY?: string;
   PAYSTACK_PUBLIC_KEY?: string;
   FLUTTERWAVE_SECRET_KEY?: string;

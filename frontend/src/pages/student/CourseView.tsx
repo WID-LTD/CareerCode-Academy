@@ -569,6 +569,12 @@ export default function CourseView() {
               <div className="lg:col-span-2">
                 <h2 className="text-white font-semibold flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary-400" /> {course.title}</h2>
                 {course.description && <p className="text-gray-400 text-sm mt-2 line-clamp-3">{course.description}</p>}
+                {(course as any).rules && (
+                  <details className="mt-3 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
+                    <summary className="text-xs font-semibold text-gray-300 cursor-pointer">Course rules & expectations</summary>
+                    <p className="text-xs text-gray-400 mt-2 whitespace-pre-line">{(course as any).rules}</p>
+                  </details>
+                )}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {course.category && <Badge variant="primary" size="sm">{course.category}</Badge>}
                   {course.level && <Badge variant="default" size="sm" className="capitalize">{course.level}</Badge>}

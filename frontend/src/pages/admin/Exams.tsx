@@ -459,7 +459,7 @@ export default function AdminExams() {
               <button onClick={resetForm} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-gray-400 mb-1 block">Course *</label>
                   <select value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })}

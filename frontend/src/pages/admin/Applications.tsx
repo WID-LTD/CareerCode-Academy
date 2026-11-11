@@ -135,7 +135,7 @@ export default function AdminApplications() {
                 {statusBadge(selectedApp.status)}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
                   <p className="text-xs text-gray-500">Specialization</p>
                   <p className="font-medium">{selectedApp.specialization || 'N/A'}</p>

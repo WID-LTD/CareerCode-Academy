@@ -227,13 +227,13 @@ courses.post('/', async (c) => {
       : 'beginner';
     const slug = await uniqueSlug(c.env, b.title);
     const { rows } = await getDb(c.env).query<any>(
-      `INSERT INTO courses (title, description, thumbnail, banner_image, promo_video_url, price, category, instructor_id, level, duration, published, slug, learning_outcomes, program_id, reference_url, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,$12,$13,$14,'draft') RETURNING *`,
+      `INSERT INTO courses (title, description, thumbnail, banner_image, promo_video_url, price, category, instructor_id, level, duration, published, slug, learning_outcomes, program_id, reference_url, status, rules)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,$12,$13,$14,'draft',$15) RETURNING *`,
       [
         b.title, b.description, b.thumbnail || null, b.banner_image || null, b.promo_video_url || null,
         Number(b.price) || 0, b.category, s.userId, level, Number(b.duration) || 1, slug,
         JSON.stringify(b.learning_outcomes || b.learningOutcomes || []),
-        b.program_id || null, b.reference_url || null,
+        b.program_id || null, b.reference_url || null, b.rules || null,
       ]
     );
     return c.json({ success: true, data: rows[0] }, 201 as any);
@@ -257,7 +257,7 @@ courses.put('/:id', async (c) => {
     const fields: string[] = [];
     const values: any[] = [];
     const push = (col: string, val: any) => { fields.push(`${col} = $${values.length + 1}`); values.push(val); };
-    for (const key of ['title', 'description', 'thumbnail', 'banner_image', 'promo_video_url', 'category', 'program_id', 'reference_url', 'status']) {
+    for (const key of ['title', 'description', 'thumbnail', 'banner_image', 'promo_video_url', 'category', 'program_id', 'reference_url', 'status', 'rules']) {
       if (b[key] !== undefined) push(key, b[key]);
     }
     if (b.price !== undefined) push('price', Number(b.price));
@@ -338,12 +338,12 @@ courses.post('/:id/duplicate', async (c) => {
     const title = `${existing.title} (Copy)`;
     const slug = await uniqueSlug(c.env, title);
     const { rows } = await db.query<any>(
-      `INSERT INTO courses (title, description, thumbnail, banner_image, promo_video_url, price, category, instructor_id, level, duration, published, slug, learning_outcomes, program_id, reference_url, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,$12,$13,$14,'draft') RETURNING *`,
+      `INSERT INTO courses (title, description, thumbnail, banner_image, promo_video_url, price, category, instructor_id, level, duration, published, slug, learning_outcomes, program_id, reference_url, status, rules)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,$12,$13,$14,'draft',$15) RETURNING *`,
       [
         title, existing.description, existing.thumbnail, existing.banner_image, existing.promo_video_url,
         existing.price, existing.category, s.userId, existing.level, existing.duration, slug,
-        existing.learning_outcomes, existing.program_id, existing.reference_url,
+        existing.learning_outcomes, existing.program_id, existing.reference_url, existing.rules,
       ]
     );
     return c.json({ success: true, data: rows[0] }, 201 as any);

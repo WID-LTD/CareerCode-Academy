@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { fail, requireAuth, statusOf } from '../route-utils';
 import { awardXp, updateStreak } from '../gamification';
 import { celebrateCompletedLearningPaths } from '../learning-path-helpers';
+import { sendPushToUser } from '../push';
 
 const progress = new Hono<{ Bindings: Env }>();
 
@@ -142,6 +143,11 @@ progress.post('/', async (c) => {
           [s.userId, `Congratulations! You earned a certificate for "${courseTitle}"`, '/student/certificates']
         );
         await awardXp(c.env, s.userId, 50, 'course_complete', `Completed course: ${courseTitle}`);
+        c.executionCtx.waitUntil(sendPushToUser(c.env, s.userId, {
+          title: 'Certificate earned',
+          body: `You earned a certificate for "${courseTitle}".`,
+          url: '/student/certificates',
+        }));
       }
       await celebrateCompletedLearningPaths(c.env, s.userId);
     }

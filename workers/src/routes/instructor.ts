@@ -18,6 +18,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, pageParams, requireRole, statusOf } from '../route-utils';
+import { sendMentoringReminders } from '../mentoring-reminders';
 import {
   STAFF_ROLES,
   createNotification,
@@ -1382,6 +1383,7 @@ instructor.get('/users', async (c) => {
 instructor.get('/mentoring-slots', async (c) => {
   try {
     const s = await requireRole(c, STAFF_ROLES);
+    c.executionCtx.waitUntil(sendMentoringReminders(c.env, s.userId));
     const { rows } = await getDb(c.env).query<any>(
       `SELECT ms.*, u.name as student_name, u.email as student_email, u.avatar as student_avatar, c.title as course_title
        FROM mentoring_slots ms

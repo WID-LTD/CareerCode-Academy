@@ -301,6 +301,7 @@ export default function CourseBuilder() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
+  const [rules, setRules] = useState('');
   const [formData, setFormData] = useState<CourseFormData>({
     step1: { title: '', subtitle: '', description: '', category: '', school: '', program: '', skillLevel: '', language: '', tags: '' },
     media: { thumbnail: null, promoVideo: '', bannerImage: null },
@@ -532,6 +533,7 @@ export default function CourseBuilder() {
       title: step1.title,
       subtitle: step1.subtitle || undefined,
       description: step1.description || undefined,
+      rules: rules || undefined,
       category: step1.category,
       school: step1.school || undefined,
       program: step1.program || undefined,
@@ -826,6 +828,17 @@ export default function CourseBuilder() {
           icon={<Video className="w-4 h-4" />}
         />
         <p className="text-xs text-gray-400">Paste a YouTube or Vimeo URL for your promotional video</p>
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Course rules & expectations</label>
+        <textarea
+          rows={4}
+          value={rules}
+          onChange={(e) => setRules(e.target.value)}
+          placeholder="e.g. Complete lessons in order, submit assignments before the deadline, be respectful in discussions…"
+          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm"
+        />
+        <p className="text-xs text-gray-400">Shown to students on the course page.</p>
       </div>
     </div>
   );

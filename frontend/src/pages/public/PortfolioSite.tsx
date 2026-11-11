@@ -317,6 +317,136 @@ export default function PortfolioSite() {
     );
   }
 
+
+  // ── Magazine ──────────────────────────────────────────────────────────
+  if (site.template === 'magazine') {
+    return (
+      <div className={shell}>
+        <div className="max-w-5xl mx-auto px-5 py-12">
+          <p className="text-xs uppercase tracking-[0.3em] opacity-50">Portfolio</p>
+          <h1 className="text-5xl sm:text-7xl font-black tracking-tight mt-3" style={{ color: accent }}>{user.name}</h1>
+          {site.headline && <p className="text-xl sm:text-2xl mt-4 opacity-80 max-w-2xl">{site.headline}</p>}
+          <div className="mt-6"><Socials site={site} dark={dark} /></div>
+          {site.about && <p className="mt-10 text-base leading-relaxed opacity-75 max-w-3xl whitespace-pre-line">{site.about}</p>}
+          <div className="mt-12 border-t" style={{ borderColor: `${accent}33` }}>
+            {projects.map((p, i) => (
+              <Link key={p.id} to={`/u/${username}/${p.slug}`} className="grid sm:grid-cols-[80px_1fr_auto] gap-4 items-baseline py-6 border-b group" style={{ borderColor: `${accent}22` }}>
+                <span className="text-sm font-mono opacity-40">{String(i + 1).padStart(2, '0')}</span>
+                <div>
+                  <h3 className="text-2xl font-bold group-hover:underline">{p.title}</h3>
+                  {p.summary && <p className="text-sm opacity-60 mt-1 max-w-xl">{p.summary}</p>}
+                </div>
+                <span className="text-xs opacity-50">{(p.tech || []).slice(0, 3).join(' · ')}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Compact ───────────────────────────────────────────────────────────
+  if (site.template === 'compact') {
+    return (
+      <div className={shell}>
+        <div className="max-w-2xl mx-auto px-5 py-10 font-mono text-sm">
+          <h1 className="text-xl font-bold">{user.name}</h1>
+          {site.headline && <p style={{ color: accent }}>{site.headline}</p>}
+          {site.about && <p className="mt-3 opacity-70 whitespace-pre-line">{site.about}</p>}
+          <div className="mt-4"><Socials site={site} dark={dark} /></div>
+          <p className="mt-8 opacity-40">— projects —</p>
+          <ul className="mt-2 space-y-2">
+            {projects.map((p) => (
+              <li key={p.id} className="flex items-baseline justify-between gap-3">
+                <Link to={`/u/${username}/${p.slug}`} className="hover:underline" style={{ color: accent }}>{p.title}</Link>
+                <span className="text-xs opacity-40">{(p.tech || []).slice(0, 2).join(', ')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Showcase ──────────────────────────────────────────────────────────
+  if (site.template === 'showcase') {
+    return (
+      <div className={shell}>
+        <div className="max-w-5xl mx-auto px-5 py-10">
+          <h1 className="text-3xl sm:text-5xl font-bold">{user.name}</h1>
+          {site.headline && <p className="mt-2 opacity-70">{site.headline}</p>}
+          <div className="mt-4"><Socials site={site} dark={dark} /></div>
+          <div className="mt-10 space-y-6">
+            {projects.map((p) => (
+              <Link key={p.id} to={`/u/${username}/${p.slug}`} className="block relative rounded-3xl overflow-hidden group">
+                {p.cover_url
+                  ? <img src={p.cover_url} alt={p.title} loading="lazy" className="w-full h-[42vh] object-cover group-hover:scale-[1.02] transition-transform duration-700" />
+                  : <div className="w-full h-[28vh]" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}44)` }} />}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                  <h3 className="text-2xl font-bold">{p.title}</h3>
+                  {p.summary && <p className="text-sm text-white/75 mt-1 max-w-xl">{p.summary}</p>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Resume ────────────────────────────────────────────────────────────
+  if (site.template === 'resume') {
+    return (
+      <div className={shell}>
+        <div className="max-w-5xl mx-auto px-5 py-10 grid lg:grid-cols-[280px_1fr] gap-10">
+          <aside>
+            {user.avatar && <img src={user.avatar} alt={user.name} className="w-20 h-20 rounded-full object-cover mb-4" />}
+            <h1 className="text-2xl font-bold">{user.name}</h1>
+            {site.headline && <p className="text-sm mt-1" style={{ color: accent }}>{site.headline}</p>}
+            <div className="mt-4 space-y-1 text-sm opacity-70">
+              {site.location && <p>{site.location}</p>}
+              {site.contact_email && <p className="break-all">{site.contact_email}</p>}
+              {site.availability && <p>{site.availability}</p>}
+            </div>
+            <div className="mt-4"><Socials site={site} dark={dark} /></div>
+            <div className="mt-6">
+              <p className="text-xs uppercase tracking-widest opacity-40 mb-2">Skills</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[...new Set(projects.flatMap((p) => p.tech || []))].slice(0, 16).map((t) => (
+                  <span key={t} className="text-xs px-2 py-0.5 rounded border" style={{ borderColor: `${accent}44`, color: accent }}>{t}</span>
+                ))}
+              </div>
+            </div>
+          </aside>
+          <main>
+            {site.about && (
+              <section className="mb-8">
+                <h2 className="text-xs uppercase tracking-widest opacity-40 mb-2">Profile</h2>
+                <p className="text-sm leading-relaxed opacity-80 whitespace-pre-line">{site.about}</p>
+              </section>
+            )}
+            <section>
+              <h2 className="text-xs uppercase tracking-widest opacity-40 mb-3">Selected projects</h2>
+              <div className="space-y-4">
+                {projects.map((p) => (
+                  <Link key={p.id} to={`/u/${username}/${p.slug}`} className="block">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 className="font-semibold">{p.title}</h3>
+                      <span className="text-xs opacity-40">{p.duration || ''}</span>
+                    </div>
+                    {p.summary && <p className="text-sm opacity-65 mt-0.5">{p.summary}</p>}
+                    {p.tech?.length ? <p className="text-xs opacity-40 mt-1">{p.tech.join(' · ')}</p> : null}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   // ── Minimal (default) ─────────────────────────────────────────────────
   return (
     <div className={shell}>

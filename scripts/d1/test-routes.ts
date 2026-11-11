@@ -363,7 +363,7 @@ async function main() {
     ['GET /api/v1/courses/:id/lessons', () => call(`/api/v1/courses/${enrolled.course_id}/lessons`), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['POST /api/v1/payments/initialize (already enrolled)', () => call('/api/v1/payments/initialize', { method: 'POST', token, body: { courseId: enrolled.course_id, provider: 'paystack', currency: 'NGN' } }), (r) => (r.json?.data?.alreadyEnrolled ? null : JSON.stringify(r.json).slice(0, 160))],
     ['POST /api/v1/courses (admin)', async () => {
-      const r = await call('/api/v1/courses', { method: 'POST', token: adminToken, body: { title: `D1 Test Course ${Date.now()}`, description: 'Temporary course created by the route suite', category: 'General', price: 0, level: 'beginner' } });
+      const r = await call('/api/v1/courses', { method: 'POST', token: adminToken, body: { title: `D1 Test Course ${Date.now()}`, description: 'Temporary course created by the route suite', category: 'General', price: 0, level: 'beginner', rules: 'Be kind and submit work on time.' } });
       (globalThis as any).__newCourse = r.json?.data?.id;
       return r;
     }, (r) => (r.status === 201 && r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 200))],
@@ -453,6 +453,8 @@ async function main() {
       const text = await res.text();
       return { status: res.status, json: { success: text.startsWith('%PDF'), skipped: false } };
     }, (r) => (r.json?.skipped || r.json?.success ? null : `status ${r.status}`)],
+    ['POST /api/v1/push/subscribe', () => call('/api/v1/push/subscribe', { method: 'POST', token, body: { endpoint: 'https://example.com/push/qa', keys: { p256dh: 'B'.repeat(87), auth: 'A'.repeat(22) } } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['DELETE /api/v1/push/unsubscribe', () => call('/api/v1/push/unsubscribe', { method: 'DELETE', token, body: { endpoint: 'https://example.com/push/qa' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

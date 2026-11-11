@@ -52,6 +52,7 @@ import payoutRoutes from './routes/payouts';
 import boardRoutes from './routes/board';
 import blogRoutes from './routes/blogs';
 import aiRoutes from './routes/ai';
+import pushRoutes from './routes/push';
 
 export { AuthDO };
 
@@ -162,6 +163,7 @@ app.route('/api/v1/payouts', payoutRoutes);
 app.route('/api/v1/board', boardRoutes);
 app.route('/api/v1/blogs', blogRoutes);
 app.route('/api/v1/ai', aiRoutes);
+app.route('/api/v1/push', pushRoutes);
 
 // ── No legacy fallback ────────────────────────────────────────────────────
 // Every route group is now served natively from D1. An unmatched /api/v1 path

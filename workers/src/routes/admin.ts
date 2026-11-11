@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { fail, pageParams, requireRole, statusOf } from '../route-utils';
 import { hashPassword, randomToken, type TokenPayload } from '../auth-helpers';
 import { mail, sendEmail } from '../email';
+import { sendPushToUser } from '../push';
 import * as M from '../admin/models';
 import * as A from '../admin/analytics';
 import { syncLearningPathForCourse } from '../admin/learning-path-sync';
@@ -398,6 +399,11 @@ admin.put('/users/:id/role', async (c) => {
       link: dash,
     });
     c.executionCtx.waitUntil(mail.roleChanged(c.env, user.email, user.name, role).catch(() => {}));
+    c.executionCtx.waitUntil(sendPushToUser(c.env, id, {
+      title: 'Your role changed',
+      body: `You are now ${role.replace('_', ' ')} on CareerCode.`,
+      url: dash,
+    }));
 
     await logAudit(c.env, {
       adminId: session.userId,

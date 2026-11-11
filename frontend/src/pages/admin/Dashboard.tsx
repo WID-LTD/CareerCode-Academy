@@ -412,7 +412,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 {funnel && (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div className="p-2 rounded-lg bg-primary-500/10 text-center">
                       <div className="text-sm font-bold text-primary-500 tabular-nums">{funnel.visitorToSignup}%</div>
                       <div className="text-[10px] text-gray-400">Visitor → Signup</div>

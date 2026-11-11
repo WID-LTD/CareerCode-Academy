@@ -208,7 +208,7 @@ export default function AdminVideos() {
               </div>
 
               {stats && previewId === video.id && (
-                <div className="mt-4 pt-3 border-t border-gray-800 grid grid-cols-4 gap-4">
+                <div className="mt-4 pt-3 border-t border-gray-800 grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-gray-500">Total Views</p>
                     <p className="text-lg font-bold text-white">{stats.total_views}</p>
@@ -246,7 +246,7 @@ export default function AdminVideos() {
 
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editing ? 'Edit Video' : 'Add Video'} size="lg">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Entity Type"
               value={form.entity_type}
@@ -280,7 +280,7 @@ export default function AdminVideos() {
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Video URL</label>
               <Input
@@ -298,7 +298,7 @@ export default function AdminVideos() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Provider"
               value={form.provider}
