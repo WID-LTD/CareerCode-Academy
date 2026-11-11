@@ -72,6 +72,10 @@ zone_name = "careercode.com.ng"
 pattern = "portfolio.careercode.com.ng/*"
 zone_name = "careercode.com.ng"
 
+[[routes]]
+pattern = "*.careercode.com.ng/*"
+zone_name = "careercode.com.ng"
+
 # [env.production.hyperdrive]  # uncomment after creating the production Hyperdrive
 # binding = "HYPERDRIVE"
 # id = "PASTE_PROD_HYPERDRIVE_ID_HERE"

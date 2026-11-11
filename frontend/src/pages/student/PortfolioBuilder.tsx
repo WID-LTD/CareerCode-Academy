@@ -213,8 +213,16 @@ export default function PortfolioBuilder() {
       </section>
 
       <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-        <h2 className="font-semibold">Custom domain</h2>
-        <p className="text-xs text-gray-500 mt-1">Use your own domain (e.g. yourname.com). DNS verification is automatic; serving requires the domain to be attached by an admin.</p>
+        <h2 className="font-semibold">Portfolio domain</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Your free CareerCode subdomain is{' '}
+          {user?.username ? (
+            <a href={`https://${user.username}.careercode.com.ng`} target="_blank" rel="noreferrer" className="text-primary-500 hover:underline font-medium">
+              {user.username}.careercode.com.ng
+            </a>
+          ) : 'created with your profile'}.
+          {' '}It is live now with SSL. External domains can be verified below; serving one directly requires Cloudflare for SaaS on our account (currently awaiting quota) — until then, set a 301 redirect from your registrar to your CareerCode subdomain.
+        </p>
         <div className="mt-3 flex flex-col sm:flex-row gap-2">
           <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="yourname.com"
             className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />

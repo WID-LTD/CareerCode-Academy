@@ -88,6 +88,21 @@ app.use('*', async (c, next) => {
           : `${c.env.FRONTEND_URL}/portfolios`;
         return c.redirect(target, 302);
       }
+      // Per-user portfolio subdomains: username.careercode.com.ng
+      if (host.endsWith('.careercode.com.ng')) {
+        const sub = host.split('.')[0];
+        if (sub && !['api', 'www', 'portfolio'].includes(sub)) {
+          const user = await getDb(c.env).query<any>('SELECT username FROM users WHERE lower(username) = $1 LIMIT 1', [sub]);
+          if (user.rows.length) {
+            const username = user.rows[0].username;
+            const target = parts.length
+              ? `${c.env.FRONTEND_URL}/u/${encodeURIComponent(username)}/${encodeURIComponent(parts[0])}`
+              : `${c.env.FRONTEND_URL}/u/${encodeURIComponent(username)}`;
+            return c.redirect(target, 302);
+          }
+          return c.redirect(`${c.env.FRONTEND_URL}/portfolios`, 302);
+        }
+      }
       if (!host.endsWith('careercode.com.ng') && !host.endsWith('pages.dev')) {
         const site = await getDb(c.env).query<any>(
           `SELECT u.username FROM portfolio_sites ps JOIN users u ON u.id = ps.user_id
