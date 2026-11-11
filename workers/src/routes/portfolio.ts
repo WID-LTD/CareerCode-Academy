@@ -4,6 +4,7 @@ import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
 import { getDb } from '../db';
 import * as PortfolioModel from '../portfolio';
 import { parseBody, storeOrLink } from '../uploads';
+import { authenticate } from '../auth-helpers';
 
 // Portfolio routes ported from backend/src/routes/portfolio.routes.ts.
 // Mounted at /api/v1/portfolio.
@@ -498,6 +499,169 @@ portfolio.get('/directory', async (c) => {
   }
 });
 
+
+// ── Likes ────────────────────────────────────────────────────────────────
+portfolio.post('/site/:username/like', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const user = (await db.query<any>('SELECT id FROM users WHERE username = $1', [c.req.param('username')])).rows[0];
+    if (!user) return fail(c, 404, 'Portfolio not found');
+    const site = (await db.query<any>('SELECT id FROM portfolio_sites WHERE user_id = $1 AND is_published = 1', [user.id])).rows[0];
+    if (!site) return fail(c, 404, 'Portfolio not found');
+
+    const existing = await db.query<any>('SELECT 1 FROM portfolio_likes WHERE site_id = $1 AND user_id = $2', [site.id, s.userId]);
+    let liked: boolean;
+    if (existing.rows.length) {
+      await db.query('DELETE FROM portfolio_likes WHERE site_id = $1 AND user_id = $2', [site.id, s.userId]);
+      liked = false;
+    } else {
+      await db.query('INSERT INTO portfolio_likes (site_id, user_id) VALUES ($1, $2)', [site.id, s.userId]);
+      liked = true;
+    }
+    const count = await db.query<any>('SELECT COUNT(*)::int as n FROM portfolio_likes WHERE site_id = $1', [site.id]);
+    return c.json({ success: true, data: { liked, likes: Number(count.rows[0]?.n) || 0 } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to update like');
+  }
+});
+
+// ── Reviews ──────────────────────────────────────────────────────────────
+portfolio.get('/site/:username/reviews', async (c) => {
+  try {
+    const db = getDb(c.env);
+    const user = (await db.query<any>('SELECT id FROM users WHERE username = $1', [c.req.param('username')])).rows[0];
+    if (!user) return fail(c, 404, 'Portfolio not found');
+    const site = (await db.query<any>('SELECT id FROM portfolio_sites WHERE user_id = $1 AND is_published = 1', [user.id])).rows[0];
+    if (!site) return fail(c, 404, 'Portfolio not found');
+
+    const { rows } = await db.query<any>(
+      `SELECT r.id, r.rating, r.comment, r.created_at, u.name, u.avatar, u.username
+       FROM portfolio_reviews r JOIN users u ON u.id = r.user_id
+       WHERE r.site_id = $1 AND r.status = 'published'
+       ORDER BY r.created_at DESC LIMIT 50`,
+      [site.id]
+    );
+    const avg = await db.query<any>(
+      `SELECT COALESCE(AVG(rating), 0) as average, COUNT(*)::int as count
+       FROM portfolio_reviews WHERE site_id = $1 AND status = 'published'`,
+      [site.id]
+    );
+    return c.json({
+      success: true,
+      data: rows,
+      average: Math.round((Number(avg.rows[0]?.average) || 0) * 10) / 10,
+      total: Number(avg.rows[0]?.count) || 0,
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load reviews');
+  }
+});
+
+portfolio.post('/site/:username/review', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const rating = Number(body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return fail(c, 400, 'rating must be 1-5');
+    const db = getDb(c.env);
+    const user = (await db.query<any>('SELECT id FROM users WHERE username = $1', [c.req.param('username')])).rows[0];
+    if (!user) return fail(c, 404, 'Portfolio not found');
+    if (user.id === s.userId) return fail(c, 400, 'You cannot review your own portfolio');
+    const site = (await db.query<any>('SELECT id FROM portfolio_sites WHERE user_id = $1 AND is_published = 1', [user.id])).rows[0];
+    if (!site) return fail(c, 404, 'Portfolio not found');
+
+    await db.query(
+      `INSERT INTO portfolio_reviews (site_id, user_id, rating, comment)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (site_id, user_id)
+       DO UPDATE SET rating = $3, comment = $4, updated_at = NOW(), status = 'published'`,
+      [site.id, s.userId, rating, body.comment ? String(body.comment).slice(0, 1000) : null]
+    );
+    return c.json({ success: true }, 201 as any);
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to save review');
+  }
+});
+
+portfolio.delete('/site/reviews/:id', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const review = (await db.query<any>('SELECT * FROM portfolio_reviews WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!review) return fail(c, 404, 'Review not found');
+    const site = (await db.query<any>('SELECT * FROM portfolio_sites WHERE id = $1', [review.site_id])).rows[0];
+    const allowed = review.user_id === s.userId || site?.user_id === s.userId || ['admin', 'super_admin'].includes(s.role);
+    if (!allowed) return fail(c, 403, 'Forbidden');
+    await db.query('DELETE FROM portfolio_reviews WHERE id = $1', [review.id]);
+    return c.json({ success: true, message: 'Review deleted' });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to delete review');
+  }
+});
+
+// ── Custom domain (request + DNS verification) ───────────────────────────
+portfolio.put('/site/custom-domain', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const site = await ensureSite(c.env, s.userId);
+    const body: any = await c.req.json().catch(() => ({}));
+    const domain = String(body.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!domain) return fail(c, 400, 'domain is required');
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return fail(c, 400, 'Invalid domain');
+
+    const token = `careercode-verify-${crypto.randomUUID()}`;
+    await getDb(c.env).query(
+      `UPDATE portfolio_sites SET custom_domain = $1, domain_status = 'pending', domain_token = $2, updated_at = NOW() WHERE id = $3`,
+      [domain, token, site.id]
+    );
+    return c.json({
+      success: true,
+      data: {
+        domain,
+        status: 'pending',
+        instructions: [
+          `Add a TXT record on _careercode.${domain} with value: ${token}`,
+          'Then press Verify. Serving the domain also requires it to be attached to CareerCode (Cloudflare for SaaS).',
+        ],
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to set domain');
+  }
+});
+
+portfolio.post('/site/custom-domain/verify', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const site = await ensureSite(c.env, s.userId);
+    if (!site.custom_domain || !site.domain_token) return fail(c, 400, 'Set a custom domain first');
+    const name = `_careercode.${site.custom_domain}`;
+    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=TXT`, {
+      headers: { Accept: 'application/dns-json' },
+    });
+    const json: any = await res.json().catch(() => ({}));
+    const answers: string[] = (json?.Answer || []).map((a: any) => String(a.data || ''));
+    const verified = answers.some((a) => a.includes(site.domain_token));
+    await getDb(c.env).query(
+      `UPDATE portfolio_sites SET domain_status = $1, updated_at = NOW() WHERE id = $2`,
+      [verified ? 'verified' : 'pending', site.id]
+    );
+    return c.json({
+      success: true,
+      data: {
+        verified,
+        status: verified ? 'verified' : 'pending',
+        message: verified
+          ? 'DNS verified. Ask an admin to attach the domain for serving.'
+          : 'TXT record not found yet. DNS can take a few minutes.',
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to verify domain');
+  }
+});
+
 // GET /portfolio/site/:username — public portfolio
 portfolio.get('/site/:username', async (c) => {
   try {
@@ -513,6 +677,17 @@ portfolio.get('/site/:username', async (c) => {
     )).rows[0];
     if (!site) return fail(c, 404, 'Portfolio not found');
     const projects = await siteProjects(c.env, site.id);
+    const likes = await db.query<any>('SELECT COUNT(*)::int as n FROM portfolio_likes WHERE site_id = $1', [site.id]);
+    let liked = false;
+    try {
+      const viewer = await authenticate(c);
+      const mine = await db.query<any>('SELECT 1 FROM portfolio_likes WHERE site_id = $1 AND user_id = $2', [site.id, viewer.userId]);
+      liked = mine.rows.length > 0;
+    } catch { /* anonymous */ }
+    const reviewStats = await db.query<any>(
+      `SELECT COALESCE(AVG(rating),0) as average, COUNT(*)::int as count FROM portfolio_reviews WHERE site_id = $1 AND status = 'published'`,
+      [site.id]
+    );
     c.executionCtx.waitUntil((async () => {
       await db.query('UPDATE portfolio_sites SET views = views + 1 WHERE id = $1', [site.id]);
       await db.query(
@@ -532,6 +707,10 @@ portfolio.get('/site/:username', async (c) => {
           seo: safeJson(site.seo, {}),
         },
         projects,
+        likes: Number(likes.rows[0]?.n) || 0,
+        liked,
+        review_average: Math.round((Number(reviewStats.rows[0]?.average) || 0) * 10) / 10,
+        review_count: Number(reviewStats.rows[0]?.count) || 0,
       },
     });
   } catch (e: any) {

@@ -35,6 +35,9 @@ export default function PortfolioBuilder() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [modal, setModal] = useState<{ open: boolean; id?: string; form: typeof emptyProject }>({ open: false, form: { ...emptyProject } });
   const [uploading, setUploading] = useState(false);
+  const [domain, setDomain] = useState('');
+  const [domainStatus, setDomainStatus] = useState('none');
+  const [domainMsg, setDomainMsg] = useState('');
 
   const load = async () => {
     try {
@@ -44,6 +47,7 @@ export default function PortfolioBuilder() {
       ]);
       const d = siteRes.data.data;
       setSite(d.site); setProjects(d.projects || []); setTemplates(d.templates || []); setUser(d.user);
+      setDomain(d.site?.custom_domain || ''); setDomainStatus(d.site?.domain_status || 'none');
       if (analyticsRes) setAnalytics(analyticsRes.data.data);
     } catch {
       toast.error('Failed to load portfolio');
@@ -206,6 +210,31 @@ export default function PortfolioBuilder() {
             <span className="text-xs text-gray-500">{(site.theme || {}).accent || '#6366f1'}</span>
           </div>
         </label>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+        <h2 className="font-semibold">Custom domain</h2>
+        <p className="text-xs text-gray-500 mt-1">Use your own domain (e.g. yourname.com). DNS verification is automatic; serving requires the domain to be attached by an admin.</p>
+        <div className="mt-3 flex flex-col sm:flex-row gap-2">
+          <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="yourname.com"
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+          <button onClick={async () => {
+            try {
+              const { data } = await api.put('/portfolio/site/custom-domain', { domain });
+              setDomainStatus(data.data.status); setDomainMsg(data.data.instructions.join(' ')); toast.success('Domain saved');
+            } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to save domain'); }
+          }} className="px-3 py-2 rounded-xl bg-primary-500 text-white text-sm font-semibold">Save</button>
+          <button onClick={async () => {
+            try {
+              const { data } = await api.post('/portfolio/site/custom-domain/verify');
+              setDomainStatus(data.data.status); setDomainMsg(data.data.message);
+              toast[data.data.verified ? 'success' : 'error'](data.data.message);
+            } catch (e: any) { toast.error(e?.response?.data?.message || 'Verification failed'); }
+          }} className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm">Verify</button>
+        </div>
+        {domainStatus !== 'none' && (
+          <p className="text-xs mt-2 text-gray-500">Status: <strong className={domainStatus === 'verified' ? 'text-emerald-500' : 'text-amber-500'}>{domainStatus}</strong>{domainMsg ? ` — ${domainMsg}` : ''}</p>
+        )}
       </section>
 
       <section>

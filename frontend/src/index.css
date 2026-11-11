@@ -253,3 +253,43 @@
   }
 }
 
+
+/* ── Mobile safety net ───────────────────────────────────────────────────
+   Prevent horizontal page scroll from wide tables, code blocks or media.
+   Individual pages still use responsive layouts; this only stops overflow. */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img,
+video,
+iframe,
+canvas {
+  max-width: 100%;
+}
+
+pre,
+code {
+  overflow-x: auto;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .container-page {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+  /* Modals should scroll rather than clip on short screens. */
+  [role='dialog'] {
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  /* Comfortable tap targets for icon-only buttons. */
+  button,
+  a {
+    touch-action: manipulation;
+  }
+}

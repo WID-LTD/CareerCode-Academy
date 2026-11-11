@@ -455,6 +455,17 @@ async function main() {
     }, (r) => (r.json?.skipped || r.json?.success ? null : `status ${r.status}`)],
     ['POST /api/v1/push/subscribe', () => call('/api/v1/push/subscribe', { method: 'POST', token, body: { endpoint: 'https://example.com/push/qa', keys: { p256dh: 'B'.repeat(87), auth: 'A'.repeat(22) } } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['DELETE /api/v1/push/unsubscribe', () => call('/api/v1/push/unsubscribe', { method: 'DELETE', token, body: { endpoint: 'https://example.com/push/qa' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/portfolio/site/:username/like', async () => {
+      const u: any = raw.prepare('SELECT username FROM users WHERE id = ?').get(user.id);
+      if (!u?.username) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/portfolio/site/${u.username}/like`, { method: 'POST', token });
+    }, (r) => (r.json?.skipped || typeof r.json?.data?.liked === 'boolean' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/portfolio/site/:username/reviews', async () => {
+      const u: any = raw.prepare('SELECT username FROM users WHERE id = ?').get(user.id);
+      if (!u?.username) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/portfolio/site/${u.username}/reviews`);
+    }, (r) => (r.json?.skipped || Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['PUT /api/v1/portfolio/site/custom-domain', () => call('/api/v1/portfolio/site/custom-domain', { method: 'PUT', token, body: { domain: 'portfolio.example.com' } }), (r) => (r.json?.data?.status === 'pending' ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

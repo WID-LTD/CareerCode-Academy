@@ -2058,6 +2058,9 @@ CREATE TABLE IF NOT EXISTS "portfolio_sites" (
   "seo" TEXT DEFAULT '{}',
   "is_published" INTEGER DEFAULT 0,
   "views" INTEGER DEFAULT 0,
+  "custom_domain" TEXT,
+  "domain_status" TEXT DEFAULT 'none',
+  "domain_token" TEXT,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -2117,4 +2120,22 @@ CREATE TABLE IF NOT EXISTS "push_subscriptions" (
   "auth" TEXT NOT NULL,
   "user_agent" TEXT,
   "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS "portfolio_likes" (
+  "site_id" TEXT NOT NULL,
+  "user_id" TEXT NOT NULL,
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY ("site_id", "user_id")
+);
+CREATE TABLE IF NOT EXISTS "portfolio_reviews" (
+  "id" TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+  "site_id" TEXT NOT NULL,
+  "user_id" TEXT NOT NULL,
+  "rating" INTEGER NOT NULL,
+  "comment" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'published',
+  "created_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(site_id, user_id)
 );

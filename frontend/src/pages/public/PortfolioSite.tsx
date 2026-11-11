@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowUpRight, Github, Globe, Linkedin, Mail, MapPin, Twitter,
-  ExternalLink, ArrowLeft, Loader,
+  ExternalLink, ArrowLeft, Loader, Heart, Star,
 } from 'lucide-react';
 import api from '@/lib/axios';
 
@@ -96,13 +96,47 @@ export default function PortfolioSite() {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSending, setReviewSending] = useState(false);
 
   useEffect(() => {
     setData(null); setError(false);
     api.get(`/portfolio/site/${username}`)
-      .then(({ data }) => setData(data.data))
+      .then(({ data }) => {
+        setData(data.data);
+        setLikes(data.data.likes || 0);
+        setLiked(!!data.data.liked);
+      })
       .catch(() => setError(true));
+    api.get(`/portfolio/site/${username}/reviews`)
+      .then(({ data }) => setReviews(data.data || []))
+      .catch(() => setReviews([]));
   }, [username]);
+
+  const toggleLike = async () => {
+    try {
+      const { data } = await api.post(`/portfolio/site/${username}/like`);
+      setLiked(data.data.liked);
+      setLikes(data.data.likes);
+    } catch { /* login required */ }
+  };
+
+  const submitReview = async () => {
+    setReviewSending(true);
+    try {
+      await api.post(`/portfolio/site/${username}/review`, { rating: reviewRating, comment: reviewComment });
+      const { data } = await api.get(`/portfolio/site/${username}/reviews`);
+      setReviews(data.data || []);
+      setReviewOpen(false);
+      setReviewComment('');
+    } catch { /* ignore */ }
+    finally { setReviewSending(false); }
+  };
 
   const project = useMemo(() => {
     if (!projectSlug || !data) return null;
@@ -464,6 +498,14 @@ export default function PortfolioSite() {
             <Socials site={site} dark={dark} />
             {site.location && <span className="text-sm opacity-60 inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{site.location}</span>}
           </div>
+          <div className="mt-5 flex items-center gap-2">
+            <button onClick={toggleLike} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm" style={{ borderColor: liked ? accent : undefined, color: liked ? accent : undefined }}>
+              <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} /> {likes}
+            </button>
+            <button onClick={() => setReviewOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm">
+              <Star className="w-4 h-4" /> {reviews.length} reviews
+            </button>
+          </div>
         </header>
         <section>
           <h2 className="text-xs uppercase tracking-widest opacity-50 mb-4">Selected work</h2>
@@ -471,7 +513,46 @@ export default function PortfolioSite() {
             {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
           </div>
         </section>
+        {reviews.length > 0 && (
+          <section className="mt-12">
+            <h2 className="text-xs uppercase tracking-widest opacity-50 mb-4">Reviews</h2>
+            <div className="space-y-3">
+              {reviews.slice(0, 6).map((r) => (
+                <div key={r.id} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium">{r.name}</span>
+                    <span className="text-amber-500">{'★'.repeat(r.rating)}</span>
+                  </div>
+                  {r.comment && <p className="text-sm opacity-70 mt-1">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <footer className="mt-14 text-xs opacity-40">Built with CareerCode Academy</footer>
+
+        {reviewOpen && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm grid place-items-center p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-900 p-5">
+              <h3 className="font-semibold mb-3">Leave a review</h3>
+              <div className="flex gap-1 mb-3">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} onClick={() => setReviewRating(n)} aria-label={`${n} stars`}>
+                    <Star className={`w-6 h-6 ${n <= reviewRating ? 'text-amber-500 fill-current' : 'text-gray-300'}`} />
+                  </button>
+                ))}
+              </div>
+              <textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} rows={3}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" placeholder="Share your feedback…" />
+              <div className="flex justify-end gap-2 mt-4">
+                <button onClick={() => setReviewOpen(false)} className="px-3 py-2 text-sm">Cancel</button>
+                <button onClick={submitReview} disabled={reviewSending} className="px-4 py-2 rounded-xl text-white text-sm font-semibold" style={{ background: accent }}>
+                  {reviewSending ? 'Sending…' : 'Submit'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

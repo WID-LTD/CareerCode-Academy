@@ -49,7 +49,7 @@ interface MegaMenuProps {
 
 function MegaMenu({ items, basePath, renderItem }: MegaMenuProps) {
   return (
-    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[600px] glass-card p-4 shadow-2xl border border-gray-200/60 dark:border-gray-800/50 z-50">
+    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[calc(100vw-2rem)] max-w-[600px] glass-card p-4 shadow-2xl border border-gray-200/60 dark:border-gray-800/50 z-50">
       <div className="grid grid-cols-2 gap-2">
         {items.map((item) => (
           <Link

@@ -42,6 +42,23 @@ admin.use('*', async (c, next) => {
     return fail(c, statusOf(e, 401), e?.message || 'You do not have permission to perform this action');
   }
   await next();
+
+  // Generic audit coverage: every successful admin mutation is recorded,
+  // even for handlers that do not call logAudit themselves.
+  try {
+    if (c.req.method !== 'GET' && c.res.status < 400) {
+      const session = c.get('session');
+      const path = new URL(c.req.url).pathname.replace('/api/v1/admin', '') || '/';
+      await logAudit(c.env, {
+        adminId: session.userId,
+        action: `${c.req.method.toLowerCase()} ${path}`,
+        resourceType: 'admin_api',
+        resourceId: null,
+        details: null,
+        ...AUDIT_META(c),
+      });
+    }
+  } catch { /* auditing must never break the response */ }
 });
 
 // Sub-router: /admin/messages (auth already applied above; the sub-router
