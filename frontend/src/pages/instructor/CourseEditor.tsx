@@ -186,7 +186,6 @@ export default function CourseEditor() {
       formData.append('video', file);
 
       const { data } = await api.post(`/videos/upload/${lessonId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           const pct = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
           setUploadProgress(pct);

@@ -25,8 +25,9 @@ export default function CommunityInvite() {
         if (!alive) return;
         setCommunity(data.data?.community || null);
         setState('joined');
-        const id = data.data?.community?.id;
-        if (id) setTimeout(() => navigate(`/community/${id}`, { replace: true }), 900);
+        const joined = data.data?.community;
+        if (joined?.slug) setTimeout(() => navigate(`/c/${joined.slug}`, { replace: true }), 900);
+        else if (joined?.id) setTimeout(() => navigate(`/community/${joined.id}`, { replace: true }), 900);
       } catch (e: any) {
         if (!alive) return;
         setState('error');
@@ -52,7 +53,7 @@ export default function CommunityInvite() {
               <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
               <h1 className="text-xl font-bold text-white mb-2">You're in!</h1>
               <p className="text-sm text-gray-400 mb-5">You joined {community?.name || 'the community'}. Opening it now…</p>
-              {community?.id && <Button onClick={() => navigate(`/community/${community.id}`, { replace: true })}>Open community</Button>}
+              {(community?.slug || community?.id) && <Button onClick={() => navigate(community.slug ? `/c/${community.slug}` : `/community/${community.id}`, { replace: true })}>Open community</Button>}
             </>
           )}
           {state === 'error' && (

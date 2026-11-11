@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, statusOf } from '../route-utils';
+import { parseBody, storeOrLink } from '../uploads';
 
 // Ported from backend/src/routes/message.routes.ts + backend/src/models/message.ts.
 // Mounted at /api/v1/messages. Socket.io emits are dropped.
@@ -80,36 +81,15 @@ messages.get('/conversations', async (c) => {
 messages.post('/', async (c) => {
   try {
     const s = await requireAuth(c);
-    const body: any = await c.req.json().catch(() => ({}));
-    const { receiver_id, content } = body;
-
-    let attachmentUrl: string | undefined =
-      typeof body.attachment_url === 'string' ? body.attachment_url
-        : typeof body.attachmentUrl === 'string' ? body.attachmentUrl
-          : undefined;
-
-    const attachment = body.attachment;
-    if (!attachmentUrl && typeof attachment === 'string' && /^https?:\/\//i.test(attachment)) {
-      attachmentUrl = attachment;
-    }
-    const attachmentData = attachment && typeof attachment === 'object'
-      ? (attachment.data || attachment.base64 || attachment.fileData)
-      : undefined;
-    if (!attachmentUrl && attachmentData) {
-      const r2 = (c.env as any).R2 as R2Bucket | undefined;
-      if (!r2) {
-        return fail(
-          c,
-          501,
-          'Attachment uploads are not configured on this deployment (R2 binding missing). Send an attachment_url instead.'
-        );
-      }
-      const filename = safeName(attachment.name || attachment.filename || attachment.fileName || 'attachment');
-      const contentType = attachment.type || attachment.contentType || attachment.mimeType || 'application/octet-stream';
-      const key = `messages/${Date.now()}-${crypto.randomUUID()}-${filename}`;
-      await r2.put(key, base64Bytes(String(attachmentData)), { httpMetadata: { contentType } });
-      attachmentUrl = publicUrl(c.env, key);
-    }
+    const { fields, file, url } = await parseBody(c as any);
+    const receiver_id = fields.receiver_id;
+    const content = typeof fields.content === 'string' ? fields.content : '';
+    const attachmentUrl = await storeOrLink(
+      c.env,
+      file,
+      url || fields.attachment_url || fields.attachmentUrl || null,
+      'messages'
+    );
 
     if (!receiver_id || (!content && !attachmentUrl)) {
       return fail(c, 400, 'receiver_id and either content or attachment are required');

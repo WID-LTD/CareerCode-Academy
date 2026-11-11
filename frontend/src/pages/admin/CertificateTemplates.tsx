@@ -119,7 +119,6 @@ export default function AdminCertificateTemplates() {
       const formData = new FormData();
       formData.append('file', file);
       await api.post(`/admin/certificate-templates/${templateId}/upload-${field}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
       });
       await fetchTemplates();
     } catch { /* ignore */ }

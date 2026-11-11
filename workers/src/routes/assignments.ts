@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
+import { parseBody, storeOrLink } from '../uploads';
 import {
   createAssignment,
   createSubmission,
@@ -202,13 +203,13 @@ assignments.delete('/:id', async (c) => {
 });
 
 // POST /api/v1/assignments/:id/submit
-// Multer upload dropped: the worker accepts a JSON `fileUrl` instead.
+// Accepts multipart file, JSON base64, or { fileUrl | url }.
 assignments.post('/:id/submit', async (c) => {
   try {
     const s = await requireRole(c, ['student']);
     const db = getDb(c.env);
     const assignmentId = c.req.param('id');
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields, file, url } = await parseBody(c as any);
 
     const assignment = await getAssignmentById(db, assignmentId);
     if (!assignment) return fail(c, 404, 'Assignment not found');
@@ -219,12 +220,18 @@ assignments.post('/:id/submit', async (c) => {
     const existing = await getSubmissionByStudentAndAssignment(db, s.userId, assignmentId);
     if (existing) return fail(c, 409, 'You have already submitted this assignment');
 
-    if (!body.fileUrl) return fail(c, 400, 'File is required for submission');
+    const fileUrl = await storeOrLink(
+      c.env,
+      file,
+      url || fields.fileUrl || fields.url || null,
+      'assignments'
+    );
+    if (!fileUrl) return fail(c, 400, 'A file or file URL is required for submission');
 
     const submission = await createSubmission(db, {
       assignment_id: assignmentId,
       student_id: s.userId,
-      file_url: body.fileUrl,
+      file_url: fileUrl,
     });
     return c.json({ success: true, data: submission }, 201);
   } catch (e: any) {

@@ -4,13 +4,15 @@ import { useInstructorStore } from '@/store/instructorStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Plus, CheckCircle, Clock, XCircle, BookOpen } from 'lucide-react';
+import { Plus, CheckCircle, Clock, XCircle, BookOpen, Upload, Loader2 } from 'lucide-react';
 import { PageSkeleton } from '@/components/student/SkeletonLoader';
 import toast from 'react-hot-toast';
+import api from '@/lib/axios';
 
 export default function InstructorCourseProposals() {
   const { courseProposals, fetchCourseProposals, createCourseProposal, isLoading } = useInstructorStore();
   const [showForm, setShowForm] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   const [formData, setFormData] = useState({
     title: '', category: '', level: 'beginner', description: '', learning_outcomes: '', 
     prerequisites: '', duration: '', lesson_count: '', teaching_format: '', 
@@ -137,6 +139,15 @@ export default function InstructorCourseProposals() {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-1">Thumbnail Image URL (Optional)</label>
                 <input type="url" name="thumbnail_url" value={formData.thumbnail_url} onChange={handleChange} className="w-full px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" placeholder="https://..." />
+                <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+                  {uploadingThumb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload thumbnail
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={async (e) => {
+                    const file = e.target.files?.[0]; if (!file) return;
+                    setUploadingThumb(true);
+                    try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setFormData((f) => ({ ...f, thumbnail_url: data.data.url })); }
+                    finally { setUploadingThumb(false); }
+                  }} />
+                </label>
               </div>
 
               <div className="md:col-span-2">

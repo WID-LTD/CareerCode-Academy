@@ -715,6 +715,9 @@ portfolio.get('/sitemap.xml', async (c) => {
       `SELECT u.username, ps.updated_at FROM portfolio_sites ps JOIN users u ON u.id = ps.user_id
        WHERE ps.is_published = 1 AND u.username IS NOT NULL AND u.username <> '' LIMIT 5000`
     );
+    const communities = await db.query<any>(
+      `SELECT slug, updated_at FROM communities WHERE is_archived = false AND visibility = 'public' LIMIT 5000`
+    ).catch(() => ({ rows: [] } as any));
     const projects = await db.query<any>(
       `SELECT u.username, pp.slug, pp.updated_at FROM portfolio_projects pp
        JOIN portfolio_sites ps ON ps.id = pp.site_id JOIN users u ON u.id = ps.user_id
@@ -728,6 +731,11 @@ portfolio.get('/sitemap.xml', async (c) => {
     for (const site of sites.rows) {
       const loc = `https://${site.username}.careercode.com.ng/`;
       const lastmod = site.updated_at ? `<lastmod>${new Date(site.updated_at).toISOString()}</lastmod>` : '';
+      urls.push(`  <url><loc>${esc(loc)}</loc>${lastmod}<changefreq>weekly</changefreq></url>`);
+    }
+    for (const community of communities.rows) {
+      const loc = `https://careercode.com.ng/c/${community.slug}`;
+      const lastmod = community.updated_at ? `<lastmod>${new Date(community.updated_at).toISOString()}</lastmod>` : '';
       urls.push(`  <url><loc>${esc(loc)}</loc>${lastmod}<changefreq>weekly</changefreq></url>`);
     }
     for (const p of projects.rows) {

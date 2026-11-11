@@ -23,7 +23,7 @@ interface Project {
   featured?: boolean;
 }
 
-const emptyProject = { title: '', summary: '', description: '', demo_url: '', repo_url: '', role: '', duration: '', tech: '', cover_url: '', featured: false };
+const emptyProject = { title: '', summary: '', description: '', demo_url: '', repo_url: '', role: '', duration: '', tech: '', cover_url: '', gallery: [] as string[], featured: false };
 
 export default function PortfolioBuilder() {
   const [loading, setLoading] = useState(true);
@@ -115,6 +115,31 @@ export default function PortfolioBuilder() {
       toast.success('Image uploaded');
     } catch { toast.error('Upload failed'); }
     finally { setUploading(false); }
+  };
+
+  const uploadGalleryImage = async (file: File) => {
+    if (!modal.id) { toast.error('Save the project first, then add gallery images'); return; }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post(`/portfolio/site/projects/${modal.id}/media`, form);
+      const project = data.data;
+      setModal((m) => ({ ...m, form: { ...m.form, gallery: project.gallery || [] } }));
+      setProjects((p) => p.map((x) => (x.id === modal.id ? { ...x, ...project } : x)));
+      toast.success('Gallery image uploaded');
+    } catch { toast.error('Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const removeGalleryImage = async (url: string) => {
+    if (!modal.id) return;
+    const gallery = (modal.form.gallery || []).filter((g) => g !== url);
+    setModal((m) => ({ ...m, form: { ...m.form, gallery } }));
+    try {
+      await api.put(`/portfolio/site/projects/${modal.id}`, { gallery });
+      setProjects((p) => p.map((x) => (x.id === modal.id ? { ...x, gallery } : x)));
+    } catch { toast.error('Failed to remove image'); }
   };
 
   if (loading) return <div className="min-h-[50vh] grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-primary-500" /></div>;
@@ -271,7 +296,7 @@ export default function PortfolioBuilder() {
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium text-sm">{p.title}</p>
                   <div className="flex gap-1">
-                    <button onClick={() => setModal({ open: true, id: p.id, form: { ...emptyProject, ...p, tech: (p.tech || []).join(', ') } })} aria-label="Edit"><Pencil className="w-4 h-4 text-gray-400" /></button>
+                    <button onClick={() => setModal({ open: true, id: p.id, form: { ...emptyProject, ...p, gallery: p.gallery || [], tech: (p.tech || []).join(', ') } })} aria-label="Edit"><Pencil className="w-4 h-4 text-gray-400" /></button>
                     <button onClick={() => deleteProject(p.id)} aria-label="Delete"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
                 </div>
@@ -308,6 +333,24 @@ export default function PortfolioBuilder() {
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImage(f); }} />
                 </label>
               </div>
+            </div>
+            <div>
+              <span className="text-xs font-medium">Gallery images</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {(modal.form.gallery || []).map((url) => (
+                  <div key={url} className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => void removeGalleryImage(url)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white grid place-items-center" aria-label="Remove image">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <label className="w-20 h-20 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 grid place-items-center cursor-pointer text-gray-400">
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploading || !modal.id} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadGalleryImage(f); }} />
+                </label>
+              </div>
+              {!modal.id && <p className="text-[11px] text-gray-500 mt-1">Save the project first to add gallery images.</p>}
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={modal.form.featured} onChange={(e) => setModal((m) => ({ ...m, form: { ...m.form, featured: e.target.checked } }))} />

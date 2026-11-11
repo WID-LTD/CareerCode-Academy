@@ -60,7 +60,7 @@ export default function LessonLightbox({ lesson, courseId, onClose, onSaved }: {
       // handle video
       if (stagedFile) {
         const fd=new FormData(); fd.append('video', stagedFile);
-        const {data}=await api.post(`/videos/upload/${lesson.id}`, fd, { headers:{'Content-Type':'multipart/form-data'}});
+        const {data}=await api.post(`/videos/upload/${lesson.id}`, fd);
         payload.video_url = data.data?.video_url || data.video_url;
       } else if (stagedVideo !== lesson.video_url) {
         payload.video_url = stagedVideo;
@@ -277,7 +277,7 @@ export default function LessonLightbox({ lesson, courseId, onClose, onSaved }: {
               {activeTab==='resources' && (
                 <div className="space-y-4">
                   <h3 className="font-medium flex items-center gap-2"><Download className="w-4 h-4" /> Resources</h3>
-                  <div onDragOver={e=>e.preventDefault()} onDrop={async e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if(!f) return; const fd=new FormData(); fd.append('file',f); fd.append('courseId',courseId); fd.append('lessonId',lesson.id); fd.append('title',f.name); await api.post('/resources',fd,{headers:{'Content-Type':'multipart/form-data'}}); const {data}=await api.get(`/resources/lesson/${lesson.id}`); setResources(data.data||[]); toast.success('Uploaded');}} className="border-2 border-dashed rounded-xl p-6 text-center border-gray-300 dark:border-gray-700">
+                  <div onDragOver={e=>e.preventDefault()} onDrop={async e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if(!f) return; const fd=new FormData(); fd.append('file',f); fd.append('courseId',courseId); fd.append('lessonId',lesson.id); fd.append('title',f.name); await api.post('/resources',fd); const {data}=await api.get(`/resources/lesson/${lesson.id}`); setResources(data.data||[]); toast.success('Uploaded');}} className="border-2 border-dashed rounded-xl p-6 text-center border-gray-300 dark:border-gray-700">
                     <p className="text-sm text-gray-500">Drag & drop files/docs here or click to browse</p>
                     <input type="file" className="hidden" id="res-upload" onChange={async e=>{const f=e.target.files?.[0]; if(!f) return; const fd=new FormData(); fd.append('file',f); fd.append('courseId',courseId); fd.append('lessonId',lesson.id); fd.append('title',f.name); await api.post('/resources',fd); const {data}=await api.get(`/resources/lesson/${lesson.id}`); setResources(data.data||[]);}} />
                     <label htmlFor="res-upload" className="inline-flex mt-2 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-sm cursor-pointer">Browse</label>

@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, pageParams, requireAuth, requireRole, statusOf } from '../route-utils';
 import type { TokenPayload } from '../auth-helpers';
+import { parseBody, storeOrLink } from '../uploads';
 import {
   abandonAttempt,
   autoIssueCertificateAfterExamPass,
@@ -837,17 +838,20 @@ exams.get('/student/:examId/results/:attemptId', async (c) => {
 });
 
 // POST /api/v1/exams/student/:examId/attempts/:attemptId/upload-recording
-// Express accepted a WEBM multipart upload; Workers accepts a URL in the body.
+// Accepts the WEBM multipart recording, JSON base64, or a hosted URL.
 exams.post('/student/:examId/attempts/:attemptId/upload-recording', async (c) => {
   try {
     const s = await requireAuth(c);
     const examId = c.req.param('examId');
-    const body: any = await c.req.json().catch(() => ({}));
-    const recordingUrl = body.recordingUrl || body.url;
+    const { fields, file, url } = await parseBody(c as any);
+    const recordingUrl = await storeOrLink(
+      c.env,
+      file,
+      url || fields.recordingUrl || fields.url || null,
+      'exam-recordings'
+    );
 
-    if (!recordingUrl || typeof recordingUrl !== 'string') {
-      return fail(c, 400, 'No recording file provided');
-    }
+    if (!recordingUrl) return fail(c, 400, 'No recording file provided');
 
     const attempt = await getAttemptById(c.env, c.req.param('attemptId'));
     if (!attempt || attempt.user_id !== s.userId || attempt.exam_id !== examId) {
@@ -855,8 +859,8 @@ exams.post('/student/:examId/attempts/:attemptId/upload-recording', async (c) =>
     }
 
     const elapsed = Math.floor((Date.now() - new Date(attempt.started_at).getTime()) / 1000);
-    const durationSeconds = Number.isFinite(Number(body.durationSeconds)) ? Number(body.durationSeconds) : elapsed;
-    const fileSizeBytes = Number.isFinite(Number(body.fileSizeBytes)) ? Number(body.fileSizeBytes) : 0;
+    const durationSeconds = Number.isFinite(Number(fields.durationSeconds)) ? Number(fields.durationSeconds) : elapsed;
+    const fileSizeBytes = file?.size || (Number.isFinite(Number(fields.fileSizeBytes)) ? Number(fields.fileSizeBytes) : 0);
 
     const recording = await saveRecording(c.env, attempt.id, recordingUrl, durationSeconds, fileSizeBytes);
     return c.json({ success: true, data: recording });

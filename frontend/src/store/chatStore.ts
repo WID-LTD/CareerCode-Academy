@@ -153,7 +153,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         formData.append('content', content);
         formData.append('attachment', attachment);
         requestData = formData;
-        headers = { 'Content-Type': 'multipart/form-data' };
       } else {
         requestData = { receiver_id: receiverId, content };
       }

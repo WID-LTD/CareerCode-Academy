@@ -313,6 +313,7 @@ export default function CourseBuilder() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingPromo, setUploadingPromo] = useState(false);
 
   const {
     register,
@@ -491,9 +492,7 @@ export default function CourseBuilder() {
     try {
       const form = new FormData();
       form.append('file', file);
-      const { data } = await api.post('/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await api.post('/upload', form);
       if (data.success) {
         const url = data.data.url || data.data.path;
         if (type === 'thumbnail') {
@@ -509,6 +508,21 @@ export default function CourseBuilder() {
       if (type === 'thumbnail') setUploadingThumbnail(false);
       else setUploadingBanner(false);
     }
+  };
+
+  const handlePromoUpload = async (file: File) => {
+    setUploadingPromo(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/upload', form);
+      if (data.success) {
+        setFormData((prev) => ({ ...prev, media: { ...prev.media, promoVideo: data.data.url || data.data.path } }));
+        toast.success('Promo video uploaded');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to upload promo video');
+    } finally { setUploadingPromo(false); }
   };
 
   const totalLessons = formData.sections.reduce((sum, s) => sum + s.lessons.length, 0);
@@ -827,7 +841,14 @@ export default function CourseBuilder() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData((prev) => ({ ...prev, media: { ...prev.media, promoVideo: e.target.value } }))}
           icon={<Video className="w-4 h-4" />}
         />
-        <p className="text-xs text-gray-400">Paste a YouTube or Vimeo URL for your promotional video</p>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+            {uploadingPromo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload video
+            <input type="file" accept="video/*" className="hidden" disabled={uploadingPromo} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handlePromoUpload(f); e.target.value = ''; }} />
+          </label>
+          {formData.media.promoVideo && <button type="button" onClick={() => setFormData((prev) => ({ ...prev, media: { ...prev.media, promoVideo: '' } }))} className="text-xs text-red-400">Remove</button>}
+        </div>
+        <p className="text-xs text-gray-400">Paste a YouTube/Vimeo URL or upload an MP4/WebM file.</p>
       </div>
       <div className="space-y-2 sm:col-span-2">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Course rules & expectations</label>

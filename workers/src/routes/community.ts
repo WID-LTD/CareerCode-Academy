@@ -5,6 +5,7 @@ import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
 import * as Community from '../community';
 import { mail } from '../email';
 import { sendPushToUser } from '../push';
+import { parseBody, storeFile } from '../uploads';
 
 // Community domain, ported from backend/src/routes/community.routes.ts.
 // Mount at /api/v1/community.
@@ -34,12 +35,17 @@ async function body(c: any): Promise<any> {
   return await c.req.json().catch(() => ({}));
 }
 
-async function notify(env: Env, input: { user_id: string; title: string; message: string; type?: string }) {
+async function notify(env: Env, input: { user_id: string; title: string; message: string; type?: string; link?: string }) {
   await getDb(env).query(
-    `INSERT INTO notifications (user_id, title, message, type)
-     VALUES ($1, $2, $3, $4)`,
-    [input.user_id, input.title, input.message, input.type || 'info']
+    `INSERT INTO notifications (user_id, title, message, type, link)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [input.user_id, input.title, input.message, input.type || 'info', input.link || null]
   );
+  await sendPushToUser(env, input.user_id, {
+    title: input.title,
+    body: input.message,
+    url: input.link || '/community',
+  }).catch(() => {});
 }
 
 // Helper: check community role (global admins bypass)
@@ -111,7 +117,12 @@ community.post('/channels', async (c) => {
     }
     if (input.course_id !== undefined && !isUuid(input.course_id)) errors.course_id = ['Invalid uuid'];
     if (input.lesson_id !== undefined && !isUuid(input.lesson_id)) errors.lesson_id = ['Invalid uuid'];
+    if (input.community_id !== undefined && !isUuid(input.community_id)) errors.community_id = ['Invalid uuid'];
     if (Object.keys(errors).length) return validationError(c, errors);
+
+    if (input.community_id) {
+      await requireCommunityRole(c, input.community_id, s.userId, ['owner', 'admin', 'moderator'], s.role);
+    }
 
     const channel = await Community.createChannel(c.env, {
       ...input,
@@ -280,25 +291,56 @@ community.post('/channels/:id/messages', async (c) => {
     if (!member) return fail(c, 403, 'You must be a member to send messages');
     if (member.is_muted) return fail(c, 403, 'You are muted in this channel');
 
-    const input = await body(c);
+    const { fields: input, file } = await parseBody(c as any);
     const rawContent = input.content;
-    if (typeof rawContent !== 'string' || rawContent.length < 1 || rawContent.length > 5000) {
-      return validationError(c, { content: ['String must contain at least 1 character(s)'] });
+    if (rawContent !== undefined && (typeof rawContent !== 'string' || rawContent.length > 5000)) {
+      return validationError(c, { content: ['String must contain at most 5000 character(s)'] });
     }
-    const content = rawContent;
-    if (!content || !content.trim()) {
-      return fail(c, 401, 'Message content is required');
+    let attachmentUrl = input.attachment_url || null;
+    let attachmentType = input.attachment_type || null;
+    let attachmentName = input.attachment_name || null;
+    if (file) {
+      attachmentUrl = await storeFile(c.env, file, 'community');
+      attachmentType = file.type || 'application/octet-stream';
+      attachmentName = file.name;
+    }
+    const content = typeof rawContent === 'string' ? rawContent.trim() : '';
+    if (!content && !attachmentUrl) {
+      return fail(c, 400, 'Message content or an attachment is required');
     }
 
-    // Uploads are not handled on the Worker: accept already-hosted URLs.
     const message = await Community.createMessage(c.env, {
       channel_id: channelId,
       author_id: s.userId,
-      content: content.trim(),
-      attachment_url: input.attachment_url,
-      attachment_type: input.attachment_type,
-      attachment_name: input.attachment_name,
+      content,
+      attachment_url: attachmentUrl,
+      attachment_type: attachmentType,
+      attachment_name: attachmentName,
     });
+
+    // Notify the rest of the community and deep-link straight to this channel.
+    try {
+      const channel = await Community.getChannelById(c.env, channelId);
+      const communityId = channel?.community_id;
+      if (communityId) {
+        const members = await getDb(c.env).query<any>(
+          `SELECT user_id FROM community_members
+           WHERE community_id = $1 AND user_id != $2 AND COALESCE(is_banned, 0) = 0 LIMIT 200`,
+          [communityId, s.userId]
+        );
+        const link = `/community/${communityId}?channel=${channelId}`;
+        const preview = content ? content.slice(0, 120) : 'Sent an attachment';
+        for (const member of members.rows) {
+          await notify(c.env, {
+            user_id: member.user_id,
+            title: `New message in #${channel?.name || 'community'}`,
+            message: preview,
+            type: 'community',
+            link,
+          });
+        }
+      }
+    } catch { /* notifications must never break the message */ }
 
     // Notify mentioned users (@username -> username@careercode.com)
     const mentions = content.match(/@(\w+)/g);
@@ -316,7 +358,8 @@ community.post('/channels/:id/messages', async (c) => {
             user_id: mentionedUser.id,
             title: 'You were mentioned',
             message: `You were mentioned in #${channel?.name || 'channel'}`,
-            type: 'info',
+            type: 'community',
+            link: channel?.community_id ? `/community/${channel.community_id}?channel=${channelId}` : '/community',
           });
         }
       }
@@ -730,6 +773,42 @@ community.get('/communities/search', async (c) => {
   }
 });
 
+// GET /api/v1/community/communities/slug/:slug
+community.get('/communities/slug/:slug', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const found = await Community.getCommunityBySlug(c.env, c.req.param('slug'));
+    if (!found) return fail(c, 404, 'Community not found');
+    const membership = await Community.isCommunityMember(c.env, found.id, s.userId);
+    const stats = await Community.getCommunityStats(c.env, found.id);
+    return c.json({
+      success: true,
+      data: { ...found, ...stats, is_member: !!membership, my_role: membership?.role },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load community');
+  }
+});
+
+// GET /api/v1/community/sitemap.xml — public communities
+community.get('/sitemap.xml', async (c) => {
+  try {
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT slug, updated_at FROM communities
+       WHERE is_archived = false AND visibility = 'public' ORDER BY updated_at DESC LIMIT 5000`
+    );
+    const esc = (v: string) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const urls = rows.map((r: any) => {
+      const lastmod = r.updated_at ? `<lastmod>${new Date(r.updated_at).toISOString()}</lastmod>` : '';
+      return `  <url><loc>${esc(`https://careercode.com.ng/c/${r.slug}`)}</loc>${lastmod}<changefreq>weekly</changefreq></url>`;
+    });
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+    return c.body(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8' });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to build community sitemap');
+  }
+});
+
 // GET /api/v1/community/communities/:id
 community.get('/communities/:id', async (c) => {
   try {
@@ -758,7 +837,7 @@ community.get('/communities/:id', async (c) => {
 community.put('/communities/:id', async (c) => {
   try {
     const s = await requireAuth(c);
-    await requireCommunityRole(c, c.req.param('id'), s.userId, ['owner', 'admin'], s.role);
+    await requireCommunityRole(c, c.req.param('id'), s.userId, ['owner', 'admin', 'moderator'], s.role);
 
     const input = await body(c);
     const errors: Record<string, string[]> = {};

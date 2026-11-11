@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Loader2, X, Users, MessageSquare, Edit, Trash2, Archive, ArchiveRestore, Globe, Lock, EyeOff, Hash, Calendar, BookOpen, Link2, Copy, Check } from 'lucide-react';
+import { Plus, Search, Loader2, X, Users, MessageSquare, Edit, Trash2, Archive, ArchiveRestore, Globe, Lock, EyeOff, Hash, Calendar, BookOpen, Link2, Copy, Check, Upload } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -18,7 +18,8 @@ export default function InstructorCommunities() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingCommunity, setEditingCommunity] = useState<Community | null>(null);
-  const [form, setForm] = useState({ name: '', slug: '', description: '', category: 'General', visibility: 'public', join_policy: 'open' });
+  const [form, setForm] = useState({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open' });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [requestsFor, setRequestsFor] = useState<Community | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -50,12 +51,22 @@ export default function InstructorCommunities() {
       if (editingCommunity) {
         // Only own can edit — backend will enforce owner check, admin can edit any (this page is instructor own-only)
         if ((editingCommunity as any).created_by !== user?.id && user?.role !== 'admin' && user?.role !== 'super_admin') return;
-        await updateCommunity(editingCommunity.id, { name: form.name, slug: form.slug, description: form.description || null, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
+        await updateCommunity(editingCommunity.id, { name: form.name, slug: form.slug, description: form.description || null, image_url: form.image_url || null, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
       } else {
-        await createCommunity({ name: form.name, slug: form.slug, description: form.description || undefined, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
+        await createCommunity({ name: form.name, slug: form.slug, description: form.description || undefined, image_url: form.image_url || undefined, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
       }
-      setShowForm(false); setEditingCommunity(null); setForm({ name: '', slug: '', description: '', category: 'General', visibility: 'public', join_policy: 'open' });
+      setShowForm(false); setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open' });
     } finally { setSaving(false); }
+  };
+
+  const uploadCommunityImage = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/upload', fd);
+      setForm((f) => ({ ...f, image_url: data.data.url }));
+    } finally { setUploadingImage(false); }
   };
 
   const canEdit = (c: Community) => (c as any).created_by === user?.id || ['owner', 'admin', 'moderator'].includes((c as any).my_role) || user?.role === 'admin' || user?.role === 'super_admin';
@@ -68,7 +79,7 @@ export default function InstructorCommunities() {
           <h1 className="text-2xl sm:text-3xl font-bold">Communities</h1>
           <p className="text-gray-500 mt-1">Create and manage your communities. You can delete/rename only those you created; admins can manage any.</p>
         </div>
-        <Button onClick={() => { setEditingCommunity(null); setForm({ name: '', slug: '', description: '', category: 'General', visibility: 'public', join_policy: 'open' }); setShowForm(true); }} icon={<Plus className="w-4 h-4" />}>Create Community</Button>
+        <Button onClick={() => { setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open' }); setShowForm(true); }} icon={<Plus className="w-4 h-4" />}>Create Community</Button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -93,6 +104,17 @@ export default function InstructorCommunities() {
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value, slug: editingCommunity ? form.slug : generateSlug(e.target.value) })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30" placeholder="My Community" /></div>
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Slug *</label><input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30" placeholder="my-community" /></div>
                 <div className="sm:col-span-2"><label className="text-xs font-medium text-gray-400 mb-1 block">Description</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30 resize-none" placeholder="Describe..." /></div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium text-gray-400 mb-1 block">Community image / logo</label>
+                  <div className="flex items-center gap-2">
+                    <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white" placeholder="https://… or upload" />
+                    <label className="px-3 py-2 rounded-xl border border-white/10 text-sm text-gray-300 cursor-pointer inline-flex items-center gap-1.5">
+                      {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Upload
+                      <input type="file" accept="image/*" className="hidden" disabled={uploadingImage} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadCommunityImage(f); }} />
+                    </label>
+                  </div>
+                  {form.image_url && <img src={form.image_url} alt="" className="mt-2 h-20 w-20 rounded-xl object-cover" />}
+                </div>
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Category</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30">{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Visibility</label><select value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30 capitalize">{['public','private','restricted'].map(v => <option key={v} value={v}>{v}</option>)}</select></div>
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Join Policy</label><select value={form.join_policy} onChange={(e) => setForm({ ...form, join_policy: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30 capitalize">{['open','approval','invite_only'].map(p => <option key={p} value={p}>{p.replace('_',' ')}</option>)}</select></div>
@@ -124,6 +146,7 @@ export default function InstructorCommunities() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-lg truncate">{community.name}</h3>
+                      {(community as any).unread_count > 0 && <span className="text-[10px] min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white grid place-items-center font-bold">{(community as any).unread_count}</span>}
                       <Badge variant={community.visibility === 'public' ? 'success' : community.visibility === 'private' ? 'danger' : 'warning'} size="sm"><VisIcon className="w-3 h-3 mr-1" />{community.visibility}</Badge>
                       {isOwn && <Badge variant="default" size="sm">Owned</Badge>}
                     </div>
@@ -134,7 +157,7 @@ export default function InstructorCommunities() {
                       <span className="flex items-center gap-1 text-xs text-gray-500"><Calendar className="w-3 h-3" /> {new Date(community.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
+                      {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', image_url: community.image_url || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
                       {canEdit(community as Community) && (
                         <Button variant="ghost" size="sm" onClick={async () => {
                           setInviteFor(community as Community); setInviteLink(''); setInviteCopied(false); setInviteLoading(true);
@@ -154,7 +177,7 @@ export default function InstructorCommunities() {
                         }} icon={<Users className="w-3.5 h-3.5" />}>Requests</Button>
                       )}
                       {canDelete(community as Community) && <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300" onClick={() => setConfirmAction({ type: 'delete', id: community.id, name: community.name })} icon={<Trash2 className="w-3.5 h-3.5" />}>Delete</Button>}
-                      {!isOwn && activeTab === 'all' && <Button variant="ghost" size="sm" onClick={() => window.location.assign(`/community/${community.id}`)} icon={<BookOpen className="w-3.5 h-3.5" />}>View</Button>}
+                      {!isOwn && activeTab === 'all' && <Button variant="ghost" size="sm" onClick={() => window.location.assign(`/c/${community.slug}`)} icon={<BookOpen className="w-3.5 h-3.5" />}>View</Button>}
                       {isOwn && <Button variant="ghost" size="sm" onClick={() => setConfirmAction({ type: 'archive', id: community.id, name: community.name })} icon={community.is_archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}>{community.is_archived ? 'Unarchive' : 'Archive'}</Button>}
                     </div>
                   </div>

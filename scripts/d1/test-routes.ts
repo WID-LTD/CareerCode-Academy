@@ -465,6 +465,12 @@ async function main() {
       (globalThis as any).__commChannelId = r.json?.data?.[0]?.id;
       return r;
     }, (r) => (r.json?.skipped || (Array.isArray(r.json?.data) && r.json.data.length >= 1 && r.json.data[0].name === 'General') ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/community/communities/slug/:slug', async () => {
+      const slug = (globalThis as any).__commNewSlug;
+      if (!slug) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/community/communities/slug/${slug}`, { token: adminToken });
+    }, (r) => (r.json?.skipped || r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/community/sitemap.xml', () => call('/api/v1/community/sitemap.xml'), (r) => (String(r.text).includes('<urlset') ? null : String(r.text).slice(0, 120))],
     ['POST /api/v1/community/communities/:id/invites', async () => {
       const id = (globalThis as any).__commNewId;
       if (!id) return { status: 200, json: { success: true, skipped: true } };

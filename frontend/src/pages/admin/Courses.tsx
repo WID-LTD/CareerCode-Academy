@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, CheckCircle, XCircle, Archive, Star, Trash2, Eye, AlertCircle,
   Loader2, ChevronDown, ChevronUp, Send, Clock, FileText, X, Plus, Edit3,
-  Code, BookOpen, FolderOpen,
+  Code, BookOpen, FolderOpen, Upload,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
@@ -24,6 +24,17 @@ export default function AdminCourses() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [tab, setTab] = useState('all');
+  const [uploadingThumb, setUploadingThumb] = useState(false);
+
+  const uploadThumbnail = async (file: File) => {
+    setUploadingThumb(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/upload', fd);
+      setFormData((f) => ({ ...f, thumbnail: data.data.url }));
+    } finally { setUploadingThumb(false); }
+  };
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [sortField, setSortField] = useState('created_at');
@@ -582,7 +593,14 @@ export default function AdminCourses() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label="Thumbnail URL" value={formData.thumbnail} onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })} placeholder="https://..." />
+                  <div>
+                    <Input label="Thumbnail URL" value={formData.thumbnail} onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })} placeholder="https://..." />
+                    <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer hover:border-primary-400">
+                      {uploadingThumb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      Upload image
+                      <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadThumbnail(f); }} />
+                    </label>
+                  </div>
                   <div className="space-y-1.5">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                     <select

@@ -47,7 +47,7 @@ export default function InstructorProfile() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '', bio: '', headline: '', location: '',
-    website: '', github: '', twitter: '', linkedin: '',
+    website: '', github: '', twitter: '', linkedin: '', avatar: '',
     expertise: [] as string[],
   });
   const [expertiseInput, setExpertiseInput] = useState('');
@@ -70,6 +70,7 @@ export default function InstructorProfile() {
         github: p.github || '',
         twitter: p.twitter || '',
         linkedin: p.linkedin || '',
+        avatar: p.avatar || '',
         expertise: p.expertise || [],
       });
     } catch {
@@ -90,6 +91,7 @@ export default function InstructorProfile() {
         github: profile.github || '',
         twitter: profile.twitter || '',
         linkedin: profile.linkedin || '',
+        avatar: profile.avatar || '',
         expertise: profile.expertise || [],
       });
     }
@@ -117,7 +119,7 @@ export default function InstructorProfile() {
     try {
       const { data } = await api.put('/instructor/profile', form);
       setProfile(prev => prev ? { ...prev, ...data.data } : null);
-      setUser({ ...user, name: form.name, bio: form.bio } as any);
+      setUser({ ...user, name: form.name, bio: form.bio, avatar: form.avatar } as any);
       toast.success('Profile updated');
       setEditing(false);
     } catch (err: any) {
@@ -156,9 +158,30 @@ export default function InstructorProfile() {
       <GlassCard className="p-6 mb-6" hover={false}>
         <div className="flex flex-col sm:flex-row items-start gap-6">
           <div className="relative">
-            <div className="w-24 h-24 gradient-bg rounded-2xl flex items-center justify-center text-3xl font-bold text-white">
-              {p?.name?.charAt(0) || 'I'}
-            </div>
+            {p?.avatar ? (
+              <img src={p.avatar} alt={p.name} className="w-24 h-24 rounded-2xl object-cover" />
+            ) : (
+              <div className="w-24 h-24 gradient-bg rounded-2xl flex items-center justify-center text-3xl font-bold text-white">
+                {p?.name?.charAt(0) || 'I'}
+              </div>
+            )}
+            {editing && (
+              <>
+                <label className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary-500 text-white rounded-full flex items-center justify-center shadow-lg cursor-pointer">
+                  <Camera className="w-4 h-4" />
+                  <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0]; if (!file) return;
+                    try {
+                      const fd = new FormData(); fd.append('file', file);
+                      const { data } = await api.post('/upload', fd);
+                      setForm((f) => ({ ...f, avatar: data.data.url }));
+                      setProfile((prev: any) => prev ? { ...prev, avatar: data.data.url } : prev);
+                      toast.success('Photo uploaded — save to apply');
+                    } catch { toast.error('Upload failed'); }
+                  }} />
+                </label>
+              </>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             {editing ? (

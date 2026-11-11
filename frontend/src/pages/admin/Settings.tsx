@@ -192,7 +192,6 @@ export default function AdminSettings() {
                             const formData = new FormData();
                             formData.append('file', file);
                             const { data: uploadRes } = await api.post('/admin/settings/upload-branding', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
                             });
                             if (uploadRes.data?.url) {
                               await api.put('/admin/settings', { key: 'certificate_default_stamp_url', value: uploadRes.data.url });
@@ -244,7 +243,6 @@ export default function AdminSettings() {
                             const formData = new FormData();
                             formData.append('file', file);
                             const { data: uploadRes } = await api.post('/admin/settings/upload-branding', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
                             });
                             if (uploadRes.data?.url) {
                               await api.put('/admin/settings', { key: 'certificate_default_signature_url', value: uploadRes.data.url });

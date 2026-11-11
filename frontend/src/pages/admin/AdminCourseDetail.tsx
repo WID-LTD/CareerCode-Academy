@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Save, Loader2, BookOpen, Clock, DollarSign, Star, Trash2, Plus, Edit3, Video, FileText } from 'lucide-react';
+import { ChevronLeft, Save, Loader2, BookOpen, Clock, DollarSign, Star, Trash2, Plus, Edit3, Video, FileText, Upload } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -21,6 +21,16 @@ export default function AdminCourseDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [uploadingThumb, setUploadingThumb] = useState(false);
+  const uploadThumbnail = async (file: File) => {
+    setUploadingThumb(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/upload', fd);
+      setForm((f: any) => ({ ...f, thumbnail: data.data.url }));
+    } finally { setUploadingThumb(false); }
+  };
   const [selectedLesson, setSelectedLesson] = useState<any>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -148,7 +158,14 @@ export default function AdminCourseDetail() {
             <Input label="Price" type="number" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} />
             <Input label="Duration (min)" type="number" value={form.duration} onChange={e=>setForm({...form, duration:e.target.value})} />
           </div>
-          <Input label="Thumbnail URL" value={form.thumbnail} onChange={e=>setForm({...form, thumbnail:e.target.value})} placeholder="https://..." />
+          <div>
+            <Input label="Thumbnail URL" value={form.thumbnail} onChange={e=>setForm({...form, thumbnail:e.target.value})} placeholder="https://..." />
+            <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer">
+              {uploadingThumb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              Upload image
+              <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadThumbnail(f); }} />
+            </label>
+          </div>
           {form.thumbnail && <img src={optimizeImageUrl(form.thumbnail, 400, 200)} alt="thumb" className="w-full max-w-sm h-40 object-cover rounded-xl border" />}
           <div className="space-y-1.5">
             <label className="block text-sm font-medium">Learning Outcomes (one per line)</label>

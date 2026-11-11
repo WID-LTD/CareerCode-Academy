@@ -407,7 +407,6 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
         formData.append('content', content);
         formData.append('attachment', file);
         requestData = formData;
-        headers['Content-Type'] = 'multipart/form-data';
       } else {
         requestData = { content };
       }

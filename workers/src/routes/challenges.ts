@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
+import { parseBody, storeOrLink } from '../uploads';
 import {
   createChallenge,
   createNotification,
@@ -173,7 +174,7 @@ challenges.get('/course/:courseId', async (c) => {
 challenges.post('/run', async (c) => {
   try {
     await requireAuth(c);
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields: body, file, url } = await parseBody(c as any);
     const errors = validateRun(body);
     if (Object.keys(errors).length) return validationFailed(c, errors);
 
@@ -200,7 +201,7 @@ challenges.get('/:id', async (c) => {
 challenges.post('/', async (c) => {
   try {
     await requireRole(c, STAFF);
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields: body, file, url } = await parseBody(c as any);
     const errors = validateCreate(body);
     if (Object.keys(errors).length) return validationFailed(c, errors);
 
@@ -231,7 +232,7 @@ challenges.post('/', async (c) => {
 challenges.put('/:id', async (c) => {
   try {
     await requireRole(c, STAFF);
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields: body, file, url } = await parseBody(c as any);
     const errors = validateUpdate(body);
     if (Object.keys(errors).length) return validationFailed(c, errors);
 
@@ -260,7 +261,7 @@ challenges.post('/:id/submit', async (c) => {
     const s = await requireAuth(c);
     const db = getDb(c.env);
     const challengeId = c.req.param('id');
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields: body, file, url } = await parseBody(c as any);
 
     const challenge = await getChallengeById(db, challengeId);
     if (!challenge) return fail(c, 404, 'Challenge not found');
@@ -303,10 +304,16 @@ challenges.post('/:id/submit', async (c) => {
         expected_output: expectedOutput || undefined, test_results: testResults,
       });
     } else {
-      // Non-code challenges: file_url / text_answer submission.
-      const { fileUrl, textAnswer } = body;
+      // Non-code challenges: uploaded file, URL, or text answer.
+      const textAnswer = body.textAnswer;
+      const fileUrl = await storeOrLink(
+        c.env,
+        file,
+        url || body.fileUrl || null,
+        'challenges'
+      );
       if (!fileUrl && !textAnswer) {
-        return fail(c, 400, 'File URL or text answer is required');
+        return fail(c, 400, 'A file, file URL, or text answer is required');
       }
       // Non-code submissions start as "pending review" (passed=false, score=null).
       submission = await submitChallenge(db, {
@@ -347,7 +354,7 @@ challenges.put('/submissions/:submissionId/grade', async (c) => {
   try {
     await requireRole(c, STAFF);
     const db = getDb(c.env);
-    const body: any = await c.req.json().catch(() => ({}));
+    const { fields: body, file, url } = await parseBody(c as any);
     const { score, feedback } = body;
 
     const submission = await gradeChallengeSubmission(db, c.req.param('submissionId'), score, feedback);

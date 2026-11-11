@@ -516,7 +516,6 @@ export const useInstructorStore = create<InstructorState>((set, get) => ({
   uploadResource: async (formData: FormData) => {
     try {
       const { data } = await api.post('/instructor/resources', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
       });
       set({ resources: [data.data, ...get().resources] });
     } catch (error) {

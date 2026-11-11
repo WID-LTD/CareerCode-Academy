@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Plus, Edit3, Trash2, Eye, Film, Loader2, X, Play, Video } from 'lucide-react';
+import { Search, Plus, Edit3, Trash2, Eye, Film, Loader2, X, Play, Video, Upload } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -31,6 +31,8 @@ export default function AdminVideos() {
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   const [form, setForm] = useState({
     entity_type: 'school',
     entity_id: '',
@@ -288,6 +290,15 @@ export default function AdminVideos() {
                 value={form.video_url}
                 onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))}
               />
+              <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+                {uploadingVideo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload video
+                <input type="file" accept="video/*" className="hidden" disabled={uploadingVideo} onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setUploadingVideo(true);
+                  try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setForm(f => ({ ...f, video_url: data.data.url })); }
+                  finally { setUploadingVideo(false); }
+                }} />
+              </label>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Thumbnail URL</label>
@@ -296,6 +307,15 @@ export default function AdminVideos() {
                 value={form.thumbnail_url}
                 onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))}
               />
+              <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+                {uploadingThumb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload thumbnail
+                <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setUploadingThumb(true);
+                  try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setForm(f => ({ ...f, thumbnail_url: data.data.url })); }
+                  finally { setUploadingThumb(false); }
+                }} />
+              </label>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

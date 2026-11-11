@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '@/lib/axios';
 import { Button } from '@/components/ui/Button';
-import { Loader2, Send, AlertCircle } from 'lucide-react';
+import { Loader2, Send, AlertCircle, Upload, X } from 'lucide-react';
 import CodeEditor from './CodeEditor';
 
 interface SolveChallengeProps {
@@ -12,6 +12,7 @@ interface SolveChallengeProps {
 
 export default function SolveChallenge({ challenge, submission, onSubmitted }: SolveChallengeProps) {
   const [fileUrl, setFileUrl] = useState(submission?.file_url || '');
+  const [file, setFile] = useState<File | null>(null);
   const [textAnswer, setTextAnswer] = useState(submission?.text_answer || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -25,11 +26,18 @@ export default function SolveChallenge({ challenge, submission, onSubmitted }: S
       setSaving(false); return;
     }
     try {
-      const payload: any = {};
-      if (challenge.submission_type === 'file_upload' || challenge.submission_type === 'both') payload.fileUrl = fileUrl;
-      if (challenge.submission_type === 'text' || challenge.submission_type === 'both') payload.textAnswer = textAnswer;
-      if (challenge.submission_type === 'link') payload.fileUrl = fileUrl;
-      const { data } = await api.post(`/challenges/${challenge.id}/submit`, payload);
+      if (file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        if (textAnswer) fd.append('textAnswer', textAnswer);
+        await api.post(`/challenges/${challenge.id}/submit`, fd);
+      } else {
+        const payload: any = {};
+        if (challenge.submission_type === 'file_upload' || challenge.submission_type === 'both') payload.fileUrl = fileUrl;
+        if (challenge.submission_type === 'text' || challenge.submission_type === 'both') payload.textAnswer = textAnswer;
+        if (challenge.submission_type === 'link') payload.fileUrl = fileUrl;
+        await api.post(`/challenges/${challenge.id}/submit`, payload);
+      }
       onSubmitted();
     } catch (e: any) {
       setError(e.response?.data?.message || 'Submission failed');
@@ -81,7 +89,7 @@ export default function SolveChallenge({ challenge, submission, onSubmitted }: S
       {subType === 'file_upload' || subType === 'both' || subType === 'link' ? (
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1.5">
-            {subType === 'link' ? 'Submission Link/URL' : 'File URL (upload a file and paste the URL)'}
+            {subType === 'link' ? 'Submission Link/URL' : 'Upload a file or paste a URL'}
           </label>
           <div className="flex gap-2">
             <input
@@ -93,6 +101,19 @@ export default function SolveChallenge({ challenge, submission, onSubmitted }: S
               <span className="text-[10px] text-gray-500 self-center flex-shrink-0">Allowed: {challenge.allowed_file_types}</span>
             )}
           </div>
+          {subType !== 'link' && (
+            <div className="mt-2 flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 text-xs cursor-pointer hover:bg-gray-800/50">
+                <Upload className="w-3.5 h-3.5" /> {file ? file.name : 'Upload file'}
+                <input type="file" className="hidden" disabled={saving} onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              </label>
+              {file && (
+                <button type="button" onClick={() => setFile(null)} className="inline-flex items-center gap-1 text-xs text-red-400">
+                  <X className="w-3.5 h-3.5" /> Remove
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -108,7 +129,7 @@ export default function SolveChallenge({ challenge, submission, onSubmitted }: S
         </div>
       ) : null}
 
-      <Button onClick={handleOtherSubmit} disabled={saving || (!fileUrl && !textAnswer)}>
+      <Button onClick={handleOtherSubmit} disabled={saving || (!file && !fileUrl && !textAnswer)}>
         {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
         Submit
       </Button>

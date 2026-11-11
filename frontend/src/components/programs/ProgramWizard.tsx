@@ -15,6 +15,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import api from '@/lib/axios';
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +24,8 @@ import {
   Clock,
   GripVertical,
   Plus,
+  Upload,
+  Loader2,
   Send,
   Trash2,
   Users,
@@ -144,6 +147,7 @@ export function ProgramWizard({ initial, schools, onClose, onSaved }: ProgramWiz
   const [saving, setSaving] = useState(false);
   const [slugTouched, setSlugTouched] = useState(!!initial?.slug);
 
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   const [basics, setBasics] = useState({
     school_id: initial?.school_id || '',
     name: initial?.name || initial?.title || '',
@@ -381,12 +385,24 @@ export function ProgramWizard({ initial, schools, onClose, onSaved }: ProgramWiz
                   </select>
                 </div>
               </div>
-              <Input
-                label="Thumbnail URL"
-                value={basics.thumbnail_url}
-                onChange={(e) => setBasics({ ...basics, thumbnail_url: e.target.value })}
-                placeholder="https://…"
-              />
+              <div>
+                <Input
+                  label="Thumbnail URL"
+                  value={basics.thumbnail_url}
+                  onChange={(e) => setBasics({ ...basics, thumbnail_url: e.target.value })}
+                  placeholder="https://…"
+                />
+                <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+                  {uploadingThumb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload image
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingThumb(true);
+                    try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setBasics((b) => ({ ...b, thumbnail_url: data.data.url })); }
+                    finally { setUploadingThumb(false); }
+                  }} />
+                </label>
+              </div>
             </div>
           )}
 

@@ -15,6 +15,7 @@ export default function Assignments() {
   const [filter, setFilter] = useState('all');
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -27,13 +28,14 @@ export default function Assignments() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedAssignment || !fileUrl) return;
+    if (!selectedAssignment || (!fileUrl && !file)) return;
     
     setIsSubmitting(true);
     try {
-      await submitAssignment(selectedAssignment, fileUrl);
+      await submitAssignment(selectedAssignment, file || fileUrl);
       setSelectedAssignment(null);
       setFileUrl('');
+      setFile(null);
     } catch (error) {
       // Silently handle
     } finally {
@@ -177,13 +179,19 @@ export default function Assignments() {
                     placeholder="https://github.com/..." 
                     value={fileUrl}
                     onChange={(e) => setFileUrl(e.target.value)}
-                    required
                   />
-                  <p className="text-xs text-gray-500 mt-2">Please provide a link to your repository, live project, or Google Doc.</p>
+                  <div className="mt-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" /> {file ? file.name : 'Or upload a file'}
+                      <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                    </label>
+                    {file && <button type="button" onClick={() => setFile(null)} className="ml-2 text-xs text-red-400">Remove</button>}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Provide a link or upload a file. Files are stored in R2/S3-compatible object storage.</p>
                 </div>
                 <div className="pt-4 flex gap-3">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setSelectedAssignment(null)}>Cancel</Button>
-                  <Button type="submit" className="flex-1" disabled={isSubmitting || !fileUrl}>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting || (!fileUrl && !file)}>
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Submit'}
                   </Button>
                 </div>

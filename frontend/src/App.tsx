@@ -318,6 +318,7 @@ function App() {
           <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
           <Route path="/pricing" element={<SuspenseWrapper><Pricing /></SuspenseWrapper>} />
           <Route path="/community" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
+          <Route path="/c/:slug" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
           <Route path="/community/join/:code" element={<SuspenseWrapper><CommunityInvite /></SuspenseWrapper>} />
           <Route path="/community/:id" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
           <Route path="/login" element={<SuspenseWrapper><Login /></SuspenseWrapper>} />

@@ -1,15 +1,17 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Loader2, X, Users, MessageSquare, Eye, Edit, Trash2,
   Archive, ArchiveRestore, Shield, ShieldOff, VolumeX, Volume2,
   ChevronDown, AlertCircle, Hash, Globe, Lock, EyeOff, Calendar,
-  UserMinus, UserPlus, Settings, BookOpen, ArrowRight,
+  UserMinus, UserPlus, Settings, BookOpen, ArrowRight, Upload,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useCommunityStore } from '@/store/communityStore';
+import api from '@/lib/axios';
 import type { Community, CommunityMember, CommunityRule } from '@/store/communityStore';
 
 const CATEGORIES = ['General', 'Tech', 'Design', 'Business', 'Other'];
@@ -55,6 +57,7 @@ function generateSlug(name: string): string {
 }
 
 export default function CommunityManagement() {
+  const navigate = useNavigate();
   const {
     communities, isLoading, fetchCommunities, createCommunity, updateCommunity,
     deleteCommunity, archiveCommunity, fetchCommunityMembers, communityMembers,
@@ -66,6 +69,7 @@ export default function CommunityManagement() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [showForm, setShowForm] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [editingCommunity, setEditingCommunity] = useState<Community | null>(null);
   const [form, setForm] = useState({
     name: '', slug: '', description: '', image_url: '', category: 'General',
@@ -322,6 +326,16 @@ export default function CommunityManagement() {
                   <label className="text-xs font-medium text-gray-400 mb-1 block">Image URL</label>
                   <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })}
                     className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30" placeholder="https://..." />
+                  <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs text-gray-300 cursor-pointer">
+                    {uploadingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload image
+                    <input type="file" accept="image/*" className="hidden" disabled={uploadingImage} onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingImage(true);
+                      try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setForm((f: any) => ({ ...f, image_url: data.data.url })); }
+                      finally { setUploadingImage(false); }
+                    }} />
+                  </label>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-400 mb-1 block">Category</label>
@@ -424,6 +438,8 @@ export default function CommunityManagement() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/c/${community.slug}`)}
+                          icon={<Eye className="w-3.5 h-3.5" />}>View community</Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(community)}
                           icon={<Edit className="w-3.5 h-3.5" />}>Edit</Button>
                         <Button variant="ghost" size="sm" onClick={() => setMemberPanel(community)}

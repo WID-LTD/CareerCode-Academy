@@ -366,6 +366,12 @@ export function MessageFeed() {
     }
   }, [messages, autoScroll]);
 
+  useEffect(() => {
+    if (!activeChannel) return;
+    const timer = window.setInterval(() => fetchMessages(activeChannel.id), 8000);
+    return () => window.clearInterval(timer);
+  }, [activeChannel?.id]);
+
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;

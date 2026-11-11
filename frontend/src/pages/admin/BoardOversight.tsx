@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Landmark, Users, ScrollText, BookOpenCheck, Plus, Pencil, Trash2, Send,
   CheckCircle2, XCircle, Eye, Camera, UsersRound, Wallet, GraduationCap,
-  BadgePercent, FileCheck2, UserPlus, BookMarked,
+  BadgePercent, FileCheck2, UserPlus, BookMarked, Upload, Loader2,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
@@ -43,6 +43,7 @@ export default function BoardOversight() {
 
   // member modal
   const [memberModal, setMemberModal] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [memberForm, setMemberForm] = useState(emptyMember);
   const [editingMember, setEditingMember] = useState<any>(null);
 
@@ -395,7 +396,17 @@ export default function BoardOversight() {
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40" /></div>
               <div><label className="text-xs font-medium text-gray-500">Avatar URL</label>
                 <input value={memberForm.avatar_url} onChange={(e) => setMemberForm({ ...memberForm, avatar_url: e.target.value })} placeholder="https://…"
-                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none" /></div>
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none" />
+                <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs cursor-pointer">
+                  {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload photo
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar} onChange={async (e) => {
+                    const file = e.target.files?.[0]; if (!file) return;
+                    setUploadingAvatar(true);
+                    try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setMemberForm((f: any) => ({ ...f, avatar_url: data.data.url })); }
+                    finally { setUploadingAvatar(false); }
+                  }} />
+                </label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-500">Sort order</label>
                   <input type="number" value={memberForm.sort_order} onChange={(e) => setMemberForm({ ...memberForm, sort_order: Number(e.target.value) })}

@@ -195,7 +195,7 @@ interface StudentState {
   fetchDashboard: () => Promise<void>;
   fetchEnrollments: (params?: { page?: number; limit?: number }) => Promise<void>;
   fetchAssignments: (params?: { page?: number; limit?: number }) => Promise<void>;
-  submitAssignment: (assignmentId: string, fileUrl: string) => Promise<void>;
+  submitAssignment: (assignmentId: string, fileOrUrl: File | string) => Promise<void>;
   fetchNotifications: (params?: { page?: number; limit?: number }) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
@@ -320,10 +320,16 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     }
   },
 
-  submitAssignment: async (assignmentId: string, fileUrl: string) => {
+  submitAssignment: async (assignmentId: string, fileOrUrl: File | string) => {
     set({ isLoading: true, error: null });
     try {
-      await api.post(`/assignments/${assignmentId}/submit`, { fileUrl });
+      if (fileOrUrl instanceof File) {
+        const fd = new FormData();
+        fd.append('file', fileOrUrl);
+        await api.post(`/assignments/${assignmentId}/submit`, fd);
+      } else {
+        await api.post(`/assignments/${assignmentId}/submit`, { fileUrl: fileOrUrl });
+      }
       get().fetchAssignments();
     } catch (error: any) {
       set({

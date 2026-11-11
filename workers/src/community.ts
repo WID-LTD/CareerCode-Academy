@@ -108,7 +108,10 @@ export async function getChannels(env: Env, userId: string): Promise<any[]> {
     [userId]
   );
   // SQLite returns 1/0 for the computed boolean; keep the Postgres shape.
-  for (const row of rows) row.is_member = !!row.is_member;
+  for (const row of rows) {
+    row.is_member = !!row.is_member;
+    row.unread_count = Number(row.unread_count) || 0;
+  }
   return rows;
 }
 
@@ -135,10 +138,17 @@ export async function createChannel(env: Env, input: {
   created_by: string;
   course_id?: string;
   lesson_id?: string;
+  community_id?: string;
 }): Promise<any> {
-  const { rows } = await getDb(env).query<any>(
-    `INSERT INTO community_channels (category_id, name, slug, description, type, is_public, created_by, course_id, lesson_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+  const db = getDb(env);
+  let memberCount = 1;
+  if (input.community_id) {
+    const count = await db.query<any>('SELECT member_count FROM communities WHERE id = $1', [input.community_id]);
+    memberCount = Number(count.rows[0]?.member_count) || 1;
+  }
+  const { rows } = await db.query<any>(
+    `INSERT INTO community_channels (category_id, name, slug, description, type, is_public, created_by, course_id, lesson_id, community_id, member_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       input.category_id || null,
@@ -150,11 +160,16 @@ export async function createChannel(env: Env, input: {
       input.created_by,
       input.course_id || null,
       input.lesson_id || null,
+      input.community_id || null,
+      memberCount,
     ]
   );
   const channel = rows[0];
   // Auto-join creator as owner
   await joinChannel(env, channel.id, input.created_by, 'owner');
+  if (input.community_id) {
+    await db.query('UPDATE communities SET channel_count = channel_count + 1 WHERE id = $1', [input.community_id]);
+  }
   return channel;
 }
 
@@ -186,7 +201,16 @@ export async function updateChannel(env: Env, id: string, input: Record<string, 
 }
 
 export async function deleteChannel(env: Env, id: string): Promise<boolean> {
-  return affected(env, 'DELETE FROM community_channels WHERE id = $1 RETURNING id', [id]);
+  const db = getDb(env);
+  const channel = await db.query<any>('SELECT community_id FROM community_channels WHERE id = $1', [id]);
+  const ok = await affected(env, 'DELETE FROM community_channels WHERE id = $1 RETURNING id', [id]);
+  if (ok && channel.rows[0]?.community_id) {
+    await db.query(
+      'UPDATE communities SET channel_count = CASE WHEN channel_count > 0 THEN channel_count - 1 ELSE 0 END WHERE id = $1',
+      [channel.rows[0].community_id]
+    );
+  }
+  return ok;
 }
 
 // ── Members ────────────────────────────────────────────────────────────────
@@ -633,7 +657,9 @@ export async function getCommunities(env: Env, userId: string): Promise<any[]> {
        COALESCE(cm.role, 'none') AS my_role,
        (SELECT r.status FROM community_join_requests r
         WHERE r.community_id = c.id AND r.user_id = $1
-        ORDER BY r.created_at DESC LIMIT 1) AS my_request_status
+        ORDER BY r.created_at DESC LIMIT 1) AS my_request_status,
+       (SELECT COUNT(*) FROM notifications n
+        WHERE n.user_id = $1 AND n.read = false AND n.link LIKE '/community/' || c.id || '%') AS unread_count
      FROM communities c
      JOIN users u ON u.id = c.created_by
      LEFT JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = $1
@@ -644,7 +670,10 @@ export async function getCommunities(env: Env, userId: string): Promise<any[]> {
     [userId]
   );
   // SQLite returns 1/0 for the computed boolean; keep the Postgres shape.
-  for (const row of rows) row.is_member = !!row.is_member;
+  for (const row of rows) {
+    row.is_member = !!row.is_member;
+    row.unread_count = Number(row.unread_count) || 0;
+  }
   return rows;
 }
 

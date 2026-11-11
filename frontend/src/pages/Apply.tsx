@@ -116,7 +116,6 @@ export default function Apply() {
       if (profileImage) data.append('profileImage', profileImage);
 
       await api.post('/applications/instructor', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
       });
       
       setIsSuccess(true);

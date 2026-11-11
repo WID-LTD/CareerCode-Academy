@@ -159,6 +159,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
   const [newCertCount, setNewCertCount] = useState(0);
+  const [communityUnread, setCommunityUnread] = useState(0);
   const { socket } = useSocket();
   const role = user?.role || 'student';
   const baseLinks = roleSidebarLinks[role] || roleSidebarLinks.student;
@@ -186,6 +187,20 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
     }
     return filtered;
   }, [role, baseLinks, user?.allowedDashboards]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCommunityUnread = () => {
+      api.get('/notifications?unread=true').then(res => {
+        if (cancelled) return;
+        const items = res.data?.data || [];
+        setCommunityUnread(items.filter((n: any) => !n.read && String(n.link || '').startsWith('/community')).length);
+      }).catch(() => {});
+    };
+    loadCommunityUnread();
+    const timer = window.setInterval(loadCommunityUnread, 30000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     if (role !== 'student') return;
@@ -285,14 +300,15 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             <nav className="space-y-1" role="navigation">
               {links.map((link) => {
                 const isActive = location.pathname === link.path;
-                const showBadge = link.label === 'Certificates' && newCertCount > 0;
+                const badgeCount = link.label === 'Certificates' ? newCertCount : link.label === 'Community' ? communityUnread : 0;
+                const showBadge = badgeCount > 0;
                 return (
                   <Link
                     key={link.path}
                     to={link.path}
                     onClick={() => {
                       if (window.innerWidth < 1024) onToggle();
-                      if (showBadge) setNewCertCount(0);
+                      if (link.label === 'Certificates' && showBadge) setNewCertCount(0);
                     }}
                     className={cn(
                       'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative',
@@ -310,7 +326,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     )}
                     {!collapsed && showBadge && (
                       <span className="ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary-500 text-white text-xs font-bold leading-none">
-                        {newCertCount > 99 ? '99+' : newCertCount}
+                        {badgeCount > 99 ? '99+' : badgeCount}
                       </span>
                     )}
                     {collapsed && showBadge && (
