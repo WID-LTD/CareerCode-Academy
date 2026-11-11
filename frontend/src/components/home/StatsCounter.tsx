@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { BookOpen, Users, Award, GraduationCap } from 'lucide-react';
-
-// Social-proof counters: animate 0 -> 999+ when scrolled into view.
-const SOCIAL_PROOF_STATS = [
-  { icon: Users, value: 999, label: 'Students Enrolled', suffix: '+' },
-  { icon: BookOpen, value: 999, label: 'Courses Available', suffix: '+' },
-  { icon: Award, value: 999, label: 'Certificates Issued', suffix: '+' },
-  { icon: GraduationCap, value: 999, label: 'Graduate Alumni', suffix: '+' },
-];
+import { usePublicStats } from '@/hooks/usePublicStats';
 
 function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -18,7 +11,7 @@ function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
   useEffect(() => {
     if (!isInView) return;
     let start = 0;
-    const duration = 2000;
+    const duration = 1600;
     const increment = target / (duration / 16);
     const timer = setInterval(() => {
       start += increment;
@@ -33,15 +26,22 @@ function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
   }, [isInView, target]);
 
   return (
-    <div ref={ref}>
-      {count.toLocaleString()}
-      {suffix}
+    <div ref={ref} className="font-display tabular-nums tracking-tight">
+      {count.toLocaleString()}{suffix}
     </div>
   );
 }
 
 export function StatsCounter() {
-  const stats = SOCIAL_PROOF_STATS;
+  const live = usePublicStats();
+  const stats = [
+    { icon: Users, value: live.students, label: 'Students Enrolled' },
+    { icon: BookOpen, value: live.courses, label: 'Courses Available' },
+    { icon: Award, value: live.certificates, label: 'Certificates Issued' },
+    { icon: GraduationCap, value: live.alumni, label: 'Graduate Alumni' },
+  ].filter((s) => s.value > 0);
+
+  if (!stats.length) return null;
 
   return (
     <section className="py-16 relative">
@@ -62,7 +62,7 @@ export function StatsCounter() {
                   <stat.icon className="w-6 h-6 text-primary-500" />
                 </div>
                 <div className="text-3xl sm:text-4xl font-bold gradient-text mb-1">
-                  <Counter target={stat.value} suffix={stat.suffix} />
+                  <Counter target={stat.value} suffix="+" />
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {stat.label}

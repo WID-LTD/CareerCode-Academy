@@ -19,6 +19,8 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, pageParams, requireRole, statusOf } from '../route-utils';
 import { sendMentoringReminders } from '../mentoring-reminders';
+import { sendPushToUser } from '../push';
+import { mail } from '../email';
 import {
   STAFF_ROLES,
   createNotification,
@@ -142,22 +144,20 @@ instructor.get('/dashboard/stats', async (c) => {
 
     // Total revenue
     const revenueRes = await db.query<any>(
-      `SELECT COALESCE(SUM(p.amount), 0) as total
-       FROM payments p
-       JOIN courses c ON p.course_id = c.id
-       WHERE c.instructor_id = $1 AND p.status = 'completed'`,
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM instructor_revenue
+       WHERE instructor_id = $1 AND status = 'completed'`,
       [instructorId]
     );
     const totalRevenue = numOf(revenueRes.rows[0]?.total);
 
     // Revenue this calendar month (stat card value)
     const monthlyRevenueRes = await db.query<any>(
-      `SELECT COALESCE(SUM(p.amount), 0) as total
-       FROM payments p
-       JOIN courses c ON p.course_id = c.id
-       WHERE c.instructor_id = $1 AND p.status = 'completed'
-         AND p.created_at >= DATE_TRUNC('month', NOW())
-         AND p.created_at < DATE_TRUNC('month', NOW()) + INTERVAL '1 month'`,
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM instructor_revenue
+       WHERE instructor_id = $1 AND status = 'completed'
+         AND created_at >= DATE_TRUNC('month', NOW())
+         AND created_at < DATE_TRUNC('month', NOW()) + INTERVAL '1 month'`,
       [instructorId]
     );
     const monthlyRevenue = numOf(monthlyRevenueRes.rows[0]?.total);
@@ -227,12 +227,11 @@ instructor.get('/dashboard/stats', async (c) => {
     // Monthly revenue (last 6 months)
     const monthlyRevenueTrendRes = await db.query<any>(
       `SELECT
-         DATE_TRUNC('month', p.created_at)::date as month,
-         COALESCE(SUM(p.amount), 0) as revenue
-       FROM payments p
-       JOIN courses c ON p.course_id = c.id
-       WHERE c.instructor_id = $1 AND p.status = 'completed' AND p.created_at > NOW() - INTERVAL '6 months'
-       GROUP BY DATE_TRUNC('month', p.created_at)
+         DATE_TRUNC('month', created_at)::date as month,
+         COALESCE(SUM(amount), 0) as revenue
+       FROM instructor_revenue
+       WHERE instructor_id = $1 AND status = 'completed' AND created_at > NOW() - INTERVAL '6 months'
+       GROUP BY DATE_TRUNC('month', created_at)
        ORDER BY month ASC`,
       [instructorId]
     );
@@ -297,11 +296,10 @@ instructor.get('/dashboard/stats', async (c) => {
               c.published,
               COUNT(DISTINCT e.user_id) as students,
               COALESCE(AVG(r.rating), 0) as rating,
-              COALESCE(SUM(p.amount), 0) as revenue
+              COALESCE((SELECT SUM(ir.amount) FROM instructor_revenue ir WHERE ir.course_id = c.id AND ir.status = 'completed'), 0) as revenue
        FROM courses c
        LEFT JOIN enrollments e ON c.id = e.course_id
        LEFT JOIN reviews r ON c.id = r.course_id
-       LEFT JOIN payments p ON c.id = p.course_id AND p.status = 'completed'
        WHERE c.instructor_id = $1
        GROUP BY c.id, c.title
        ORDER BY students DESC
@@ -473,10 +471,9 @@ instructor.get('/analytics', async (c) => {
 
     // Total Revenue (assuming 100% goes to instructor for simplicity, or 70% share)
     const revenueRes = await db.query<any>(
-      `SELECT COALESCE(SUM(p.amount), 0) as total
-       FROM payments p
-       JOIN courses c ON p.course_id = c.id
-       WHERE c.instructor_id = $1 AND p.status = 'completed'`,
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM instructor_revenue
+       WHERE instructor_id = $1 AND status = 'completed'`,
       [instructorId]
     );
     const totalRevenue = numOf(revenueRes.rows[0]?.total);
@@ -484,12 +481,11 @@ instructor.get('/analytics', async (c) => {
     // Monthly revenue for the last 6 months
     const monthlyRevenue = await db.query<any>(
       `SELECT
-         DATE_TRUNC('month', p.created_at)::date as month,
-         COALESCE(SUM(p.amount), 0) as revenue
-       FROM payments p
-       JOIN courses c ON p.course_id = c.id
-       WHERE c.instructor_id = $1 AND p.status = 'completed' AND p.created_at > NOW() - INTERVAL '6 months'
-       GROUP BY DATE_TRUNC('month', p.created_at)
+         DATE_TRUNC('month', created_at)::date as month,
+         COALESCE(SUM(amount), 0) as revenue
+       FROM instructor_revenue
+       WHERE instructor_id = $1 AND status = 'completed' AND created_at > NOW() - INTERVAL '6 months'
+       GROUP BY DATE_TRUNC('month', created_at)
        ORDER BY month ASC`,
       [instructorId]
     );
@@ -1454,6 +1450,70 @@ instructor.put('/mentoring-slots/:id', async (c) => {
   }
 });
 
+// POST /instructor/mentoring-slots/:id/reschedule/approve
+instructor.post('/mentoring-slots/:id/reschedule/approve', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const db = getDb(c.env);
+    const slot = (await db.query<any>('SELECT * FROM mentoring_slots WHERE id = $1 AND instructor_id = $2', [c.req.param('id'), s.userId])).rows[0];
+    if (!slot) return fail(c, 404, 'Slot not found');
+    if (slot.reschedule_status !== 'requested' || !slot.proposed_start_time || !slot.proposed_end_time) return fail(c, 400, 'No pending reschedule request');
+    const { rows } = await db.query<any>(
+      `UPDATE mentoring_slots SET start_time = $1, end_time = $2, reschedule_status = 'approved',
+         reminder_24_sent = 0, reminder_1_sent = 0, updated_at = NOW() WHERE id = $3 RETURNING *`,
+      [slot.proposed_start_time, slot.proposed_end_time, slot.id]
+    );
+    if (slot.student_id) {
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type, link)
+         VALUES ($1, 'Mentoring reschedule approved', $2, 'info', '/student/mentoring')`,
+        [slot.student_id, `Your session "${slot.title}" moved to ${new Date(slot.proposed_start_time).toUTCString()}.`]
+      );
+      c.executionCtx.waitUntil(sendPushToUser(c.env, slot.student_id, {
+        title: 'Mentoring reschedule approved',
+        body: `"${slot.title}" moved to ${new Date(slot.proposed_start_time).toLocaleString()}.`,
+        url: '/student/mentoring',
+      }));
+      const student = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [slot.student_id])).rows[0];
+      if (student?.email) c.executionCtx.waitUntil(mail.mentoringBooked(c.env, student.email, student.name, new Date(slot.proposed_start_time).toUTCString(), 'your instructor').catch(() => {}));
+    }
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to approve reschedule');
+  }
+});
+
+// POST /instructor/mentoring-slots/:id/reschedule/reject
+instructor.post('/mentoring-slots/:id/reschedule/reject', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const db = getDb(c.env);
+    const body: any = await c.req.json().catch(() => ({}));
+    const slot = (await db.query<any>('SELECT * FROM mentoring_slots WHERE id = $1 AND instructor_id = $2', [c.req.param('id'), s.userId])).rows[0];
+    if (!slot) return fail(c, 404, 'Slot not found');
+    await db.query(
+      `UPDATE mentoring_slots SET reschedule_status = 'rejected', reschedule_reason = $1, proposed_start_time = NULL,
+         proposed_end_time = NULL, updated_at = NOW() WHERE id = $2`,
+      [body.reason ? String(body.reason).slice(0, 500) : null, slot.id]
+    );
+    if (slot.student_id) {
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type, link)
+         VALUES ($1, 'Mentoring reschedule declined', $2, 'info', '/student/mentoring')`,
+        [slot.student_id, `Your reschedule request for "${slot.title}" was declined.${body.reason ? ` Reason: ${String(body.reason).slice(0, 200)}` : ''}`]
+      );
+      c.executionCtx.waitUntil(sendPushToUser(c.env, slot.student_id, {
+        title: 'Mentoring reschedule declined',
+        body: `Your request for "${slot.title}" was declined.`,
+        url: '/student/mentoring',
+      }));
+    }
+    return c.json({ success: true });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to reject reschedule');
+  }
+});
+
 // DELETE /instructor/mentoring-slots/:id - Delete a slot
 instructor.delete('/mentoring-slots/:id', async (c) => {
   try {
@@ -1487,7 +1547,7 @@ instructor.get('/profile', async (c) => {
         (SELECT COUNT(*) FROM courses WHERE instructor_id = $1)::int as total_courses,
         (SELECT COUNT(*) FROM courses WHERE instructor_id = $1 AND published = true)::int as published_courses,
         (SELECT COUNT(DISTINCT e.user_id) FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE c.instructor_id = $1)::int as total_students,
-        (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN courses c ON p.course_id = c.id WHERE c.instructor_id = $1 AND p.status = 'completed')::float as total_revenue,
+        (SELECT COALESCE(SUM(amount), 0) FROM instructor_revenue WHERE instructor_id = $1 AND status = 'completed')::float as total_revenue,
         (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r JOIN courses c ON r.course_id = c.id WHERE c.instructor_id = $1)::float as average_rating`,
       [userId]
     );

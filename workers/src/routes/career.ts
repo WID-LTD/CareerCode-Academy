@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
 import * as CareerModel from '../career';
 import { ingestJobs, jobsAreStale } from '../jobs-ingest';
+import { isEnabled } from '../feature-flags';
 
 // Career Center routes ported from backend/src/routes/career.routes.ts.
 // Mounted at /api/v1/career.
@@ -35,7 +36,7 @@ career.get('/jobs', async (c) => {
     const jobs = await CareerModel.getActiveJobs(c.env);
     // Refresh the board in the background at most every 6 hours.
     c.executionCtx.waitUntil((async () => {
-      if (await jobsAreStale(c.env)) await ingestJobs(c.env);
+      if (await isEnabled(c.env, 'jobs_enabled') && await jobsAreStale(c.env)) await ingestJobs(c.env);
     })().catch(() => {}));
     return c.json({ success: true, data: jobs });
   } catch (e: any) {

@@ -6,7 +6,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
 import toast from 'react-hot-toast';
-import { CreditCard, Wallet, Lock, ShieldCheck, CheckCircle, ChevronLeft, Zap, Gift, Ticket, Coins } from 'lucide-react';
+import { CreditCard, Wallet, Lock, ShieldCheck, CheckCircle, ChevronLeft, Zap, Gift, Ticket, Coins, BookOpen, Layers } from 'lucide-react';
 import { optimizeImageUrl } from '@/lib/cloudinary';
 
 const providers = [
@@ -39,7 +39,9 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const courseId = searchParams.get('courseId');
+  const pathId = searchParams.get('pathId');
   const [course, setCourse] = useState<any>(null);
+  const [bundle, setBundle] = useState<any>(null);
   const [provider, setProvider] = useState('paystack');
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -56,12 +58,36 @@ export default function Checkout() {
       navigate('/login');
       return;
     }
-    if (!courseId) {
+    if (!courseId && !pathId) {
       navigate('/courses');
       return;
     }
-    loadCourse();
-  }, [courseId]);
+    if (courseId) loadCourse();
+    else loadBundle();
+  }, [courseId, pathId]);
+
+  const loadBundle = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/learning-paths/by-id/${pathId}`);
+      const p = data.data;
+      if (!p?.pricing?.unpaid_courses) {
+        toast.success('You already own every course in this path');
+        navigate(`/student/learning-paths/${p.slug}`);
+        return;
+      }
+      setBundle(p);
+      try {
+        const b = await api.get('/gamification/balance');
+        if (b.data.success) setXpBalance(b.data.data);
+      } catch { /* ignore */ }
+    } catch {
+      toast.error('Learning path not found');
+      navigate('/learning-paths');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadCourse = async () => {
     setLoading(true);
@@ -100,7 +126,7 @@ export default function Checkout() {
   const handleApplyCode = async () => {
     if (!discountCode.trim()) { toast.error('Enter a discount code'); return; }
     try {
-      const { data } = await api.post('/payments/validate-discount', { code: discountCode.trim(), courseId });
+      const { data } = await api.post('/payments/validate-discount', { code: discountCode.trim(), courseId: courseId || undefined, pathId: pathId || undefined });
       setAppliedDiscount(data.data.discount);
       setCodeStatus('valid');
       setCodeMessage(`Applied ₦${data.data.discount.toLocaleString()} off • ${data.data.xpRedeemed} XP`);
@@ -155,6 +181,26 @@ export default function Checkout() {
     }
   };
 
+  const handlePayBundle = async () => {
+    setProcessing(true);
+    try {
+      const { data } = await api.post('/payments/initialize', {
+        pathId,
+        provider,
+        discountCode: appliedDiscount !== null && codeStatus === 'valid' ? discountCode.trim().toUpperCase() : undefined,
+      });
+      if (data.data?.authorizationUrl) {
+        window.location.href = data.data.authorizationUrl;
+      } else {
+        toast.success('Enrolled successfully!');
+        navigate(`/student/learning-paths/${bundle?.slug || ''}`);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Payment failed. Please try again.');
+      setProcessing(false);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center relative">
       <div className="absolute top-[-20%] left-[-10%] w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] pointer-events-none" />
@@ -163,6 +209,101 @@ export default function Checkout() {
       <p className="mt-6 text-gray-500 font-medium animate-pulse">Preparing your secure checkout...</p>
     </div>
   );
+
+
+  if (pathId && !courseId && bundle) {
+    const pricing = bundle.pricing || {};
+    const courses = pricing.courses || [];
+    const total = Math.max(0, Number(pricing.bundle_price || 0) - (appliedDiscount || 0));
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-16 sm:pt-24 pb-12 sm:pb-16 relative">
+        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <Link to={`/learning-paths/${bundle.slug}`} className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-8 group">
+            <ChevronLeft className="w-5 h-5 mr-1 transform group-hover:-translate-x-1 transition-transform" />
+            <span>Back to Learning Path</span>
+          </Link>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+            <div className="lg:col-span-7 space-y-8">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Path Checkout</h1>
+                <p className="text-gray-500 dark:text-gray-400">One payment unlocks every course in this learning path.</p>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Wallet className="w-5 h-5 text-blue-500" /> Payment Method</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {providers.map((p) => {
+                    const isSelected = provider === p.id;
+                    return (
+                      <div key={p.id} onClick={() => setProvider(p.id)} className={`cursor-pointer rounded-2xl p-6 border transition-all ${isSelected ? `bg-gradient-to-br ${p.color} ring-1 ${p.ring} scale-[1.02] shadow-lg` : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400'}`}>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className={`p-3 rounded-xl ${isSelected ? 'bg-white/90 dark:bg-white/10' : 'bg-gray-100 dark:bg-gray-800'}`}><p.icon className={`w-6 h-6 ${isSelected ? p.text : 'text-gray-500'}`} /></div>
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? `${p.border} ${p.bgAlpha}` : 'border-gray-300 dark:border-gray-600'}`}>{isSelected && <div className={`w-3 h-3 rounded-full ${p.bg}`} />}</div>
+                        </div>
+                        <h3 className={`font-semibold text-lg ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>{p.name}</h3>
+                        <p className="text-sm mt-1">Pay securely via {p.name}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium"><Ticket className="w-4 h-4 text-primary-500" /> Have a discount code?</div>
+                <div className="flex gap-2">
+                  <input value={discountCode} onChange={(e)=>{setDiscountCode(e.target.value.toUpperCase()); setCodeStatus('idle'); setCodeMessage(''); setAppliedDiscount(null);}} placeholder="e.g. XP-AB12CD34" className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm uppercase tracking-wider" />
+                  <Button size="sm" variant="outline" onClick={handleApplyCode} disabled={!discountCode.trim()}>Apply</Button>
+                </div>
+                {codeMessage && <p className={`text-xs ${codeStatus==='valid' ? 'text-emerald-600' : 'text-red-500'}`}>{codeMessage}</p>}
+              </div>
+            </div>
+
+            <div className="lg:col-span-5">
+              <div className="sticky top-24">
+                <GlassCard className="p-0 overflow-hidden border-gray-200 dark:border-white/10 shadow-2xl bg-white dark:bg-gray-900/50">
+                  {processing && (
+                    <div className="absolute inset-0 z-20 bg-white/90 dark:bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl">
+                      <Loader size="lg" className="text-blue-500 mb-4" />
+                      <p className="text-gray-900 dark:text-white font-medium animate-pulse">Connecting to secure gateway...</p>
+                    </div>
+                  )}
+                  <div className="p-6 sm:p-8 bg-gradient-to-b from-gray-50 dark:from-white/5 to-transparent">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Order Summary</h2>
+                    <p className="text-sm text-gray-500 mb-5 flex items-center gap-1.5"><Layers className="w-4 h-4" /> {bundle.title}</p>
+                    <div className="space-y-2 mb-5 max-h-48 overflow-y-auto">
+                      {courses.filter((c: any) => !c.owned).map((c: any) => (
+                        <div key={c.id} className="flex items-center justify-between text-sm gap-2">
+                          <span className="truncate flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" /> {c.title}</span>
+                          <span className="text-gray-500 flex-shrink-0">{Number(c.price) > 0 ? `₦${Number(c.price).toLocaleString()}` : 'Free'}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-3 text-sm border-t border-gray-200 dark:border-white/10 pt-4">
+                      <div className="flex justify-between text-gray-600 dark:text-gray-300"><span>Courses subtotal</span><span>₦{Number(pricing.full_price || 0).toLocaleString()}</span></div>
+                      {Number(pricing.savings) > 0 && <div className="flex justify-between text-emerald-600"><span>Bundle savings</span><span>-₦{Number(pricing.savings).toLocaleString()}</span></div>}
+                      {appliedDiscount !== null && codeStatus==='valid' && <div className="flex justify-between text-amber-600"><span>Discount ({discountCode})</span><span>-₦{appliedDiscount.toLocaleString()}</span></div>}
+                      <div className="flex justify-between items-end border-t border-gray-200 dark:border-white/10 pt-3">
+                        <span className="font-medium text-gray-800 dark:text-gray-300">Total</span>
+                        <span className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">₦{total.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6 sm:p-8 bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-white/5">
+                    <Button onClick={handlePayBundle} disabled={processing} className="w-full h-12 sm:h-14 text-base sm:text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">
+                      {processing ? <span className="flex items-center justify-center"><Loader size="sm" className="mr-3 text-white" /> Processing...</span> : 'Pay for all courses'}
+                    </Button>
+                    <div className="mt-4 flex items-center justify-center gap-2 text-gray-500 text-xs"><Lock className="w-3.5 h-3.5" /> Guaranteed safe & secure checkout</div>
+                  </div>
+                </GlassCard>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!course) return null;
 

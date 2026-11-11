@@ -20,7 +20,7 @@ Date: 2026-11-10
 | Tiptap duplicate underline | Removed the extra extension (StarterKit already provides it) |
 | Exam camera AbortError | Separate refs for the two `<video>` elements; safe `play()`; tracks no longer stopped by step changes |
 | Uploads | Shared parser accepts multipart, JSON base64 or external URL; `/upload`, `/videos/upload`, `/resources`, applications all work |
-| Email | Brevo removed; one sender (Cloudflare Email binding or Resend) with templates for verification, welcome, reset, role change, application, enrollment, mentorship, invoice |
+| Email | Brevo removed; one sender (Cloudflare Email binding) with templates for verification, welcome, reset, role change, application, enrollment, mentorship, invoice |
 
 ## Media migration (applied)
 

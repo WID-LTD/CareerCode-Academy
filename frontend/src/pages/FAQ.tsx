@@ -49,7 +49,7 @@ const faqs = [
     items: [
       { q: 'What browsers are supported?', a: 'We support the latest versions of Chrome, Firefox, Safari, and Edge. For the best experience, we recommend using Chrome.' },
       { q: 'Is there a mobile app?', a: 'Yes, our mobile app is available for both iOS and Android. You can watch lessons, complete exercises, and participate in discussions on the go.' },
-      { q: 'How do I report a bug?', a: 'You can report bugs through our Help Center or email support@careercode.academy. We typically respond within 24 hours.' },
+      { q: 'How do I report a bug?', a: 'You can report bugs through our Help Center or email hello@careercode.com.ng. We typically respond within 24 hours.' },
       { q: 'My code is not running. What should I do?', a: 'First, check our troubleshooting guide in the Help Center. If you are still stuck, our community forums and mentor support are available to help.' },
     ],
   },

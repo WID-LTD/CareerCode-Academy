@@ -53,8 +53,11 @@ import boardRoutes from './routes/board';
 import blogRoutes from './routes/blogs';
 import aiRoutes from './routes/ai';
 import pushRoutes from './routes/push';
+import todoRoutes from './routes/todos';
+import { runScheduled } from './cron';
 
 export { AuthDO };
+export { app };
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -69,7 +72,39 @@ function allowedOrigins(env: Env): string[] {
     .map((s) => s.trim());
 }
 
+// Portfolio host routing: portfolio.careercode.com.ng/<username> redirects to
+// the public portfolio. Verified custom domains use the same path when the
+// host is attached through Cloudflare for SaaS.
 app.use('*', async (c, next) => {
+  try {
+    const url = new URL(c.req.url);
+    const host = url.host.toLowerCase();
+    const isApi = url.pathname.startsWith('/api/') || url.pathname === '/health' || url.pathname === '/db-health';
+    if (!isApi && host !== 'api.careercode.com.ng' && !host.endsWith('workers.dev')) {
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (host === 'portfolio.careercode.com.ng') {
+        const target = parts.length
+          ? `${c.env.FRONTEND_URL}/u/${encodeURIComponent(parts[0])}${parts[1] ? `/${encodeURIComponent(parts[1])}` : ''}`
+          : `${c.env.FRONTEND_URL}/portfolios`;
+        return c.redirect(target, 302);
+      }
+      if (!host.endsWith('careercode.com.ng') && !host.endsWith('pages.dev')) {
+        const site = await getDb(c.env).query<any>(
+          `SELECT u.username FROM portfolio_sites ps JOIN users u ON u.id = ps.user_id
+           WHERE lower(ps.custom_domain) = $1 AND ps.domain_status = 'verified' AND ps.is_published = 1 LIMIT 1`,
+          [host]
+        );
+        if (site.rows.length) {
+          const username = site.rows[0].username;
+          const target = parts.length
+            ? `${c.env.FRONTEND_URL}/u/${encodeURIComponent(username)}/${encodeURIComponent(parts[0])}`
+            : `${c.env.FRONTEND_URL}/u/${encodeURIComponent(username)}`;
+          return c.redirect(target, 302);
+        }
+      }
+    }
+  } catch { /* host routing must never break the API */ }
+
   const allowed = allowedOrigins(c.env);
   return cors({
     origin: (origin) => {
@@ -164,6 +199,7 @@ app.route('/api/v1/board', boardRoutes);
 app.route('/api/v1/blogs', blogRoutes);
 app.route('/api/v1/ai', aiRoutes);
 app.route('/api/v1/push', pushRoutes);
+app.route('/api/v1/todos', todoRoutes);
 
 // ── No legacy fallback ────────────────────────────────────────────────────
 // Every route group is now served natively from D1. An unmatched /api/v1 path
@@ -181,4 +217,9 @@ app.onError((err, c) => {
   return c.json({ success: false, source: 'edge', message: err?.message || 'Internal server error' }, status as any);
 });
 
-export default app;
+export default {
+  fetch: (request: Request, env: Env, ctx: any) => app.fetch(request, env, ctx),
+  scheduled: (event: any, env: Env, ctx: any) => {
+    ctx.waitUntil(runScheduled(env, event.cron));
+  },
+};

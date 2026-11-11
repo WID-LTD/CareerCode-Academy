@@ -29,10 +29,9 @@ async function balances(env: Env, instructorId: string): Promise<{
   const rate = await commissionRate(env);
 
   const balanceRes = await db.query<any>(
-    `SELECT COALESCE(SUM(p.amount), 0) as total_revenue
-     FROM payments p
-     JOIN courses c ON p.course_id = c.id
-     WHERE c.instructor_id = $1 AND p.status = 'completed'`,
+    `SELECT COALESCE(SUM(amount), 0) as total_revenue
+     FROM instructor_revenue
+     WHERE instructor_id = $1 AND status = 'completed'`,
     [instructorId]
   );
 

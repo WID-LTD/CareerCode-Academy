@@ -261,16 +261,95 @@ export async function getGroupedBySchool(env: Env): Promise<any[]> {
   return result;
 }
 
-export async function enrollInPath(env: Env, userId: string, path: any) {
+
+export async function getPathPricing(env: Env, path: any, userId?: string | null) {
+  const db = getDb(env);
+  const { rows: courses } = await db.query<any>(
+    `SELECT c.id, c.title, c.slug, c.thumbnail, c.duration, c.level, c.price,
+            lpc.order_index, u.name as instructor_name
+     FROM learning_path_courses lpc
+     JOIN courses c ON lpc.course_id = c.id
+     JOIN users u ON c.instructor_id = u.id
+     WHERE lpc.path_id = $1 ORDER BY lpc.order_index ASC`,
+    [path.id]
+  );
+
+  let owned = new Set<string>();
+  if (userId) {
+    const { rows } = await db.query<any>(
+      `SELECT e.course_id FROM enrollments e
+       JOIN learning_path_courses lpc ON lpc.course_id = e.course_id
+       WHERE e.user_id = $1 AND lpc.path_id = $2`,
+      [userId, path.id]
+    );
+    owned = new Set(rows.map((r: any) => r.course_id));
+  }
+
+  const enriched = courses.map((c: any) => ({
+    ...c,
+    price: Number(c.price) || 0,
+    owned: owned.has(c.id),
+    effective_price: owned.has(c.id) ? 0 : Number(c.price) || 0,
+  }));
+
+  const paid = enriched.filter((c: any) => c.price > 0);
+  const free = enriched.filter((c: any) => c.price <= 0);
+  const unpaid = paid.filter((c: any) => !c.owned);
+  const fullPaidTotal = paid.reduce((sum: number, c: any) => sum + c.price, 0);
+  const unpaidTotal = unpaid.reduce((sum: number, c: any) => sum + c.price, 0);
+  const discountPct = Math.max(0, Math.min(90, Number(path.bundle_discount_percent) || 0));
+
+  let bundlePrice = unpaidTotal;
+  if (path.bundle_price !== null && path.bundle_price !== undefined && Number(path.bundle_price) > 0 && fullPaidTotal > 0) {
+    bundlePrice = Number(path.bundle_price) * (unpaidTotal / fullPaidTotal);
+  } else if (discountPct > 0) {
+    bundlePrice = unpaidTotal * (1 - discountPct / 100);
+  }
+  bundlePrice = Math.round(Math.max(0, bundlePrice) * 100) / 100;
+  const savings = Math.round(Math.max(0, unpaidTotal - bundlePrice) * 100) / 100;
+
+  return {
+    path_id: path.id,
+    courses: enriched,
+    full_price: Math.round(unpaidTotal * 100) / 100,
+    bundle_price: bundlePrice,
+    savings,
+    discount_percent: discountPct,
+    paid_courses: paid.length,
+    free_courses: free.length,
+    unpaid_courses: unpaid.length,
+    owned_courses: owned.size,
+    total_courses: enriched.length,
+    requires_payment: unpaid.length > 0 && bundlePrice > 0,
+    bundle_enabled: path.bundle_enabled === undefined || path.bundle_enabled === null ? true : !!path.bundle_enabled,
+  };
+}
+
+async function ensurePathTodos(env: Env, userId: string, path: any, courses: any[]): Promise<void> {
+  try {
+    const db = getDb(env);
+    for (let i = 0; i < courses.length; i++) {
+      const course = courses[i];
+      const autoKey = `path:${path.id}:course:${course.id}`;
+      const existing = await db.query<any>('SELECT id FROM todos WHERE user_id = $1 AND auto_key = $2', [userId, autoKey]);
+      if (existing.rows.length) continue;
+      await db.query(
+        `INSERT INTO todos (id, user_id, title, notes, priority, category, course_id, path_id, source, auto_key, sort_order)
+         VALUES ($1,$2,$3,$4,$5,'study',$6,$7,'path',$8,$9)`,
+        [
+          crypto.randomUUID(), userId, `Work through: ${course.title}`,
+          `Part of the ${path.title} learning path.`, i === 0 ? 'high' : 'medium',
+          course.id, path.id, autoKey, i,
+        ]
+      );
+    }
+  } catch { /* to-dos are best-effort */ }
+}
+
+export async function enrollInPath(env: Env, userId: string, path: any, mode: 'free' | 'all' | 'force' = 'free') {
   const db = getDb(env);
   const existing = await db.query<any>(
-    'SELECT id FROM learning_path_enrollments WHERE user_id = $1 AND path_id = $2',
-    [userId, path.id]
-  );
-  if (existing.rows.length) throw Object.assign(new Error('Already enrolled in this learning path'), { statusCode: 409 });
-
-  const { rows } = await db.query<any>(
-    'INSERT INTO learning_path_enrollments (user_id, path_id) VALUES ($1, $2) RETURNING *',
+    'SELECT * FROM learning_path_enrollments WHERE user_id = $1 AND path_id = $2',
     [userId, path.id]
   );
 
@@ -291,7 +370,22 @@ export async function enrollInPath(env: Env, userId: string, path: any) {
     );
     if (Number(course.price) > 0) {
       if (!has.rows.length) {
-        paidCourses.push({ id: course.id, title: course.title, slug: course.slug, price: Number(course.price) });
+        if (mode === 'force') {
+          await db.query(
+            `INSERT INTO enrollments (user_id, course_id, status) VALUES ($1, $2, 'active')`,
+            [userId, course.id]
+          );
+          enrolledCourseIds.push(course.id);
+          await db.query(
+            `INSERT INTO notifications (user_id, title, message, type, link)
+             VALUES ($1, 'New Enrollment', $2, 'enrollment', '/instructor/students')`,
+            [course.instructor_id, `A new student enrolled in "${course.title}"`]
+          );
+        } else {
+          paidCourses.push({ id: course.id, title: course.title, slug: course.slug, price: Number(course.price) });
+        }
+      } else {
+        enrolledCourseIds.push(course.id);
       }
       continue;
     }
@@ -308,5 +402,31 @@ export async function enrollInPath(env: Env, userId: string, path: any) {
       [course.instructor_id, `A new student enrolled in "${course.title}"`, '/instructor/students']
     );
   }
-  return { enrollment: rows[0], enrolledCourseIds, paidCourses };
+
+  // "all" only succeeds when nothing is left to pay for.
+  if (mode === 'all' && paidCourses.length > 0) {
+    return {
+      enrollment: existing.rows[0] || null,
+      enrolledCourseIds,
+      paidCourses,
+      requiresPayment: true,
+    };
+  }
+
+  let enrollment = existing.rows[0] || null;
+  if (enrollment) {
+    await db.query(
+      `UPDATE learning_path_enrollments SET status = 'active' WHERE id = $1`,
+      [enrollment.id]
+    );
+  } else {
+    const { rows } = await db.query<any>(
+      `INSERT INTO learning_path_enrollments (user_id, path_id, status) VALUES ($1, $2, 'active') RETURNING *`,
+      [userId, path.id]
+    );
+    enrollment = rows[0];
+  }
+
+  await ensurePathTodos(env, userId, path, courseRows);
+  return { enrollment, enrolledCourseIds, paidCourses, requiresPayment: false };
 }

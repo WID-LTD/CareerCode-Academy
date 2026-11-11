@@ -104,8 +104,8 @@ export default function Accessibility() {
               </p>
               <p className="text-sm text-gray-500">
                 Email us at{' '}
-                <a href="mailto:accessibility@careercode.academy" className="text-primary-500 hover:text-primary-600 font-medium">
-                  accessibility@careercode.academy
+                <a href="mailto:accessibility@careercode.com.ng" className="text-primary-500 hover:text-primary-600 font-medium">
+                  accessibility@careercode.com.ng
                 </a>
               </p>
             </GlassCard>

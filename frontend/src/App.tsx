@@ -11,6 +11,7 @@ import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { PwaBridge } from '@/components/pwa/PwaBridge';
 import { GigoWidget } from '@/components/ai/GigoWidget';
+import { MaintenanceBanner } from '@/components/layout/MaintenanceBanner';
 import { ScrollToTop, ErrorBoundary } from '@/components/ui';
 import { SkeletonLine, SkeletonBlock } from '@/components/ui/Skeleton';
 
@@ -130,6 +131,7 @@ const Accessibility = lazy(() => import('@/pages/Accessibility'));
 const Board = lazy(() => import('@/pages/public/Board'));
 // Student pages
 const StudentDashboard = lazy(() => import('@/pages/student/Dashboard'));
+const Todos = lazy(() => import('@/pages/Todos'));
 const StudentMyCourses = lazy(() => import('@/pages/student/MyCourses'));
 const StudentCourseView = lazy(() => import('@/pages/student/CourseView'));
 const StudentAssignments = lazy(() => import('@/pages/student/Assignments'));
@@ -189,6 +191,9 @@ const InstructorCourseBuilder = lazy(() => import('@/pages/instructor/CourseBuil
 
 // Admin pages
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
+const AdminLearningPaths = lazy(() => import('@/pages/admin/LearningPaths'));
+const AdminFeatureFlags = lazy(() => import('@/pages/admin/FeatureFlags'));
+const AdminSystemHealth = lazy(() => import('@/pages/admin/SystemHealth'));
 const AdminUsers = lazy(() => import('@/pages/admin/Users'));
 const AdminCourses = lazy(() => import('@/pages/admin/Courses'));
 const AdminApplications = lazy(() => import('@/pages/admin/Applications'));
@@ -275,6 +280,7 @@ function App() {
       <NotificationBridge />
       <RoleWatcher />
       <PwaBridge />
+      <MaintenanceBanner />
       <GigoWidget />
       <ScrollToTop />
       <Routes>
@@ -329,6 +335,7 @@ function App() {
 
         <Route path="/student" element={<DashboardLayout requiredRole="student" />}>
           <Route path="dashboard" element={<SuspenseWrapper><StudentDashboard /></SuspenseWrapper>} />
+          <Route path="todos" element={<SuspenseWrapper><Todos /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><StudentMyCourses /></SuspenseWrapper>} />
           <Route path="courses/:slug" element={<SuspenseWrapper><StudentCourseView /></SuspenseWrapper>} />
           <Route path="learning-paths" element={<SuspenseWrapper><StudentLearningPaths /></SuspenseWrapper>} />
@@ -363,6 +370,7 @@ function App() {
 
         <Route path="/instructor" element={<DashboardLayout requiredRole="instructor" />}>
           <Route path="dashboard" element={<SuspenseWrapper><InstructorDashboard /></SuspenseWrapper>} />
+          <Route path="todos" element={<SuspenseWrapper><Todos /></SuspenseWrapper>} />
           <Route path="analytics" element={<SuspenseWrapper><InstructorAnalytics /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><InstructorManageCourses /></SuspenseWrapper>} />
           <Route path="course-proposals" element={<SuspenseWrapper><InstructorCourseProposals /></SuspenseWrapper>} />
@@ -394,6 +402,10 @@ function App() {
 
         <Route path="/admin" element={<DashboardLayout requiredRole="admin" />}>
           <Route path="dashboard" element={<SuspenseWrapper><AdminDashboard /></SuspenseWrapper>} />
+          <Route path="todos" element={<SuspenseWrapper><Todos /></SuspenseWrapper>} />
+          <Route path="learning-paths" element={<SuspenseWrapper><AdminLearningPaths /></SuspenseWrapper>} />
+          <Route path="feature-flags" element={<SuspenseWrapper><AdminFeatureFlags /></SuspenseWrapper>} />
+          <Route path="system-health" element={<SuspenseWrapper><AdminSystemHealth /></SuspenseWrapper>} />
           <Route path="users" element={<SuspenseWrapper><AdminUsers /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><AdminCourses /></SuspenseWrapper>} />
           <Route path="courses/:id" element={<SuspenseWrapper><AdminCourseDetail /></SuspenseWrapper>} />

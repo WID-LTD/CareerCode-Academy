@@ -5,6 +5,9 @@ import { fail, requireAuth, statusOf } from '../route-utils';
 import { validateDiscountCode, markDiscountCodeUsed } from '../gamification';
 import { receiptPdf } from '../receipt';
 import { mail } from '../email';
+import { initializeBundlePayment, enrollBundleCourses } from '../bundle-payments';
+import * as LP from '../learning-paths';
+import { isEnabled } from '../feature-flags';
 
 const payments = new Hono<{ Bindings: Env }>();
 
@@ -169,15 +172,25 @@ async function verifyPaymentByReference(env: Env, reference: string) {
       if (payment.discount_code_id) {
         await markDiscountCodeUsed(env, payment.discount_code_id, payment.id);
       }
-      await enrollIfMissing(env, payment.user_id, payment.course_id);
+      if (payment.course_id) await enrollIfMissing(env, payment.user_id, payment.course_id);
+      else await enrollBundleCourses(env, payment);
     }
   }
 
   const updated = await db.query<any>('SELECT * FROM payments WHERE reference = $1', [reference]);
   const fresh = updated.rows[0];
   if (wasPending && fresh?.status === 'completed') {
-    const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [fresh.course_id]);
-    await sendReceipt(env, fresh, course.rows[0]?.title || 'Course enrollment');
+    let title = 'Course enrollment';
+    if (fresh.course_id) {
+      const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [fresh.course_id]);
+      title = course.rows[0]?.title || title;
+    } else {
+      try {
+        const meta = JSON.parse(fresh.metadata || '{}');
+        title = meta.pathTitle ? `Learning path: ${meta.pathTitle}` : 'Learning path bundle';
+      } catch { title = 'Learning path bundle'; }
+    }
+    await sendReceipt(env, fresh, title);
   }
   return fresh;
 }
@@ -193,8 +206,18 @@ payments.post('/initialize', async (c) => {
   try {
     const s = await requireAuth(c);
     const body: any = await c.req.json().catch(() => ({}));
-    const { courseId, provider, discountCode } = body;
+    if (!(await isEnabled(c.env, 'paid_enrollment_enabled'))) return fail(c, 403, 'Paid enrolment is currently disabled');
+    const { courseId, provider, discountCode, pathId } = body;
     let currency = body.currency ? String(body.currency).toUpperCase() : await platformCurrency(c.env);
+
+    // Learning-path bundle checkout: one payment, many courses.
+    if (pathId) {
+      const path = (await getDb(c.env).query<any>('SELECT * FROM learning_paths WHERE id = $1 OR slug = $1', [pathId])).rows[0];
+      if (!path) return fail(c, 404, 'Learning path not found');
+      const bundle = await initializeBundlePayment(c.env, s.userId, path, body);
+      return c.json({ success: true, data: bundle });
+    }
+
     if (!courseId) return fail(c, 400, 'courseId is required');
     if (!['paystack', 'flutterwave'].includes(provider)) return fail(c, 400, 'provider must be paystack or flutterwave');
 
@@ -269,6 +292,11 @@ payments.post('/initialize', async (c) => {
       ]
     );
     const payment = payRows[0];
+    await db.query(
+      `INSERT OR IGNORE INTO payment_courses (payment_id, course_id, amount, instructor_id, commission_rate)
+       VALUES ($1, $2, $3, (SELECT instructor_id FROM courses WHERE id = $2), NULL)`,
+      [payment.id, courseId, effectivePrice]
+    );
 
     const data: any = {
       paymentId: payment.id,
@@ -407,17 +435,27 @@ payments.post('/webhook', async (c) => {
     if (!payment) return fail(c, 404, 'Payment not found');
 
     const finalStatus = ['success', 'completed', 'successful'].includes(String(status)) ? 'completed' : 'failed';
+    let priorMeta: any = {};
+    try { priorMeta = JSON.parse(payment.metadata || '{}'); } catch { /* ignore */ }
+    const mergedMeta = JSON.stringify({ ...priorMeta, webhook: raw });
     await db.query(
       'UPDATE payments SET status = $1, metadata = $2 WHERE reference = $3',
-      [finalStatus, raw, reference]
+      [finalStatus, mergedMeta, reference]
     );
 
     if (finalStatus === 'completed') {
       if (payment.discount_code_id) await markDiscountCodeUsed(c.env, payment.discount_code_id, payment.id);
-      await enrollIfMissing(c.env, payment.user_id, payment.course_id);
+      if (payment.course_id) await enrollIfMissing(c.env, payment.user_id, payment.course_id);
+      else await enrollBundleCourses(c.env, payment);
       if (payment.status !== 'completed') {
-        const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [payment.course_id]);
-        c.executionCtx.waitUntil(sendReceipt(c.env, payment, course.rows[0]?.title || 'Course enrollment'));
+        let title = 'Course enrollment';
+        if (payment.course_id) {
+          const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [payment.course_id]);
+          title = course.rows[0]?.title || title;
+        } else if (priorMeta.pathTitle) {
+          title = `Learning path: ${priorMeta.pathTitle}`;
+        }
+        c.executionCtx.waitUntil(sendReceipt(c.env, payment, title));
       }
     }
     return c.json({ success: true });
@@ -433,7 +471,14 @@ payments.post('/validate-discount', async (c) => {
     const body: any = await c.req.json().catch(() => ({}));
     if (!body.code) return fail(c, 400, 'code required');
     let price: number | undefined;
-    if (body.courseId) {
+    if (body.pathId) {
+      const db = getDb(c.env);
+      const path = (await db.query<any>('SELECT * FROM learning_paths WHERE id = $1 OR slug = $1', [body.pathId])).rows[0];
+      if (path) {
+        const pricing = await LP.getPathPricing(c.env, path, s.userId);
+        price = pricing.bundle_price;
+      }
+    } else if (body.courseId) {
       const db = getDb(c.env);
       const { rows } = await db.query<any>('SELECT * FROM courses WHERE id = $1', [body.courseId]);
       if (rows[0]) {

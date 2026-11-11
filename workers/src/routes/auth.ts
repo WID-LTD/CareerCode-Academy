@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getDb } from '../db';
 import { verifyTurnstile } from '../turnstile';
+import { isEnabled } from '../feature-flags';
 import { backupCodes, generateSecret, otpauthUrl, sha256Hex as totpHash, verifyTotp } from '../totp';
 import { getCookie } from 'hono/cookie';
 import type { Env } from '../env';
@@ -48,6 +49,7 @@ auth.post('/register', async (c) => {
   } catch {
     return err(c, 400, 'Invalid JSON body');
   }
+  if (!(await isEnabled(c.env, 'registration_enabled'))) return err(c, 403, 'Registration is currently closed');
   const name = String(body.name || '').trim();
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');

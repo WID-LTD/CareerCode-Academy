@@ -70,10 +70,18 @@ const env: any = {
   AUTH_DO,
   JWT_EXPIRES_IN: '15m',
   JWT_REFRESH_EXPIRES_IN: '7d',
+  AI: {
+    run: async (model: string) => {
+      if (String(model).includes('whisper')) return { text: 'Explain compilers' };
+      if (String(model).includes('melotts') || String(model).includes('aura')) return { audio: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=' };
+      return { response: JSON.stringify({ blocks: [{ type: 'quiz', question: 'What does a compiler do?', options: ['Run code', 'Translate code', 'Debug code', 'Style code'], answer: 1, explanation: 'It translates source code into machine code.' }], followups: ['Try another'] }) };
+    },
+  },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const app = require(path.join(ROOT, 'workers/src/index.ts')).default;
+const mod = require(path.join(ROOT, 'workers/src/index.ts'));
+const app = mod.app || mod.default;
 
 const pending: Promise<any>[] = [];
 const ctx = { waitUntil: (p: Promise<any>) => pending.push(p), passThroughOnException: () => {} };
@@ -466,6 +474,69 @@ async function main() {
       return call(`/api/v1/portfolio/site/${u.username}/reviews`);
     }, (r) => (r.json?.skipped || Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['PUT /api/v1/portfolio/site/custom-domain', () => call('/api/v1/portfolio/site/custom-domain', { method: 'PUT', token, body: { domain: 'portfolio.example.com' } }), (r) => (r.json?.data?.status === 'pending' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/todos', () => call('/api/v1/todos', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/todos', async () => {
+      const r = await call('/api/v1/todos', { method: 'POST', token, body: { title: 'QA task', category: 'study', priority: 'high' } });
+      (globalThis as any).__todoId = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['PATCH /api/v1/todos/:id/toggle', async () => {
+      const id = (globalThis as any).__todoId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/todos/${id}/toggle`, { method: 'PATCH', token });
+    }, (r) => (r.json?.skipped || r.json?.data?.status === 'done' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['DELETE /api/v1/todos/:id', async () => {
+      const id = (globalThis as any).__todoId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/todos/${id}`, { method: 'DELETE', token });
+    }, (r) => (r.json?.skipped || r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/ai/config', () => call('/api/v1/ai/config', { token }), (r) => (r.json?.data?.limits ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/ai/chat (no auth)', () => call('/api/v1/ai/chat', { method: 'POST', body: { messages: [{ role: 'user', content: 'hi' }] } }), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
+    ['POST /api/v1/ai/chat (quiz blocks)', async () => {
+      const r = await call('/api/v1/ai/chat', { method: 'POST', token, body: { messages: [{ role: 'user', content: 'Quiz me on compilers' }], mode: 'quiz' } });
+      (globalThis as any).__aiQuiz = r.json?.data?.quiz;
+      return r;
+    }, (r) => (r.json?.data?.blocks?.[0]?.type === 'quiz' && r.json?.data?.quiz?.answer === 1 && !String(r.json?.data?.reply || '').includes('"quiz"') ? null : JSON.stringify(r.json).slice(0, 240))],
+    ['POST /api/v1/ai/tts', () => call('/api/v1/ai/tts', { method: 'POST', token, body: { text: 'Hello from GiGo' } }), (r) => (String(r.json?.data?.audio || '').startsWith('data:audio/') ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/ai/voice', async () => {
+      const fd = new FormData();
+      fd.append('audio', new File([new Uint8Array([1, 2, 3, 4])], 'voice.wav', { type: 'audio/wav' }));
+      fd.append('messages', JSON.stringify([{ role: 'user', content: 'hello' }]));
+      return call('/api/v1/ai/voice', { method: 'POST', token, body: fd });
+    }, (r) => (r.json?.data?.transcript === 'Explain compilers' && r.json?.data?.blocks ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/ai/voice (no auth)', () => call('/api/v1/ai/voice', { method: 'POST', body: new FormData() }), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
+    ['GET /api/v1/learning-paths/:slug/pricing', async () => {
+      const p: any = raw.prepare('SELECT slug FROM learning_paths LIMIT 1').get();
+      if (!p) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/learning-paths/${p.slug}/pricing`, { token });
+    }, (r) => (r.json?.skipped || typeof r.json?.data?.bundle_price === 'number' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/learning-paths/:slug/checkout (bundle)', async () => {
+      const smoke: any = raw.prepare('SELECT id, role FROM users WHERE email = ?').get((globalThis as any).__email);
+      const smokeToken = await sign({ userId: smoke.id, role: smoke.role || 'student', exp: Math.floor(Date.now() / 1000) + 900 }, JWT_SECRET);
+      const p: any = raw.prepare(`SELECT lp.slug FROM learning_paths lp
+        JOIN learning_path_courses lpc ON lpc.path_id = lp.id
+        JOIN courses c ON c.id = lpc.course_id
+        LEFT JOIN enrollments e ON e.course_id = c.id AND e.user_id = ?
+        WHERE lp.bundle_enabled = 1 AND c.price > 0 AND e.id IS NULL LIMIT 1`).get(smoke?.id);
+      if (!p) return { status: 200, json: { success: true, skipped: true } };
+      const r = await call(`/api/v1/learning-paths/${p.slug}/checkout`, { method: 'POST', token: smokeToken, body: { provider: 'paystack' } });
+      (globalThis as any).__bundleRef = r.json?.data?.reference;
+      return r;
+    }, (r) => (r.json?.skipped || r.json?.data?.alreadyEnrolled || (typeof r.json?.data?.amount === 'number' && (r.json?.data?.authorizationUrl || r.json?.data?.reference)) ? null : JSON.stringify(r.json).slice(0, 240))],
+    ['POST /api/v1/payments/verify (bundle)', async () => {
+      const ref = (globalThis as any).__bundleRef;
+      if (!ref) return { status: 200, json: { success: true, skipped: true } };
+      const smoke: any = raw.prepare('SELECT id, role FROM users WHERE email = ?').get((globalThis as any).__email);
+      const smokeToken = await sign({ userId: smoke.id, role: smoke.role || 'student', exp: Math.floor(Date.now() / 1000) + 900 }, JWT_SECRET);
+      return call('/api/v1/payments/verify', { method: 'POST', token: smokeToken, body: { reference: ref } });
+    }, (r) => (r.json?.skipped || r.json?.data?.status === 'completed' ? null : JSON.stringify(r.json).slice(0, 240))],
+    ['GET /api/v1/admin/feature-flags', () => call('/api/v1/admin/feature-flags', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['PUT /api/v1/admin/feature-flags/ai_enabled', () => call('/api/v1/admin/feature-flags/ai_enabled', { method: 'PUT', token: adminToken, body: { enabled: true } }), (r) => (r.json?.data?.key === 'ai_enabled' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/admin/learning-paths', () => call('/api/v1/admin/learning-paths', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/admin/health', () => call('/api/v1/admin/health', { token: adminToken }), (r) => (r.json?.data?.database ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/admin/action-center', () => call('/api/v1/admin/action-center', { token: adminToken }), (r) => (r.json?.data ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/public/config', () => call('/api/v1/public/config'), (r) => (r.json?.data?.name ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/public/testimonials', () => call('/api/v1/public/testimonials'), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];

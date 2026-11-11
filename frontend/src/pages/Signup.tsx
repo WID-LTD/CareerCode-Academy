@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Turnstile } from '@/components/security/Turnstile';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, Eye, EyeOff, Code2, GraduationCap, Github, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BookOpen, Brain, Trophy, Zap } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Code2, GraduationCap, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BookOpen, Brain, Trophy, Zap } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -220,7 +220,7 @@ export default function Signup() {
                       <h3 className="font-semibold text-lg">What interests you?</h3>
                       <p className="text-sm text-gray-500">Choose your learning path (select all that apply)</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                       {interests.map((interest) => {
                         const isSelected = selectedInterests.includes(interest.label);
                         const Icon = interest.icon;
@@ -320,8 +320,7 @@ export default function Signup() {
                   <div className="relative flex justify-center text-sm"><span className="px-3 bg-white dark:bg-gray-900 text-gray-500">or sign up with</span></div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" icon={<Github className="w-4 h-4" />} onClick={() => toast('Social login coming soon')}>GitHub</Button>
+                <div className="grid grid-cols-1 gap-3">
                   <Button variant="outline" icon={
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>

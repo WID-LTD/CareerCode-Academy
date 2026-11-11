@@ -24,6 +24,7 @@ interface AdminUser {
 
 const ALLOWED_DASHBOARDS: { path: string; label: string }[] = [
   { path: '/admin/dashboard', label: 'Dashboard' },
+  { path: '/admin/todos', label: 'To-Do' },
   { path: '/admin/users', label: 'Users' },
   { path: '/admin/courses', label: 'Courses' },
   { path: '/admin/categories', label: 'Categories' },
@@ -44,6 +45,9 @@ const ALLOWED_DASHBOARDS: { path: string; label: string }[] = [
   { path: '/admin/settings', label: 'Settings' },
   { path: '/admin/payouts', label: 'Payouts' },
   { path: '/admin/audit-log', label: 'Audit Log' },
+  { path: '/admin/learning-paths', label: 'Learning Paths' },
+  { path: '/admin/feature-flags', label: 'Feature Flags' },
+  { path: '/admin/system-health', label: 'System Health' },
 ];
 
 export default function AdminManagement() {

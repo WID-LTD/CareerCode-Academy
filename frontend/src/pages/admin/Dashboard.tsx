@@ -13,6 +13,8 @@ import {
   PieChart as RePieChart, Pie, Cell,
 } from 'recharts';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { ActionCenter } from '@/components/admin/ActionCenter';
+import { TodoWidget } from '@/components/todos/TodoWidget';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Loader } from '@/components/ui/Loader';
@@ -230,6 +232,11 @@ export default function AdminDashboard() {
             </span>
           )}
         </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <ActionCenter />
+        <TodoWidget basePath="/admin" />
       </div>
 
       {/* Error State */}

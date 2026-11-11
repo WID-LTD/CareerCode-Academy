@@ -59,7 +59,13 @@ export default function Blog() {
             <Link to={`/blog/${post.slug}`}>
               <GlassCard hover className="overflow-hidden h-full">
                 <div className="h-48 overflow-hidden">
-                  <img src={post.image_url || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&h=400&fit=crop'} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  {post.image_url ? (
+                    <img src={post.image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-500/20 via-violet-500/10 to-cyan-500/20 grid place-items-center">
+                      <span className="text-4xl font-bold text-primary-500/40">CC</span>
+                    </div>
+                  )}
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-3">

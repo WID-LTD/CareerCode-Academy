@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import SEO from '@/components/seo/SEO';
 
 const contactInfo = [
-  { icon: Mail, label: 'Email', value: 'hello@careercode.academy', href: 'mailto:hello@careercode.academy' },
+  { icon: Mail, label: 'Email', value: 'hello@careercode.com.ng', href: 'mailto:hello@careercode.com.ng' },
   { icon: Phone, label: 'Phone', value: '+1 (555) 123-4567', href: 'tel:+15551234567' },
   { icon: MapPin, label: 'Office', value: 'San Francisco, CA 94105', href: '#' },
   { icon: Clock, label: 'Hours', value: 'Mon-Fri, 9AM-6PM PST', href: '#' },

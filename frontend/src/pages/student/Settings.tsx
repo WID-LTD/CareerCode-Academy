@@ -8,6 +8,9 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/store/themeStore';
 import api from '@/lib/axios';
+import QRCodeLib from 'react-qr-code';
+
+const QRCode = QRCodeLib as unknown as React.ComponentType<{ value: string; size?: number }>;
 import { disablePush, enablePush, sendTestPush } from '@/lib/push';
 import toast from 'react-hot-toast';
 import {
@@ -246,7 +249,11 @@ export default function Settings() {
             </button>
           ) : twoFaSetup ? (
             <div className="mt-4 space-y-3">
-              <p className="text-sm text-gray-500">Add this secret to your authenticator app:</p>
+              <p className="text-sm text-gray-500">Scan this QR code with your authenticator app:</p>
+              <div className="w-fit rounded-xl bg-white p-3">
+                <QRCode value={twoFaSetup.otpauth} size={168} />
+              </div>
+              <p className="text-xs text-gray-500">Or add this secret manually:</p>
               <code className="block text-sm font-mono break-all rounded-xl bg-gray-100 dark:bg-gray-900 px-3 py-2">{twoFaSetup.secret}</code>
               <a href={twoFaSetup.otpauth} className="text-xs text-primary-500 break-all">Open in authenticator app</a>
               <div className="flex gap-2">
@@ -263,7 +270,19 @@ export default function Settings() {
 
           {backupCodes.length > 0 && (
             <div className="mt-4">
-              <p className="text-sm font-medium">Backup codes (save these now)</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Backup codes (save these now)</p>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([backupCodes.join('\n')], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'careercode-backup-codes.txt'; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-xs text-primary-500 hover:underline"
+                >Download</button>
+              </div>
               <div className="mt-2 grid grid-cols-2 gap-1 text-xs font-mono">
                 {backupCodes.map((c) => <span key={c} className="rounded bg-gray-100 dark:bg-gray-900 px-2 py-1">{c}</span>)}
               </div>

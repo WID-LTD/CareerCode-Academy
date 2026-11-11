@@ -625,11 +625,9 @@ admin.get('/revenue', async (c) => {
 
     const revenueByCourse = await db.query<any>(
       `SELECT c.id, c.title, c.slug,
-              COUNT(p.id) as enrollments,
-              COALESCE(SUM(p.amount), 0) as revenue
+              (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = c.id) as enrollments,
+              COALESCE((SELECT SUM(ir.amount) FROM instructor_revenue ir WHERE ir.course_id = c.id AND ir.status = 'completed'), 0) as revenue
        FROM courses c
-       LEFT JOIN payments p ON c.id = p.course_id AND p.status = 'completed'
-       GROUP BY c.id, c.title, c.slug
        ORDER BY revenue DESC
        LIMIT 20`
     );
@@ -2081,5 +2079,300 @@ admin.get('/analytics/summary', async (c) => {
     return fail(c, statusOf(e), e?.message || 'Failed to load analytics summary');
   }
 });
+
+
+// ══════════════════════════════════════════════════════════════
+// PHASE 7: feature flags, learning paths, action center, health
+// ══════════════════════════════════════════════════════════════
+
+const DEFAULT_FLAGS: Array<{ key: string; enabled: number; description: string }> = [
+  { key: 'ai_enabled', enabled: 1, description: 'GiGo AI assistant (text)' },
+  { key: 'ai_voice_enabled', enabled: 1, description: 'GiGo voice input and spoken replies' },
+  { key: 'registration_enabled', enabled: 1, description: 'Public sign-up' },
+  { key: 'paid_enrollment_enabled', enabled: 1, description: 'Paid course and bundle checkout' },
+  { key: 'community_enabled', enabled: 1, description: 'Community spaces' },
+  { key: 'mentorship_enabled', enabled: 1, description: 'Mentoring bookings' },
+  { key: 'jobs_enabled', enabled: 1, description: 'Job board and ingestion' },
+  { key: 'portfolio_enabled', enabled: 1, description: 'Public portfolios' },
+  { key: 'certificates_enabled', enabled: 1, description: 'Certificate issuing' },
+  { key: 'maintenance_mode', enabled: 0, description: 'Show maintenance notice to non-admins' },
+];
+
+async function ensureFlags(env: Env) {
+  const db = getDb(env);
+  for (const f of DEFAULT_FLAGS) {
+    await db.query(
+      `INSERT OR IGNORE INTO feature_flags (key, enabled, description) VALUES ($1, $2, $3)`,
+      [f.key, f.enabled, f.description]
+    );
+  }
+}
+
+admin.get('/feature-flags', async (c) => {
+  try {
+    await ensureFlags(c.env);
+    const { rows } = await getDb(c.env).query<any>('SELECT * FROM feature_flags ORDER BY key');
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load feature flags');
+  }
+});
+
+admin.put('/feature-flags/:key', async (c) => {
+  try {
+    const session = c.get('session');
+    const key = c.req.param('key');
+    const body = await jsonBody(c);
+    const enabled = body.enabled === true || body.enabled === 'true' || body.enabled === 1;
+    await ensureFlags(c.env);
+    const { rows } = await getDb(c.env).query<any>(
+      `UPDATE feature_flags SET enabled = $1, updated_by = $2, updated_at = NOW() WHERE key = $3 RETURNING *`,
+      [enabled ? 1 : 0, session.userId, key]
+    );
+    if (!rows.length) return fail(c, 404, 'Feature flag not found');
+    await logAudit(c.env, {
+      adminId: session.userId,
+      action: 'update_feature_flag',
+      resourceType: 'feature_flag',
+      resourceId: key,
+      details: `${key}=${enabled}`,
+      ...AUDIT_META(c),
+    });
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to update feature flag');
+  }
+});
+
+admin.get('/learning-paths', async (c) => {
+  try {
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT lp.*,
+              (SELECT COUNT(*)::int FROM learning_path_courses lpc WHERE lpc.path_id = lp.id) AS courses_count,
+              (SELECT COALESCE(SUM(c.price), 0) FROM learning_path_courses lpc JOIN courses c ON c.id = lpc.course_id WHERE lpc.path_id = lp.id) AS full_price
+       FROM learning_paths lp ORDER BY lp.title ASC`
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load learning paths');
+  }
+});
+
+admin.post('/learning-paths', async (c) => {
+  try {
+    const session = c.get('session');
+    const body = await jsonBody(c);
+    if (!body.title || !body.slug) return fail(c, 400, 'title and slug are required');
+    const { rows } = await getDb(c.env).query<any>(
+      `INSERT INTO learning_paths (title, description, slug, level, color, icon, bundle_price, bundle_discount_percent, enrollment_mode, bundle_enabled, is_published)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [
+        String(body.title), body.description || null, String(body.slug), body.level || 'beginner',
+        body.color || 'from-blue-600 to-cyan-600', body.icon || 'GitBranch',
+        body.bundle_price ?? null, Number(body.bundle_discount_percent) || 0,
+        body.enrollment_mode || 'mixed', body.bundle_enabled === false ? 0 : 1,
+        body.is_published === false ? 0 : 1,
+      ]
+    );
+    await logAudit(c.env, { adminId: session.userId, action: 'create', resourceType: 'learning_path', resourceId: rows[0].id, ...AUDIT_META(c) });
+    return c.json({ success: true, data: rows[0] }, 201);
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to create learning path');
+  }
+});
+
+admin.put('/learning-paths/:id', async (c) => {
+  try {
+    const session = c.get('session');
+    const body = await jsonBody(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `UPDATE learning_paths SET
+         title = COALESCE($1, title), description = COALESCE($2, description),
+         level = COALESCE($3, level), color = COALESCE($4, color), icon = COALESCE($5, icon),
+         bundle_price = $6, bundle_discount_percent = $7, enrollment_mode = $8,
+         bundle_enabled = $9, is_published = $10, updated_at = NOW()
+       WHERE id = $11 RETURNING *`,
+      [
+        body.title ?? null, body.description ?? null, body.level ?? null,
+        body.color ?? null, body.icon ?? null,
+        body.bundle_price === '' || body.bundle_price === undefined ? null : Number(body.bundle_price),
+        Number(body.bundle_discount_percent) || 0,
+        body.enrollment_mode || 'mixed',
+        body.bundle_enabled === false ? 0 : 1,
+        body.is_published === false ? 0 : 1,
+        c.req.param('id'),
+      ]
+    );
+    if (!rows.length) return fail(c, 404, 'Learning path not found');
+    await logAudit(c.env, { adminId: session.userId, action: 'update', resourceType: 'learning_path', resourceId: rows[0].id, ...AUDIT_META(c) });
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to update learning path');
+  }
+});
+
+admin.post('/learning-paths/:id/courses', async (c) => {
+  try {
+    const body = await jsonBody(c);
+    if (!body.course_id) return fail(c, 400, 'course_id is required');
+    const db = getDb(c.env);
+    const count = await db.query<any>('SELECT COUNT(*)::int AS n FROM learning_path_courses WHERE path_id = $1', [c.req.param('id')]);
+    await db.query(
+      `INSERT INTO learning_path_courses (path_id, course_id, order_index) VALUES ($1, $2, $3)
+       ON CONFLICT (path_id, course_id) DO NOTHING`,
+      [c.req.param('id'), body.course_id, Number(count.rows[0]?.n) || 0]
+    );
+    return c.json({ success: true }, 201);
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to add course');
+  }
+});
+
+admin.delete('/learning-paths/:id/courses/:courseId', async (c) => {
+  try {
+    await getDb(c.env).query('DELETE FROM learning_path_courses WHERE path_id = $1 AND course_id = $2', [c.req.param('id'), c.req.param('courseId')]);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to remove course');
+  }
+});
+
+admin.post('/learning-paths/:id/reorder', async (c) => {
+  try {
+    const body = await jsonBody(c);
+    const order = Array.isArray(body.courseIds) ? body.courseIds : [];
+    for (let i = 0; i < order.length; i++) {
+      await getDb(c.env).query('UPDATE learning_path_courses SET order_index = $1 WHERE path_id = $2 AND course_id = $3', [i, c.req.param('id'), String(order[i])]);
+    }
+    return c.json({ success: true });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to reorder courses');
+  }
+});
+
+admin.get('/action-center', async (c) => {
+  try {
+    const db = getDb(c.env);
+    const one = async (sql: string, params: any[] = []) => {
+      try { return Number((await db.query<any>(sql, params)).rows[0]?.n) || 0; } catch { return 0; }
+    };
+    const [applications, proposals, flaggedReviews, communityReports, pendingPayouts, failedPayments, refunds, openTickets, aiToday] = await Promise.all([
+      one(`SELECT COUNT(*)::int AS n FROM instructor_applications WHERE status = 'pending'`),
+      one(`SELECT COUNT(*)::int AS n FROM course_proposals WHERE status = 'pending'`),
+      one(`SELECT COUNT(*)::int AS n FROM reviews WHERE reported = 1`),
+      one(`SELECT COUNT(*)::int AS n FROM community_reports WHERE status = 'pending'`),
+      one(`SELECT COUNT(*)::int AS n FROM payouts WHERE status = 'pending'`),
+      one(`SELECT COUNT(*)::int AS n FROM payments WHERE status = 'failed'`),
+      one(`SELECT COUNT(*)::int AS n FROM payments WHERE status = 'refunded'`),
+      one(`SELECT COUNT(*)::int AS n FROM support_tickets WHERE status = 'open'`),
+      one(`SELECT COALESCE(SUM(requests), 0)::int AS n FROM ai_usage WHERE day = date('now')`),
+    ]);
+    const payoutAmount = await db.query<any>(`SELECT COALESCE(SUM(amount),0)::float AS amount FROM payouts WHERE status='pending'`).catch(() => ({ rows: [{ amount: 0 }] } as any));
+    const lastJob = await db.query<any>(`SELECT value FROM system_settings WHERE key='jobs_last_ingest'`).catch(() => ({ rows: [] } as any));
+    return c.json({
+      success: true,
+      data: {
+        applications, proposals, flaggedReviews, communityReports, pendingPayouts,
+        pendingPayoutAmount: Number(payoutAmount.rows[0]?.amount) || 0,
+        failedPayments, refunds, openTickets, aiToday,
+        jobsLastIngest: lastJob.rows[0]?.value || null,
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load action center');
+  }
+});
+
+admin.get('/health', async (c) => {
+  try {
+    const db = getDb(c.env);
+    let database = false;
+    try { await db.query('SELECT 1'); database = true; } catch { database = false; }
+    const crons = await db.query<any>('SELECT * FROM cron_runs ORDER BY name').catch(() => ({ rows: [] } as any));
+    return c.json({
+      success: true,
+      data: {
+        database,
+        backend: 'd1',
+        r2: !!c.env.R2,
+        ai: !!c.env.AI,
+        email: !!c.env.EMAIL,
+        push: !!c.env.VAPID_PRIVATE_KEY,
+        turnstile: !!c.env.TURNSTILE_SECRET,
+        crons: crons.rows,
+        now: new Date().toISOString(),
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load health');
+  }
+});
+
+admin.get('/ai-usage', async (c) => {
+  try {
+    const db = getDb(c.env);
+    const daily = await db.query<any>(
+      `SELECT day, SUM(requests)::int AS requests, SUM(voice_requests)::int AS voice, SUM(tts_requests)::int AS tts, SUM(tokens)::int AS tokens
+       FROM ai_usage GROUP BY day ORDER BY day DESC LIMIT 14`
+    );
+    const top = await db.query<any>(
+      `SELECT u.name, u.email, SUM(a.requests)::int AS requests, SUM(a.voice_requests)::int AS voice, SUM(a.tts_requests)::int AS tts
+       FROM ai_usage a JOIN users u ON u.id = a.user_id GROUP BY u.id ORDER BY requests DESC LIMIT 10`
+    );
+    return c.json({ success: true, data: { daily: daily.rows, top: top.rows } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load AI usage');
+  }
+});
+
+admin.get('/testimonials', async (c) => {
+  try {
+    const { rows } = await getDb(c.env).query<any>('SELECT * FROM testimonials ORDER BY sort_order ASC, created_at DESC');
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load testimonials');
+  }
+});
+
+admin.post('/testimonials', async (c) => {
+  try {
+    const body = await jsonBody(c);
+    if (!body.quote) return fail(c, 400, 'quote is required');
+    const { rows } = await getDb(c.env).query<any>(
+      `INSERT INTO testimonials (id, user_id, course_id, quote, role, company, image_url, status, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [crypto.randomUUID(), body.user_id || null, body.course_id || null, String(body.quote), body.role || null, body.company || null, body.image_url || null, body.status || 'published', Number(body.sort_order) || 0]
+    );
+    return c.json({ success: true, data: rows[0] }, 201);
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to create testimonial');
+  }
+});
+
+admin.put('/testimonials/:id', async (c) => {
+  try {
+    const body = await jsonBody(c);
+    const { rows } = await getDb(c.env).query<any>(
+      `UPDATE testimonials SET quote = COALESCE($1, quote), role = COALESCE($2, role), company = COALESCE($3, company),
+         image_url = COALESCE($4, image_url), status = COALESCE($5, status), sort_order = COALESCE($6, sort_order)
+       WHERE id = $7 RETURNING *`,
+      [body.quote ?? null, body.role ?? null, body.company ?? null, body.image_url ?? null, body.status ?? null, body.sort_order ?? null, c.req.param('id')]
+    );
+    if (!rows.length) return fail(c, 404, 'Testimonial not found');
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to update testimonial');
+  }
+});
+
+admin.delete('/testimonials/:id', async (c) => {
+  try {
+    await getDb(c.env).query('DELETE FROM testimonials WHERE id = $1', [c.req.param('id')]);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to delete testimonial');
+  }
+});
+
 
 export default admin;

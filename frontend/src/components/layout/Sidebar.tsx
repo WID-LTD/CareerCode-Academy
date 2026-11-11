@@ -33,6 +33,9 @@ import {
   Compass,
   BadgePercent,
   Landmark,
+  ListChecks,
+  ToggleLeft,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -47,6 +50,7 @@ interface SidebarProps {
 const roleSidebarLinks: Record<string, { label: string; path: string; icon: any }[]> = {
   student: [
     { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
+    { label: 'To-Do', path: '/student/todos', icon: ListChecks },
     { label: 'My Courses', path: '/student/courses', icon: BookOpen },
     { label: 'Learning Paths', path: '/student/learning-paths', icon: GitBranch },
     { label: 'Pathway Finder', path: '/student/pathway-finder', icon: Compass },
@@ -70,6 +74,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   ],
   instructor: [
     { label: 'Dashboard Overview', path: '/instructor/dashboard', icon: LayoutDashboard },
+    { label: 'To-Do', path: '/instructor/todos', icon: ListChecks },
     { label: 'My Programs', path: '/instructor/programs', icon: GitBranch },
     { label: 'My Courses', path: '/instructor/courses', icon: BookOpen },
     { label: 'Course Builder', path: '/instructor/courses/new', icon: Plus },
@@ -88,6 +93,10 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   ],
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
+    { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
+    { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },
+    { label: 'System Health', path: '/admin/system-health', icon: Activity },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: GraduationCap },
     { label: 'Categories', path: '/admin/categories', icon: Hash },
@@ -114,6 +123,10 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   ],
   adminNarrow: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
+    { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
+    { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },
+    { label: 'System Health', path: '/admin/system-health', icon: Activity },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Courses', path: '/admin/courses', icon: BookOpen },
     { label: 'Categories', path: '/admin/categories', icon: GitBranch },

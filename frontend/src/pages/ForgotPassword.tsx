@@ -378,7 +378,7 @@ export default function ForgotPassword() {
                   <div>
                     <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Dedicated Support</h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Having trouble with your account? Reach out to our support team anytime at support@careercode.com.
+                      Having trouble with your account? Reach out to our support team anytime at hello@careercode.com.ng.
                     </p>
                   </div>
                 </div>

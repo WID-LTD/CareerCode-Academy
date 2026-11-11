@@ -103,7 +103,7 @@ export function Footer() {
             <div className="flex flex-col xs:flex-row items-center gap-3 xs:gap-4 sm:gap-6 text-xs sm:text-sm text-gray-500">
               <div className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                hello@careercode.academy
+                hello@careercode.com.ng
               </div>
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

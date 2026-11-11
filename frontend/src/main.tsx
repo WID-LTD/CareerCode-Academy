@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
+import '@fontsource-variable/bricolage-grotesque';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

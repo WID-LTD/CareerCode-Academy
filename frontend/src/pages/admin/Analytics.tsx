@@ -87,6 +87,37 @@ export default function AdminAnalytics() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportFull = () => {
+    const lines: string[] = [];
+    const section = (title: string, headers: string[], rows: any[][]) => {
+      lines.push(title);
+      lines.push(headers.join(','));
+      rows.forEach((r) => lines.push(r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')));
+      lines.push('');
+    };
+    section('Overview', ['Metric', 'Value'], [
+      ['Total Visitors', overview?.totalVisitors || 0],
+      ['Unique Visitors', overview?.uniqueVisitors || 0],
+      ['Returning Rate', `${overview?.returningRate || 0}%`],
+      ['Bounce Rate', `${overview?.bounceRate || 0}%`],
+      ['Avg Session Duration', formatDuration(overview?.avgSessionDuration || 0)],
+      ['Total Page Views', overview?.totalPageViews || 0],
+    ]);
+    section('Pages', ['Path', 'Views', 'Unique Visitors', 'Avg Duration'], (pageAnalytics?.mostVisited || []).map((p: any) => [p.page_url, p.views, p.unique_visitors, formatDuration(p.avg_time_sec || 0)]));
+    section('Devices', ['Device', 'Sessions', 'Percentage'], (deviceAnalytics?.devices || []).map((d: any) => [d.device_type, d.count, `${d.percentage}%`]));
+    section('Sources', ['Source', 'Sessions', 'Percentage'], (sourceAnalytics || []).map((s: any) => [s.source, s.sessions, `${s.percentage}%`]));
+    section('Courses', ['Course', 'Views', 'Enrollments', 'Revenue'], (courseAnalytics || []).map((c: any) => [c.title, c.page_views, c.enrollments, c.revenue]));
+    const clickRows = Array.isArray(clickAnalytics) ? clickAnalytics : (clickAnalytics?.elements || clickAnalytics?.clicks || clickAnalytics?.topElements || []);
+    section('Clicks', ['Element', 'Clicks'], clickRows.map((c: any) => [c.element || c.label || c.selector, c.clicks || c.count || 0]));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-full-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading && !overview) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -116,7 +147,10 @@ export default function AdminAnalytics() {
             <RefreshCw className="w-4 h-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-1" /> Export
+            <Download className="w-4 h-4 mr-1" /> Overview
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportFull}>
+            <Download className="w-4 h-4 mr-1" /> Export all
           </Button>
         </div>
       </div>

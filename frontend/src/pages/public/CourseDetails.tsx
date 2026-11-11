@@ -459,7 +459,7 @@ export default function CourseDetails() {
               {curriculumOpen && (
                 <div className="mt-4 space-y-1">
                   {lessons.length === 0 ? (
-                    <p className="text-gray-500 text-sm py-4">Curriculum coming soon.</p>
+                    <p className="text-gray-500 text-sm py-4">The curriculum for this course is being finalised.</p>
                   ) : (
                     lessons.map((lesson: any, i: number) => (
                       <div

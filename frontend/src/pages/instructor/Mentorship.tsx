@@ -23,6 +23,10 @@ interface Slot {
   end_time: string;
   meeting_url: string | null;
   status: string;
+  reschedule_status?: string | null;
+  reschedule_reason?: string | null;
+  proposed_start_time?: string | null;
+  proposed_end_time?: string | null;
 }
 
 function formatDate(dateStr: string): string {
@@ -126,6 +130,17 @@ export default function InstructorMentorship() {
     }
   }
 
+  async function handleReschedule(slotId: string, approve: boolean) {
+    const reason = approve ? undefined : window.prompt('Reason for declining (optional)') || undefined;
+    try {
+      await api.post(`/instructor/mentoring-slots/${slotId}/reschedule/${approve ? 'approve' : 'reject'}`, { reason });
+      toast.success(approve ? 'Reschedule approved' : 'Reschedule declined');
+      fetchSlots();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update reschedule');
+    }
+  }
+
   const bookedSlots = slots.filter((s) => s.status === 'booked');
   const availableSlots = slots.filter((s) => s.status === 'available');
 
@@ -212,6 +227,21 @@ export default function InstructorMentorship() {
                           <Clock className="w-3 h-3" /> {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                         </span>
                       </div>
+                      {slot.reschedule_status === 'requested' && (
+                        <div className="mt-2 rounded-xl border border-amber-300/50 bg-amber-500/5 p-2.5">
+                          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">Reschedule requested</p>
+                          {slot.proposed_start_time && (
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              Proposed: {formatDate(slot.proposed_start_time)} · {formatTime(slot.proposed_start_time)} - {formatTime(slot.proposed_end_time || slot.proposed_start_time)}
+                            </p>
+                          )}
+                          {slot.reschedule_reason && <p className="text-[11px] text-gray-500">Reason: {slot.reschedule_reason}</p>}
+                          <div className="flex gap-2 mt-2">
+                            <Button size="sm" onClick={() => handleReschedule(slot.id, true)}>Approve</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleReschedule(slot.id, false)}>Decline</Button>
+                          </div>
+                        </div>
+                      )}
                       {slot.student_name && (
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                           <div className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-xs font-medium text-primary-600">

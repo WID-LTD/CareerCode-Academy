@@ -45,10 +45,36 @@ export default function StudentMentorship() {
   const [confirmSlot, setConfirmSlot] = useState<Slot | null>(null);
   const [booking, setBooking] = useState(false);
   const [myTab, setMyTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [rescheduleSlot, setRescheduleSlot] = useState<Slot | null>(null);
+  const [proposedStart, setProposedStart] = useState('');
+  const [proposedEnd, setProposedEnd] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  async function requestReschedule() {
+    if (!rescheduleSlot) return;
+    if (!proposedStart || !proposedEnd) { toast.error('Choose a new start and end time'); return; }
+    setRescheduling(true);
+    try {
+      await api.post(`/student/mentoring-slots/${rescheduleSlot.id}/reschedule`, {
+        proposed_start_time: new Date(proposedStart).toISOString(),
+        proposed_end_time: new Date(proposedEnd).toISOString(),
+        reason: rescheduleReason,
+      });
+      toast.success('Reschedule requested');
+      setRescheduleSlot(null);
+      setProposedStart('');
+      setProposedEnd('');
+      setRescheduleReason('');
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to request reschedule');
+    } finally { setRescheduling(false); }
+  }
 
   async function cancelBooking(slotId: string) {
     if (!confirm('Cancel this mentoring booking?')) return;
@@ -242,12 +268,25 @@ export default function StudentMentorship() {
                                 <AlertCircle className="w-3 h-3" /> Past session
                               </span>
                             )}
+                            {(slot as any).reschedule_status === 'requested' && <Badge variant="warning" size="sm">Reschedule requested</Badge>}
+                            {(slot as any).reschedule_status === 'approved' && <Badge variant="success" size="sm">Rescheduled</Badge>}
+                            {(slot as any).reschedule_status === 'rejected' && <Badge variant="danger" size="sm">Reschedule declined</Badge>}
                           </div>
                         </div>
                         {!expired && (
-                          <Button variant="ghost" size="sm" className="text-red-400" onClick={() => cancelBooking(slot.id)}>
-                            Cancel
-                          </Button>
+                          <div className="flex flex-col gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => {
+                              setRescheduleSlot(slot);
+                              const start = new Date(slot.start_time);
+                              const end = new Date(slot.end_time);
+                              const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                              setProposedStart(toLocal(start));
+                              setProposedEnd(toLocal(end));
+                            }}>Reschedule</Button>
+                            <Button variant="ghost" size="sm" className="text-red-400" onClick={() => cancelBooking(slot.id)}>
+                              Cancel
+                            </Button>
+                          </div>
                         )}
                         {!expired && slot.meeting_url && (
                           <a
@@ -268,6 +307,31 @@ export default function StudentMentorship() {
           </div>
         )}
       </div>
+
+      <Modal isOpen={!!rescheduleSlot} onClose={() => setRescheduleSlot(null)}>
+        <div className="p-6">
+          <h2 className="text-xl font-bold mb-1">Request a new time</h2>
+          <p className="text-sm text-gray-500 mb-4">Your instructor will approve or decline the request.</p>
+          <div className="space-y-3">
+            <label className="block text-sm">
+              <span className="text-gray-500">New start</span>
+              <input type="datetime-local" value={proposedStart} onChange={(e) => setProposedStart(e.target.value)} className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-gray-500">New end</span>
+              <input type="datetime-local" value={proposedEnd} onChange={(e) => setProposedEnd(e.target.value)} className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-gray-500">Reason (optional)</span>
+              <textarea value={rescheduleReason} onChange={(e) => setRescheduleReason(e.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+            </label>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setRescheduleSlot(null)}>Cancel</Button>
+              <Button onClick={requestReschedule} disabled={rescheduling}>{rescheduling ? 'Sending…' : 'Send request'}</Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       <Modal isOpen={!!confirmSlot} onClose={() => setConfirmSlot(null)}>
         <div className="p-6">

@@ -16,10 +16,10 @@ import { useSocket } from '@/hooks/useSocket';
 import { HeroSection } from '@/components/student/HeroSection';
 import CareerGoalWidget from '@/components/student/CareerGoalWidget';
 import { StatsCards } from '@/components/student/StatsCards';
+import { TodoWidget } from '@/components/todos/TodoWidget';
 import { LearningAnalytics } from '@/components/student/LearningAnalytics';
 import { RecommendedCourses } from '@/components/student/RecommendedCourses';
 import { AchievementCenter } from '@/components/student/AchievementCenter';
-import { AIStudyAssistant } from '@/components/student/AIStudyAssistant';
 import { HeroSkeleton, StatsSkeleton, CardSkeleton, ChartSkeleton } from '@/components/student/SkeletonLoader';
 import SEO from '@/components/seo/SEO';
 
@@ -186,6 +186,8 @@ export default function StudentDashboard() {
 
       {/* Stats Cards */}
       <StatsCards stats={stats} />
+
+      <TodoWidget basePath="/student" />
 
       {/* My Career Goal */}
       <CareerGoalWidget />
@@ -515,8 +517,6 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* AI Study Assistant (Floating) */}
-      <AIStudyAssistant />
     </motion.div>
   );
 }

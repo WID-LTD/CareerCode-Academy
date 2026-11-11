@@ -644,7 +644,7 @@ portfolio.post('/site/custom-domain/verify', async (c) => {
     const answers: string[] = (json?.Answer || []).map((a: any) => String(a.data || ''));
     const verified = answers.some((a) => a.includes(site.domain_token));
     await getDb(c.env).query(
-      `UPDATE portfolio_sites SET domain_status = $1, updated_at = NOW() WHERE id = $2`,
+      `UPDATE portfolio_sites SET domain_status = $1, domain_verified_at = CASE WHEN $1 = 'verified' THEN COALESCE(domain_verified_at, NOW()) ELSE domain_verified_at END, updated_at = NOW() WHERE id = $2`,
       [verified ? 'verified' : 'pending', site.id]
     );
     return c.json({

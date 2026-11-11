@@ -90,7 +90,7 @@ export default function Board() {
           <h2 className="text-xl font-bold">Our Directors</h2>
         </div>
         {members.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">Director profiles are coming soon.</div>
+          <div className="text-center py-10 text-gray-500">Board profiles will appear here once published.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {members.map((m) => (

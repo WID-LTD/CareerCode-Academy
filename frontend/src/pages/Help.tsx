@@ -83,14 +83,14 @@ export default function Help() {
                 <h2 className="text-lg font-semibold mb-4">Popular Articles</h2>
                 <div className="space-y-3">
                   {popularArticles.map((article) => (
-                    <a
+                    <Link
                       key={article.title}
-                      href="#"
+                      to="/contact"
                       className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                     >
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{article.title}</span>
-                      <span className="text-xs text-gray-400">{article.views} views</span>
-                    </a>
+                      <span className="text-xs text-gray-400">Open</span>
+                    </Link>
                   ))}
                 </div>
               </GlassCard>

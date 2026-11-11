@@ -1,87 +1,33 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, Clock, User, Tag, Share2, Bookmark } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, User, Tag, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatDate } from '@/lib/utils';
+import api from '@/lib/axios';
 import SEO from '@/components/seo/SEO';
-
-const postData = {
-  'landing-first-dev-job': {
-    title: 'The Complete Guide to Landing Your First Developer Job in 2025',
-    content: `Landing your first developer job can feel like an impossible challenge, but with the right strategy, it's entirely achievable. This comprehensive guide will walk you through every step of the process.
-
-## 1. Build a Strong Foundation
-
-Before you start applying, ensure you have a solid understanding of the fundamentals. Focus on:
-
-- **Data Structures & Algorithms**: Arrays, linked lists, trees, graphs, sorting, and searching
-- **Version Control**: Git and GitHub workflows
-- **One Framework**: Go deep with React, Vue, or Angular
-- **Backend Basics**: REST APIs, databases, authentication
-
-## 2. Create a Portfolio That Stands Out
-
-Your portfolio is your ticket to getting noticed. Build 3-4 substantial projects that demonstrate:
-
-- Full-stack capabilities
-- Clean, well-documented code
-- Real-world problem solving
-- Proper use of modern tools and practices
-
-## 3. Master the Job Search
-
-### Resume Tips
-- Keep it to one page
-- Highlight impact, not just responsibilities
-- Include links to your GitHub and portfolio
-- Tailor it for each application
-
-### Networking
-- Attend tech meetups and conferences
-- Engage on LinkedIn and Twitter
-- Contribute to open source projects
-- Join developer communities
-
-## 4. Ace the Interview
-
-### Technical Preparation
-- Practice coding challenges daily (LeetCode, HackerRank)
-- Review system design basics
-- Prepare behavioral stories using the STAR method
-- Do mock interviews with peers
-
-### Common Questions
-- "Tell me about yourself"
-- "Why do you want to work here?"
-- "Describe a challenging project"
-- Technical coding challenges
-
-## 5. Negotiate Your Offer
-
-When you receive an offer, remember to:
-- Research market rates for your role and location
-- Consider the total compensation package
-- Don't be afraid to negotiate respectfully
-- Get everything in writing
-
-The journey to landing your first developer job is a marathon, not a sprint. Stay consistent, keep learning, and don't get discouraged by rejections. Every "no" brings you closer to the right "yes."`,
-    image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=600&fit=crop',
-    author: 'Sarah Mitchell',
-    role: 'VP of Student Success',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
-    date: '2025-03-15',
-    readTime: '8 min read',
-    category: 'Career Advice',
-    tags: ['job search', 'interviews', 'portfolio'],
-  },
-};
 
 export default function BlogPost() {
   const { slug } = useParams();
-  const post = postData[slug as keyof typeof postData];
+  const [post, setPost] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    api.get(`/blogs/${slug}`)
+      .then(({ data }) => { if (alive) setPost(data.data); })
+      .catch(() => { if (alive) setPost(null); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [slug]);
+
+  if (loading) {
+    return <div className="min-h-[60vh] grid place-items-center"><Loader2 className="w-8 h-8 text-primary-500 animate-spin" /></div>;
+  }
 
   if (!post) {
     return (
@@ -94,57 +40,54 @@ export default function BlogPost() {
     );
   }
 
+  const tags: string[] = (() => {
+    try { const t = JSON.parse(post.tags || '[]'); return Array.isArray(t) ? t : []; } catch { return []; }
+  })();
+  const readTime = `${Math.max(1, Math.ceil(String(post.content || '').split(/\s+/).length / 220))} min read`;
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <SEO title={post?.title || 'Blog Post'} description={post?.content?.slice(0, 160)} type="article" />
-      <div className="relative h-[40vh] overflow-hidden">
-        <img src={post.image} alt={post.title} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/60 to-transparent" />
+      <SEO title={post.title} description={String(post.excerpt || post.content || '').slice(0, 160)} type="article" />
+      <div className="relative h-[32vh] min-h-[220px] overflow-hidden">
+        {post.image_url ? (
+          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-500/20 via-violet-500/10 to-cyan-500/20" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-gray-950 via-white/40 dark:via-gray-950/40 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+            <Link to="/blog" className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300 mb-4 hover:text-primary-500">
+              <ArrowLeft className="w-4 h-4" /> Back to Blog
+            </Link>
+            <Badge variant="primary" size="sm" className="mb-3">{post.category}</Badge>
+            <h1 className="text-2xl sm:text-4xl font-bold leading-tight">{post.title}</h1>
+          </div>
+        </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-32 relative z-10 pb-16">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4">
-            <ArrowLeft className="w-4 h-4" /> Back to Blog
-          </Link>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-8">
+          <span className="flex items-center gap-1.5">
+            <User className="w-4 h-4" />
+            {post.author_name || 'CareerCode Academy'}
+          </span>
+          <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" />{formatDate(post.created_at)}</span>
+          <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" />{readTime}</span>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <Badge variant="primary" size="md">{post.category}</Badge>
-            <div className="flex items-center gap-1 text-sm text-gray-400"><Clock className="w-4 h-4" /> {post.readTime}</div>
-            <div className="flex items-center gap-1 text-sm text-gray-400"><Calendar className="w-4 h-4" /> {formatDate(post.date)}</div>
+        <GlassCard className="p-6 sm:p-8" hover={false}>
+          <article className="prose prose-gray dark:prose-invert max-w-none prose-headings:font-bold prose-a:text-primary-500 prose-img:rounded-xl">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+          </article>
+        </GlassCard>
+
+        {tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mt-6">
+            <Tag className="w-4 h-4 text-gray-400" />
+            {tags.map((t) => <span key={t} className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">#{t}</span>)}
           </div>
-
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-8">{post.title}</h1>
-
-          <GlassCard className="p-8 sm:p-12 prose prose-gray dark:prose-invert max-w-none">
-            <div className="flex flex-wrap items-center gap-3 mb-8 pb-8 border-b border-gray-200 dark:border-gray-800">
-              <img src={post.avatar} alt={post.author} className="w-14 h-14 rounded-full object-cover" />
-              <div>
-                <div className="font-semibold text-gray-900 dark:text-white">{post.author}</div>
-                <div className="text-sm text-gray-500">{post.role}</div>
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <Button variant="ghost" size="sm" icon={<Bookmark className="w-4 h-4" />}>Save</Button>
-                <Button variant="ghost" size="sm" icon={<Share2 className="w-4 h-4" />}>Share</Button>
-              </div>
-            </div>
-
-            <div className="leading-relaxed whitespace-pre-line text-gray-700 dark:text-gray-300">
-              {post.content}
-            </div>
-
-            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                <Tag className="w-4 h-4" /> Tags:
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {post.tags.map((tag) => (
-                  <Badge key={tag} variant="default" size="md">{tag}</Badge>
-                ))}
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
+        )}
       </div>
     </motion.div>
   );

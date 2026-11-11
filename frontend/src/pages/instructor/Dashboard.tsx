@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { TodoWidget } from '@/components/todos/TodoWidget';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useInstructorStore } from '@/store/instructorStore';
@@ -165,6 +166,10 @@ export default function InstructorDashboard() {
               <div className="text-sm text-gray-500">{stat.label}</div>
             </GlassCard>
           ))}
+        </motion.div>
+
+        <motion.div variants={item}>
+          <TodoWidget basePath="/instructor" />
         </motion.div>
 
         {/* Quick Actions */}

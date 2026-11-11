@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Play, Code2, Sparkles, Shield, Zap, Award, Users, BookOpen, Building2, Star, ChevronRight } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { Badge } from '@/components/ui/Badge';
+import { cn } from '@/lib/utils';
+import { usePublicStats } from '@/hooks/usePublicStats';
 
 const typingTexts = [
   'Master In-Demand Skills',
@@ -19,8 +21,9 @@ const floatingShapes = [
   { icon: Shield, color: 'text-neon-green', delay: 1.5, x: '80%', y: '75%' },
 ];
 
-const employerLogos = [
-  'Google', 'Microsoft', 'Amazon', 'Stripe', 'Netflix', 'Spotify', 'Atlassian', 'GitLab', 'Vercel', 'Figma',
+// Learning tracks — not employer logos. We only show claims we can stand behind.
+const learningTracks = [
+  'Frontend', 'Backend', 'Full Stack', 'Data Science', 'AI & ML', 'Cloud', 'Cybersecurity', 'Product Design', 'Mobile', 'DevOps',
 ];
 
 const styles = {
@@ -49,7 +52,7 @@ function Marquee() {
         animate={{ x: ['0%', '-50%'] }}
         transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
       >
-        {[...employerLogos, ...employerLogos].map((name, i) => (
+        {[...learningTracks, ...learningTracks].map((name, i) => (
           <div
             key={i}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100/50 dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
@@ -68,30 +71,32 @@ export function Hero() {
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Social-proof counters: animate 0 -> 999+ on mount.
-  const SOCIAL_PROOF_TARGET = 999;
+  // Real counters from /public/stats. Each stat animates to its own value;
+  // zero-value stats are hidden rather than replaced with invented numbers.
+  const live = usePublicStats();
+  const targets = [live.students, live.courses, live.certificates, live.alumni];
+  const targetKey = targets.join(',');
   const [counts, setCounts] = useState([0, 0, 0, 0]);
   const stats = [
-    { number: `${counts[0].toLocaleString()}+`, label: 'Students' },
-    { number: `${counts[1].toLocaleString()}+`, label: 'Courses' },
-    { number: `${counts[2].toLocaleString()}+`, label: 'Certificates Issued' },
-    { number: `${counts[3].toLocaleString()}+`, label: 'Graduate Alumni' },
-  ];
+    { number: counts[0], label: 'Students', suffix: '+' },
+    { number: counts[1], label: 'Courses', suffix: '+' },
+    { number: counts[2], label: 'Certificates Issued', suffix: '+' },
+    { number: counts[3], label: 'Graduate Alumni', suffix: '+' },
+  ].filter((_, i) => targets[i] > 0);
 
   useEffect(() => {
-    const duration = 2000;
+    const duration = 1600;
     const startedAt = performance.now();
     let raf = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - p, 3);
-      const value = Math.floor(eased * SOCIAL_PROOF_TARGET);
-      setCounts([value, value, value, value]);
+      setCounts(targets.map((t) => Math.floor(eased * t)));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [targetKey]);
 
   useEffect(() => {
     const currentText = typingTexts[textIndex];
@@ -214,8 +219,8 @@ export function Hero() {
           >
             {stats.map((stat) => (
               <div key={stat.label} className="text-center">
-                <div className={styles.statNumber}>
-                  {stat.number}
+                <div className={cn(styles.statNumber, 'font-display tabular-nums tracking-tight')}>
+                  {stat.number.toLocaleString()}{stat.suffix}
                 </div>
                 <div>{stat.label}</div>
               </div>
@@ -226,7 +231,7 @@ export function Hero() {
             <div className="mt-8 flex items-center justify-center gap-3">
               <Badge variant="success" size="sm" className="px-3 py-1">
                 <Award className="w-3 h-3" />
-                Industry Approved
+                Project-based learning
               </Badge>
               <Badge variant="primary" size="sm" className="px-3 py-1">
                 <Users className="w-3 h-3" />

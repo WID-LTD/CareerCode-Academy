@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Turnstile } from '@/components/security/Turnstile';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Code2, Github, Star, Shield, Award, TrendingUp, Quote } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Code2, Star, Shield, Award, TrendingUp, Quote } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -149,8 +149,7 @@ export default function Login() {
               <div className="relative flex justify-center text-sm"><span className="px-3 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400">or continue with</span></div>
             </div>
 
-            <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-              <Button variant="outline" icon={<Github className="w-4 h-4" />} aria-label="Sign in with GitHub" onClick={() => toast('Social login coming soon')}>GitHub</Button>
+            <div className="grid grid-cols-1 gap-3">
               <Button variant="outline" icon={
                 <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -215,7 +214,7 @@ export default function Login() {
               <Shield className="w-3 h-3" /> 100% Secure
             </Badge>
             <Badge variant="primary" size="sm" className="px-3 py-1">
-              <Award className="w-3 h-3" /> Industry Approved
+              <Award className="w-3 h-3" /> Verifiable certificates
             </Badge>
             <Badge variant="default" size="sm" className="px-3 py-1">
               <TrendingUp className="w-3 h-3" /> Career Guarantee

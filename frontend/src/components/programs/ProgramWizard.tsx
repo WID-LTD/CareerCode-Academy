@@ -551,7 +551,7 @@ export function ProgramWizard({ initial, schools, onClose, onSaved }: ProgramWiz
               <GlassCard hover={false} className="p-4">
                 <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Career Outcomes</h4>
                 {outcomes.length === 0 ? (
-                  <p className="text-sm text-gray-500">Career outcomes coming soon.</p>
+                  <p className="text-sm text-gray-500">Career outcomes are added as cohorts complete.</p>
                 ) : (
                   <div className="space-y-1.5">
                     {outcomes.map((o, i) => (

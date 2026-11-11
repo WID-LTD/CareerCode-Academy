@@ -795,6 +795,47 @@ student.post('/mentoring-slots/:id/cancel', async (c) => {
   } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to cancel booking'); }
 });
 
+// POST /student/mentoring-slots/:id/reschedule — request a new time
+student.post('/mentoring-slots/:id/reschedule', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const body: any = await c.req.json().catch(() => ({}));
+    const slot = (await db.query<any>('SELECT * FROM mentoring_slots WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!slot) return err(c, 404, 'Slot not found');
+    if (slot.student_id !== s.userId) return err(c, 403, 'This booking is not yours');
+    if (slot.status !== 'booked') return err(c, 400, 'Only booked sessions can be rescheduled');
+    const start = body.proposed_start_time ? new Date(body.proposed_start_time) : null;
+    const end = body.proposed_end_time ? new Date(body.proposed_end_time) : null;
+    if (!start || Number.isNaN(start.getTime()) || !end || Number.isNaN(end.getTime())) return err(c, 400, 'Valid proposed start and end times are required');
+    if (start.getTime() < Date.now()) return err(c, 400, 'The proposed time must be in the future');
+    if (end.getTime() <= start.getTime()) return err(c, 400, 'The end time must be after the start time');
+
+    await db.query(
+      `UPDATE mentoring_slots SET
+         reschedule_status = 'requested', reschedule_requested_by = $1, reschedule_reason = $2,
+         proposed_start_time = $3, proposed_end_time = $4, updated_at = NOW()
+       WHERE id = $5`,
+      [s.userId, body.reason ? String(body.reason).slice(0, 500) : null, start.toISOString(), end.toISOString(), slot.id]
+    );
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type, link)
+       VALUES ($1, 'Mentoring reschedule requested', $2, 'info', '/instructor/mentoring')`,
+      [slot.instructor_id, `A student requested a new time for "${slot.title}".`]
+    );
+    c.executionCtx.waitUntil(sendPushToUser(c.env, slot.instructor_id, {
+      title: 'Mentoring reschedule requested',
+      body: `A student proposed a new time for "${slot.title}".`,
+      url: '/instructor/mentoring',
+    }));
+    const instructor = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [slot.instructor_id])).rows[0];
+    if (instructor?.email) {
+      c.executionCtx.waitUntil(mail.mentoringBooked(c.env, instructor.email, instructor.name, `${start.toUTCString()} (reschedule requested)`, 'a student').catch(() => {}));
+    }
+    return c.json({ success: true, message: 'Reschedule requested' });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to request reschedule'); }
+});
+
 student.get('/my-mentoring-slots', async (c) => {
   try {
     const s = await authenticate(c);

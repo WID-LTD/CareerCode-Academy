@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { useAdminStore } from '@/store/adminStore';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 const sections = [
   { id: 'general', label: 'General', icon: Globe },
@@ -23,6 +24,8 @@ export default function AdminSettings() {
   const [localSettings, setLocalSettings] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingBranding, setUploadingBranding] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -96,8 +99,8 @@ export default function AdminSettings() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Platform Description</label>
                   <textarea rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all" value={getSetting('platform_description', 'Empowering the next generation of developers...')} onChange={(e) => handleChange('platform_description', e.target.value)} />
                 </div>
-                <Input label="Support Email" type="email" value={getSetting('support_email', 'hello@careercode.academy')} onChange={(e) => handleChange('support_email', e.target.value)} icon={<Mail className="w-4 h-4" />} />
-                <Input label="Website URL" value={getSetting('website_url', 'https://careercode.academy')} onChange={(e) => handleChange('website_url', e.target.value)} icon={<Globe className="w-4 h-4" />} />
+                <Input label="Support Email" type="email" value={getSetting('support_email', 'hello@careercode.com.ng')} onChange={(e) => handleChange('support_email', e.target.value)} icon={<Mail className="w-4 h-4" />} />
+                <Input label="Website URL" value={getSetting('website_url', 'https://careercode.com.ng')} onChange={(e) => handleChange('website_url', e.target.value)} icon={<Globe className="w-4 h-4" />} />
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Default Language</label>
                   <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('default_language', 'English (US)')} onChange={(e) => handleChange('default_language', e.target.value)}>
@@ -122,40 +125,30 @@ export default function AdminSettings() {
 
           {activeSection === 'security' && (
             <GlassCard className="p-6">
-              <h2 className="text-lg font-semibold mb-6">Security Settings</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <Lock className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium text-sm">Two-Factor Authentication</div>
-                      <div className="text-xs text-gray-500">Add an extra layer of security to your account</div>
-                    </div>
-                  </div>
-                  <input type="checkbox" checked={getSetting('2fa_enabled', 'false') === 'true'} onChange={(e) => handleChange('2fa_enabled', e.target.checked.toString())} className="rounded text-primary-500 focus:ring-primary-500" />
+              <h2 className="text-lg font-semibold mb-6">Security</h2>
+              <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+                  <p className="font-medium">Per-user two-factor authentication</p>
+                  <p className="text-xs text-gray-500 mt-1">Each user enables TOTP and downloads backup codes from their own Settings page. Admins can reset 2FA from Users.</p>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium text-sm">Single Sign-On (SSO)</div>
-                      <div className="text-xs text-gray-500">Enable SSO with Google, GitHub, or Microsoft</div>
-                    </div>
-                  </div>
-                  <input type="checkbox" checked={getSetting('sso_enabled', 'false') === 'true'} onChange={(e) => handleChange('sso_enabled', e.target.checked.toString())} className="rounded text-primary-500 focus:ring-primary-500" />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+                  <p className="font-medium">Login providers</p>
+                  <p className="text-xs text-gray-500 mt-1">Google sign-in is enabled. Other providers are not configured, so no dead buttons are shown.</p>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <Smartphone className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium text-sm">Device Management</div>
-                      <div className="text-xs text-gray-500">Manage active sessions and devices</div>
-                    </div>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Audit trail</p>
+                    <p className="text-xs text-gray-500 mt-1">Every admin mutation is recorded with method, path, IP and user agent.</p>
                   </div>
-                  <Button variant="ghost" size="sm">Manage</Button>
+                  <a href="/admin/audit-log" className="text-xs font-medium text-primary-500 hover:underline">Open audit log</a>
                 </div>
-                <Input label="Session Timeout (minutes)" type="number" value={getSetting('session_timeout', '60')} onChange={(e) => handleChange('session_timeout', e.target.value)} />
-                <Input label="Max Login Attempts" type="number" value={getSetting('max_login_attempts', '5')} onChange={(e) => handleChange('max_login_attempts', e.target.value)} />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Feature controls</p>
+                    <p className="text-xs text-gray-500 mt-1">Registration, AI, paid enrolment and other switches live in Feature Flags.</p>
+                  </div>
+                  <a href="/admin/feature-flags" className="text-xs font-medium text-primary-500 hover:underline">Open flags</a>
+                </div>
               </div>
             </GlassCard>
           )}
@@ -333,18 +326,27 @@ export default function AdminSettings() {
 
           {activeSection === 'email' && (
             <GlassCard className="p-6">
-              <h2 className="text-lg font-semibold mb-6">Email Settings</h2>
+              <h2 className="text-lg font-semibold mb-1">Email Service</h2>
+              <p className="text-sm text-gray-500 mb-6">CareerCode sends transactional email through Cloudflare Email Service. SMTP is not used.</p>
               <div className="space-y-4">
-                <Input label="SMTP Host" value={getSetting('smtp_host', '')} onChange={(e) => handleChange('smtp_host', e.target.value)} placeholder="smtp.gmail.com" icon={<Mail className="w-4 h-4" />} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="SMTP Port" type="number" value={getSetting('smtp_port', '587')} onChange={(e) => handleChange('smtp_port', e.target.value)} />
-                  <Input label="SMTP User" value={getSetting('smtp_user', '')} onChange={(e) => handleChange('smtp_user', e.target.value)} />
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-500/5 p-4">
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Provider: Cloudflare Email Service</p>
+                  <p className="text-xs text-gray-500 mt-1">Sender: noreply@careercode.com.ng · configured through the EMAIL binding.</p>
                 </div>
-                <Input label="SMTP Password" type="password" value={getSetting('smtp_pass', '')} onChange={(e) => handleChange('smtp_pass', e.target.value)} />
-                <Input label="From Email" type="email" value={getSetting('email_from', getSetting('support_email','hello@careercode.academy'))} onChange={(e) => handleChange('email_from', e.target.value)} />
-                <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <input type="checkbox" checked={getSetting('email_notifications_enabled','true')==='true'} onChange={(e)=>handleChange('email_notifications_enabled', e.target.checked?'true':'false')} className="rounded text-primary-500" />
-                  <span className="text-sm font-medium">Enable Email Notifications</span>
+                <Input label="Support email (shown on public pages)" type="email" value={getSetting('support_email', 'hello@careercode.com.ng')} onChange={(e) => handleChange('support_email', e.target.value)} icon={<Mail className="w-4 h-4" />} />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3">
+                  <p className="text-sm font-medium">Send a test email</p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="you@example.com" className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+                    <Button size="sm" disabled={testingEmail || !testEmail.trim()} onClick={async () => {
+                      setTestingEmail(true);
+                      try {
+                        const { data } = await api.post('/admin/email-test', { to: testEmail.trim() });
+                        if (data.success) toast.success('Test email sent'); else toast.error(data.data?.error || 'Email failed');
+                      } catch (e: any) { toast.error(e?.response?.data?.message || 'Email failed'); }
+                      finally { setTestingEmail(false); }
+                    }}>{testingEmail ? 'Sending…' : 'Send test'}</Button>
+                  </div>
                 </div>
               </div>
             </GlassCard>
@@ -352,24 +354,24 @@ export default function AdminSettings() {
 
           {activeSection === 'notifications' && (
             <GlassCard className="p-6">
-              <h2 className="text-lg font-semibold mb-6">Notification Settings</h2>
+              <h2 className="text-lg font-semibold mb-1">Notifications</h2>
+              <p className="text-sm text-gray-500 mb-6">Notification delivery is controlled by the broadcast composer and each user's browser settings.</p>
               <div className="space-y-4">
-                <label className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800 cursor-pointer">
+                <Input label="Notification Retention (days)" type="number" value={getSetting('notification_retention_days','90')} onChange={(e)=>handleChange('notification_retention_days', e.target.value)} />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium">Broadcasts Enabled</div>
-                    <div className="text-xs text-gray-500">Allow admin broadcasts to students/instructors</div>
+                    <p className="text-sm font-medium">Send a broadcast</p>
+                    <p className="text-xs text-gray-500 mt-1">Email + in-app notifications to a role or everyone.</p>
                   </div>
-                  <input type="checkbox" checked={getSetting('broadcasts_enabled','true')==='true'} onChange={(e)=>handleChange('broadcasts_enabled', e.target.checked?'true':'false')} className="rounded text-primary-500" />
-                </label>
-                <label className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800 cursor-pointer">
+                  <a href="/admin/broadcasts" className="text-xs font-medium text-primary-500 hover:underline">Open broadcasts</a>
+                </div>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium">Push Notifications</div>
-                    <div className="text-xs text-gray-500">Enable browser push for new enrollments, certificates</div>
+                    <p className="text-sm font-medium">Web Push</p>
+                    <p className="text-xs text-gray-500 mt-1">Users enable browser notifications from their own Settings page.</p>
                   </div>
-                  <input type="checkbox" checked={getSetting('push_enabled','true')==='true'} onChange={(e)=>handleChange('push_enabled', e.target.checked?'true':'false')} className="rounded text-primary-500" />
-                </label>
-                <Input label="Notification Retention (days)" type="number" value={getSetting('notification_retention_days','30')} onChange={(e)=>handleChange('notification_retention_days', e.target.value)} />
-                <Input label="Admin Alert Email" type="email" value={getSetting('admin_alert_email', getSetting('support_email',''))} onChange={(e)=>handleChange('admin_alert_email', e.target.value)} />
+                  <a href="/admin/system-health" className="text-xs font-medium text-primary-500 hover:underline">Check status</a>
+                </div>
               </div>
             </GlassCard>
           )}

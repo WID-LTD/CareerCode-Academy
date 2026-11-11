@@ -13,7 +13,7 @@ const sections = [
   { title: '7. Limitation of Liability', content: 'CareerCode Academy provides educational content "as is" without warranties of any kind. We are not liable for any damages arising from your use of the Platform, including but not limited to loss of data or missed employment opportunities.' },
   { title: '8. Termination', content: 'We may suspend or terminate accounts for violations of these terms. You may delete your account at any time through settings. Upon termination, your access to paid content will cease.' },
   { title: '9. Governing Law', content: 'These terms are governed by the laws of the State of California. Any disputes shall be resolved through binding arbitration in San Francisco County.' },
-  { title: '10. Contact', content: 'For questions about these terms, please contact us at legal@careercode.academy or through our Contact page.' },
+  { title: '10. Contact', content: 'For questions about these terms, please contact us at legal@careercode.com.ng or through our Contact page.' },
 ];
 
 export default function Terms() {

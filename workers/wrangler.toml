@@ -68,6 +68,14 @@ R2_PUBLIC_URL = "https://pub-a2269f45348a44958044822fb0428bb7.r2.dev"
 pattern = "api.careercode.com.ng/*"
 zone_name = "careercode.com.ng"
 
+[[routes]]
+pattern = "portfolio.careercode.com.ng/*"
+zone_name = "careercode.com.ng"
+
 # [env.production.hyperdrive]  # uncomment after creating the production Hyperdrive
 # binding = "HYPERDRIVE"
 # id = "PASTE_PROD_HYPERDRIVE_ID_HERE"
+
+# ── Background jobs ───────────────────────────────────────────────────────
+[triggers]
+crons = ["*/15 * * * *", "0 * * * *"]

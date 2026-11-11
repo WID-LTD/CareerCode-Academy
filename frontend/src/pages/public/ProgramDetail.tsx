@@ -144,7 +144,7 @@ export default function ProgramDetail() {
                   <Target className="w-5 h-5 text-primary-500" /> Career Outcomes
                 </h3>
                 {outcomes.length === 0 ? (
-                  <p className="text-sm text-gray-500">Career outcomes coming soon.</p>
+                  <p className="text-sm text-gray-500">Career outcomes are added as cohorts complete.</p>
                 ) : (
                   <div className="space-y-2">
                     {outcomes.map((outcome: string, i: number) => (
