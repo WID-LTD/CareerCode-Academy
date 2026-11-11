@@ -707,6 +707,41 @@ portfolio.get('/site/custom-domain/status', async (c) => {
   }
 });
 
+// GET /portfolio/sitemap.xml — public sitemap of published portfolios
+portfolio.get('/sitemap.xml', async (c) => {
+  try {
+    const db = getDb(c.env);
+    const sites = await db.query<any>(
+      `SELECT u.username, ps.updated_at FROM portfolio_sites ps JOIN users u ON u.id = ps.user_id
+       WHERE ps.is_published = 1 AND u.username IS NOT NULL AND u.username <> '' LIMIT 5000`
+    );
+    const projects = await db.query<any>(
+      `SELECT u.username, pp.slug, pp.updated_at FROM portfolio_projects pp
+       JOIN portfolio_sites ps ON ps.id = pp.site_id JOIN users u ON u.id = ps.user_id
+       WHERE ps.is_published = 1 AND u.username IS NOT NULL AND u.username <> '' LIMIT 20000`
+    );
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const urls: string[] = [
+      'https://careercode.com.ng/', 'https://careercode.com.ng/courses',
+      'https://careercode.com.ng/learning-paths', 'https://careercode.com.ng/portfolios',
+    ].map((loc) => `  <url><loc>${loc}</loc><changefreq>weekly</changefreq></url>`);
+    for (const site of sites.rows) {
+      const loc = `https://${site.username}.careercode.com.ng/`;
+      const lastmod = site.updated_at ? `<lastmod>${new Date(site.updated_at).toISOString()}</lastmod>` : '';
+      urls.push(`  <url><loc>${esc(loc)}</loc>${lastmod}<changefreq>weekly</changefreq></url>`);
+    }
+    for (const p of projects.rows) {
+      const loc = `https://${p.username}.careercode.com.ng/${encodeURIComponent(p.slug)}`;
+      const lastmod = p.updated_at ? `<lastmod>${new Date(p.updated_at).toISOString()}</lastmod>` : '';
+      urls.push(`  <url><loc>${esc(loc)}</loc>${lastmod}<changefreq>monthly</changefreq></url>`);
+    }
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+    return c.body(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8' });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to build sitemap');
+  }
+});
+
 // GET /portfolio/resolve-host?host=... — public host → username lookup for Pages Functions
 portfolio.get('/resolve-host', async (c) => {
   try {

@@ -69,10 +69,6 @@ pattern = "api.careercode.com.ng/*"
 zone_name = "careercode.com.ng"
 
 [[routes]]
-pattern = "portfolio.careercode.com.ng/*"
-zone_name = "careercode.com.ng"
-
-[[routes]]
 pattern = "*.careercode.com.ng/*"
 zone_name = "careercode.com.ng"
 

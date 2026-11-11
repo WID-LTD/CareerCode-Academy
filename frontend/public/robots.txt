@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /student/
+Disallow: /instructor/
+Disallow: /checkout
+Disallow: /verify-payment
+
+Sitemap: https://careercode.com.ng/sitemap.xml

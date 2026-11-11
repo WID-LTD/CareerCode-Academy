@@ -20,7 +20,6 @@ export const onRequest = async (context: any) => {
   if (
     host === 'careercode.com.ng' ||
     host === 'www.careercode.com.ng' ||
-    host === 'portfolio.careercode.com.ng' ||
     host.endsWith('.pages.dev') ||
     host.endsWith('.careercode.com.ng')
   ) {

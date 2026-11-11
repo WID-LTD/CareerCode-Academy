@@ -88,8 +88,8 @@ async function proxyPages(path: string, request: Request): Promise<Response> {
   return new Response(res.body, { status: res.status, headers });
 }
 
-// Portfolio host routing: portfolio.careercode.com.ng/<username> serves the
-// public portfolio at that host. Per-user subdomains redirect to the main site.
+// Portfolio host routing: each user gets a dedicated subdomain,
+// <username>.careercode.com.ng, which serves the Pages SPA in place.
 app.use('*', async (c, next) => {
   try {
     const url = new URL(c.req.url);
@@ -97,29 +97,15 @@ app.use('*', async (c, next) => {
     const isApi = url.pathname.startsWith('/api/') || url.pathname === '/health' || url.pathname === '/db-health';
     if (!isApi && host !== 'api.careercode.com.ng' && !host.endsWith('workers.dev')) {
       const parts = url.pathname.split('/').filter(Boolean);
-      if (host === 'portfolio.careercode.com.ng') {
-        if (!parts.length) return c.redirect(`${c.env.FRONTEND_URL}/portfolios`, 302);
-        const asset = /^\/(assets|icons|fonts|wasm)\//.test(url.pathname) ||
-          ['/manifest.webmanifest', '/sw.js', '/offline.html', '/favicon.svg', '/screen.png'].includes(url.pathname);
-        if (asset || parts[0] === 'u') {
-          return proxyPages(url.pathname + url.search, c.req.raw);
-        }
-        const project = parts[1] ? `/${encodeURIComponent(parts[1])}` : '';
-        return c.redirect(`https://${host}/u/${encodeURIComponent(parts[0])}${project}${url.search}`, 302);
-      }
       // Per-user portfolio subdomains: username.careercode.com.ng
+      // Serve the Pages SPA on the subdomain itself so the portfolio has a
+      // dedicated, unbranded URL.
       if (host.endsWith('.careercode.com.ng')) {
         const sub = host.split('.')[0];
         if (sub && !['api', 'www', 'portfolio'].includes(sub)) {
           const user = await getDb(c.env).query<any>('SELECT username FROM users WHERE lower(username) = $1 LIMIT 1', [sub]);
-          if (user.rows.length) {
-            const username = user.rows[0].username;
-            const target = parts.length
-              ? `${c.env.FRONTEND_URL}/u/${encodeURIComponent(username)}/${encodeURIComponent(parts[0])}`
-              : `${c.env.FRONTEND_URL}/u/${encodeURIComponent(username)}`;
-            return c.redirect(target, 302);
-          }
-          return c.redirect(`${c.env.FRONTEND_URL}/portfolios`, 302);
+          if (!user.rows.length) return c.redirect(`${c.env.FRONTEND_URL}/portfolios`, 302);
+          return proxyPages(url.pathname + url.search, c.req.raw);
         }
       }
       if (!host.endsWith('careercode.com.ng') && !host.endsWith('pages.dev')) {

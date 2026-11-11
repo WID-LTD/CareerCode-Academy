@@ -274,16 +274,33 @@ function App() {
     );
   }
 
+  const host = window.location.hostname.toLowerCase();
+  const sub = host.endsWith('.careercode.com.ng') ? host.split('.')[0] : '';
+  const isPortfolioHost = !!sub && !['api', 'www', 'portfolio'].includes(sub) && !host.endsWith('.pages.dev');
+  const pathname = window.location.pathname;
+  const portfolioPath = pathname.startsWith('/u/') ? null : pathname.split('/').filter(Boolean)[0] || null;
+  const renderPortfolioHost = isPortfolioHost && !pathname.startsWith('/u/');
+  const isPortfolioRoute = isPortfolioHost || pathname.startsWith('/u/');
+
   return (
     <OnboardingProvider>
       <AnalyticsTracker />
       <NotificationBridge />
       <RoleWatcher />
       <PwaBridge />
-      <MaintenanceBanner />
-      <GigoWidget />
+      {!isPortfolioRoute && <MaintenanceBanner />}
+      {!isPortfolioRoute && <GigoWidget />}
       <ScrollToTop />
+      {renderPortfolioHost ? (
+        <ErrorBoundary>
+          <SuspenseWrapper>
+            <PublicProfile username={sub} projectSlug={portfolioPath || undefined} />
+          </SuspenseWrapper>
+        </ErrorBoundary>
+      ) : (
       <Routes>
+        <Route path="/u/:username" element={<ErrorBoundary><SuspenseWrapper><PublicProfile /></SuspenseWrapper></ErrorBoundary>} />
+        <Route path="/u/:username/:projectSlug" element={<ErrorBoundary><SuspenseWrapper><PublicProfile /></SuspenseWrapper></ErrorBoundary>} />
         <Route element={<ErrorBoundary><MainLayout /></ErrorBoundary>}>
           <Route path="/" element={<GuestRoute><SuspenseWrapper><Home /></SuspenseWrapper></GuestRoute>} />
           <Route path="/about" element={<SuspenseWrapper><About /></SuspenseWrapper>} />
@@ -319,8 +336,6 @@ function App() {
           <Route path="/career/internships" element={<SuspenseWrapper><InternshipsPage /></SuspenseWrapper>} />
           <Route path="/career/alumni" element={<SuspenseWrapper><AlumniDirectory /></SuspenseWrapper>} />
           <Route path="/portfolios" element={<SuspenseWrapper><PortfolioDirectory /></SuspenseWrapper>} />
-          <Route path="/u/:username" element={<SuspenseWrapper><PublicProfile /></SuspenseWrapper>} />
-          <Route path="/u/:username/:projectSlug" element={<SuspenseWrapper><PublicProfile /></SuspenseWrapper>} />
           <Route path="/faq" element={<SuspenseWrapper><FAQ /></SuspenseWrapper>} />
           <Route path="/careers" element={<SuspenseWrapper><Careers /></SuspenseWrapper>} />
           <Route path="/partners" element={<SuspenseWrapper><Partners /></SuspenseWrapper>} />
@@ -436,7 +451,8 @@ function App() {
 
         <Route path="*" element={<SuspenseWrapper><NotFound /></SuspenseWrapper>} />
       </Routes>
-      <OnboardingModal />
+      )}
+      {!isPortfolioRoute && <OnboardingModal />}
     </OnboardingProvider>
   );
 }

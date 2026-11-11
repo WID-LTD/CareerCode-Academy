@@ -91,8 +91,10 @@ function ProjectCard({ project, accent, dark, onOpen }: { project: Project; acce
   );
 }
 
-export default function PortfolioSite() {
-  const { username, projectSlug } = useParams();
+export default function PortfolioSite({ username: forcedUsername, projectSlug: forcedProjectSlug }: { username?: string; projectSlug?: string } = {}) {
+  const params = useParams();
+  const username = forcedUsername || params.username;
+  const projectSlug = forcedProjectSlug ?? params.projectSlug;
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -143,9 +145,84 @@ export default function PortfolioSite() {
     return (data.projects || []).find((p: Project) => p.slug === projectSlug) || null;
   }, [projectSlug, data]);
 
+  const onSubdomain = useMemo(() => {
+    const host = window.location.hostname.toLowerCase();
+    return host.endsWith('.careercode.com.ng') && !['api', 'www', 'portfolio'].includes(host.split('.')[0]);
+  }, []);
+  const projectHref = (slug: string) => onSubdomain ? `/${slug}` : `/u/${username}/${slug}`;
+
   useEffect(() => {
-    if (data) document.title = `${data.user.name}${project ? ` · ${project.title}` : ''} — Portfolio`;
-  }, [data, project]);
+    if (!data) return;
+    const prevTitle = document.title;
+    const cleanTitle = `${data.user.name}${project ? ` · ${project.title}` : ''} — Portfolio`;
+    document.title = cleanTitle;
+    const added: HTMLElement[] = [];
+    const setMeta = (key: string, content: string, attr: 'name' | 'property' = 'name') => {
+      let el = document.head.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        el.setAttribute('data-portfolio-meta', '1');
+        document.head.appendChild(el);
+        added.push(el);
+      }
+      el.setAttribute('content', content);
+    };
+    const description = data.site?.headline || data.user.headline || `Portfolio of ${data.user.name}`;
+    const canonical = onSubdomain
+      ? `https://${username}.careercode.com.ng${projectSlug ? `/${projectSlug}` : '/'}`
+      : `${window.location.origin}/u/${username}${projectSlug ? `/${projectSlug}` : ''}`;
+    setMeta('description', description);
+    setMeta('author', data.user.name);
+    setMeta('generator', 'CareerCode Academy');
+    setMeta('robots', 'index,follow');
+    setMeta('og:title', cleanTitle, 'property');
+    setMeta('og:description', description, 'property');
+    setMeta('og:type', 'profile', 'property');
+    setMeta('og:url', canonical, 'property');
+    setMeta('twitter:card', 'summary');
+    setMeta('twitter:title', cleanTitle);
+    setMeta('twitter:description', description);
+
+    let canonicalEl = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!canonicalEl) {
+      canonicalEl = document.createElement('link');
+      canonicalEl.rel = 'canonical';
+      canonicalEl.setAttribute('data-portfolio-meta', '1');
+      document.head.appendChild(canonicalEl);
+      added.push(canonicalEl);
+    }
+    canonicalEl.href = canonical;
+
+    let ld = document.getElementById('portfolio-jsonld') as HTMLScriptElement | null;
+    if (!ld) {
+      ld = document.createElement('script');
+      ld.id = 'portfolio-jsonld';
+      ld.type = 'application/ld+json';
+      ld.setAttribute('data-portfolio-meta', '1');
+      document.head.appendChild(ld);
+      added.push(ld);
+    }
+    ld.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      mainEntity: {
+        '@type': 'Person',
+        name: data.user.name,
+        jobTitle: data.user.headline || undefined,
+        description,
+        url: canonical,
+        image: data.user.avatar || undefined,
+        sameAs: Object.values(data.site?.socials || {}).filter(Boolean),
+      },
+      isPartOf: { '@type': 'WebSite', name: 'CareerCode Academy', url: 'https://careercode.com.ng' },
+    });
+
+    return () => {
+      document.title = prevTitle;
+      added.forEach((el) => el.remove());
+    };
+  }, [data, project, username, projectSlug, onSubdomain]);
 
   if (error) {
     return (
@@ -153,7 +230,6 @@ export default function PortfolioSite() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Portfolio not found</h1>
           <p className="text-gray-400 mb-5">This portfolio may be private or the link is wrong.</p>
-          <Link to="/" className="text-indigo-400">Back to CareerCode</Link>
         </div>
       </div>
     );
@@ -169,7 +245,7 @@ export default function PortfolioSite() {
     return (
       <div className={dark ? 'min-h-screen bg-gray-950 text-gray-100' : 'min-h-screen bg-white text-gray-900'}>
         <div className="max-w-4xl mx-auto px-5 py-10">
-          <Link to={`/u/${username}`} className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100">
+          <Link to={onSubdomain ? '/' : `/u/${username}`} className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100">
             <ArrowLeft className="w-4 h-4" /> {user.name}
           </Link>
           <h1 className="text-3xl sm:text-4xl font-bold mt-6">{project.title}</h1>
@@ -277,7 +353,7 @@ export default function PortfolioSite() {
           <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 [&>*]:mb-4">
             {projects.map((p) => (
               <div key={p.id} className="break-inside-avoid">
-                <ProjectCard project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />
+                <ProjectCard project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = projectHref(p.slug))} />
               </div>
             ))}
           </div>
@@ -301,7 +377,7 @@ export default function PortfolioSite() {
             {site.availability && <p className="mt-4 text-xs px-2 py-1 rounded-lg inline-block" style={{ background: `${accent}1a`, color: accent }}>{site.availability}</p>}
           </aside>
           <main className="grid sm:grid-cols-2 gap-4">
-            {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
+            {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = projectHref(p.slug))} />)}
           </main>
         </div>
       </div>
@@ -345,7 +421,7 @@ export default function PortfolioSite() {
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-5 py-10 grid sm:grid-cols-2 gap-4">
-          {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
+          {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = projectHref(p.slug))} />)}
         </div>
       </div>
     );
@@ -510,7 +586,7 @@ export default function PortfolioSite() {
         <section>
           <h2 className="text-xs uppercase tracking-widest opacity-50 mb-4">Selected work</h2>
           <div className="grid sm:grid-cols-2 gap-4">
-            {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = `/u/${username}/${p.slug}`)} />)}
+            {projects.map((p) => <ProjectCard key={p.id} project={p} accent={accent} dark={dark} onOpen={() => (window.location.href = projectHref(p.slug))} />)}
           </div>
         </section>
         {reviews.length > 0 && (
@@ -529,7 +605,7 @@ export default function PortfolioSite() {
             </div>
           </section>
         )}
-        <footer className="mt-14 text-xs opacity-40">Built with CareerCode Academy</footer>
+        <footer className="mt-14 text-xs opacity-40">© {new Date().getFullYear()} {user.name}</footer>
 
         {reviewOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm grid place-items-center p-4">

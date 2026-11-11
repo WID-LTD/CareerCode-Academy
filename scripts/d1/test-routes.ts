@@ -473,6 +473,7 @@ async function main() {
       if (!u?.username) return { status: 200, json: { success: true, skipped: true } };
       return call(`/api/v1/portfolio/site/${u.username}/reviews`);
     }, (r) => (r.json?.skipped || Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/portfolio/sitemap.xml', () => call('/api/v1/portfolio/sitemap.xml'), (r) => (String(r.text).includes('<urlset') ? null : String(r.text).slice(0, 120))],
     ['GET /api/v1/portfolio/resolve-host', () => call('/api/v1/portfolio/resolve-host?host=example.careercode.com.ng'), (r) => (r.json?.success && 'data' in r.json ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/portfolio/site/custom-domain/status', () => call('/api/v1/portfolio/site/custom-domain/status', { token }), (r) => (r.json?.data?.status ? null : JSON.stringify(r.json).slice(0, 160))],
     ['PUT /api/v1/portfolio/site/custom-domain', () => call('/api/v1/portfolio/site/custom-domain', { method: 'PUT', token, body: { domain: 'portfolio.example.com' } }), (r) => (r.json?.data?.status === 'pending' ? null : JSON.stringify(r.json).slice(0, 160))],
