@@ -49,7 +49,7 @@ pub.get('/currency', async (c) => {
 pub.get('/config', async (c) => {
   try {
     const { rows } = await getDb(c.env).query<any>(
-      `SELECT key, value FROM system_settings WHERE key IN ('platform_name','support_email','website_url','platform_currency','platform_currency_symbol')`
+      `SELECT key, value FROM system_settings WHERE key IN ('platform_name','platform_description','support_email','website_url','platform_currency','platform_currency_symbol','default_language','timezone')`
     );
     const map: Record<string, string> = {};
     rows.forEach((r: any) => { map[r.key] = r.value; });
@@ -62,8 +62,11 @@ pub.get('/config', async (c) => {
       success: true,
       data: {
         name: map.platform_name || 'CareerCode Academy',
+        description: map.platform_description || 'CareerCode Academy is the education venture of WID LTD, delivering practical, project-based technology education.',
         supportEmail: map.support_email || 'hello@careercode.com.ng',
         websiteUrl: map.website_url || 'https://careercode.com.ng',
+        language: map.default_language || 'English (Nigeria)',
+        timezone: map.timezone || 'West Africa Time (WAT)',
         currency: map.platform_currency || 'NGN',
         currencySymbol: map.platform_currency_symbol || '₦',
         flags,

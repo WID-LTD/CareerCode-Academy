@@ -4,10 +4,6 @@
 export interface Env {
   // Primary datastore (Cloudflare D1).
   DB?: D1Database;
-  // Neon fallback, used only when DB_BACKEND=neon.
-  DATABASE_URL?: string;
-  // Manual switch: 'd1' (default) or 'neon'. Set as a worker secret/var.
-  DB_BACKEND?: 'd1' | 'neon';
   // R2 bucket for database backups (see scripts/backup-d1.sh).
   BACKUPS?: R2Bucket;
   // R2 bucket for course media / uploads.

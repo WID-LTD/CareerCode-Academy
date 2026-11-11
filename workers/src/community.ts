@@ -211,15 +211,51 @@ export async function leaveChannel(env: Env, channelId: string, userId: string):
 }
 
 export async function isChannelMember(env: Env, channelId: string, userId: string): Promise<any | null> {
-  const { rows } = await getDb(env).query<any>(
+  const db = getDb(env);
+  const { rows } = await db.query<any>(
     'SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2',
     [channelId, userId]
   );
-  return rows[0] || null;
+  if (rows[0]) return rows[0];
+
+  // Community channels inherit access from community membership.
+  const channel = await db.query<any>('SELECT community_id FROM community_channels WHERE id = $1', [channelId]);
+  const communityId = channel.rows[0]?.community_id;
+  if (!communityId) return null;
+  const member = await db.query<any>(
+    'SELECT * FROM community_members WHERE community_id = $1 AND user_id = $2 AND COALESCE(is_banned, 0) = 0',
+    [communityId, userId]
+  );
+  if (!member.rows[0]) return null;
+  return {
+    ...member.rows[0],
+    channel_id: channelId,
+    user_id: userId,
+    via_community: true,
+    is_muted: member.rows[0].is_muted ? 1 : 0,
+    is_banned: 0,
+  };
 }
 
 export async function getChannelMembers(env: Env, channelId: string): Promise<any[]> {
-  const { rows } = await getDb(env).query<any>(
+  const db = getDb(env);
+  const channel = await db.query<any>('SELECT community_id FROM community_channels WHERE id = $1', [channelId]);
+  const communityId = channel.rows[0]?.community_id;
+  if (communityId) {
+    const communityMembers = await db.query<any>(
+      `SELECT cm.*,
+         u.name AS user_name, u.email AS user_email, u.avatar AS user_avatar, u.role AS user_role
+       FROM community_members cm
+       JOIN users u ON u.id = cm.user_id
+       WHERE cm.community_id = $1 AND COALESCE(cm.is_banned, 0) = 0
+       ORDER BY
+         CASE cm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'moderator' THEN 2 ELSE 3 END,
+         u.name`,
+      [communityId]
+    );
+    if (communityMembers.rows.length) return communityMembers.rows;
+  }
+  const { rows } = await db.query<any>(
     `SELECT cm.*,
        u.name AS user_name, u.email AS user_email, u.avatar AS user_avatar, u.role AS user_role
      FROM channel_members cm
@@ -680,6 +716,17 @@ export async function createCommunity(env: Env, input: {
     [community.id]
   );
 
+  // Every community starts with a General channel so it is usable immediately.
+  try {
+    await db.query(
+      `INSERT INTO community_channels (name, slug, description, created_by, community_id, is_public, member_count)
+       VALUES ('General', 'general', 'General discussion for this community.', $1, $2, 1, 1)`,
+      [input.created_by, community.id]
+    );
+    await db.query('UPDATE communities SET channel_count = 1 WHERE id = $1', [community.id]);
+    community.channel_count = 1;
+  } catch { /* channel creation is best-effort */ }
+
   community.member_count = 1;
   return community;
 }
@@ -739,8 +786,19 @@ export async function joinCommunity(env: Env, communityId: string, userId: strin
      RETURNING *`,
     [communityId, userId, role]
   );
+  if (!rows[0]) {
+    const existing = await db.query<any>(
+      'SELECT * FROM community_members WHERE community_id = $1 AND user_id = $2',
+      [communityId, userId]
+    );
+    return existing.rows[0] || null;
+  }
   await db.query(
     'UPDATE communities SET member_count = member_count + 1 WHERE id = $1',
+    [communityId]
+  );
+  await db.query(
+    'UPDATE community_channels SET member_count = member_count + 1 WHERE community_id = $1',
     [communityId]
   );
   return rows[0];
@@ -755,6 +813,10 @@ export async function leaveCommunity(env: Env, communityId: string, userId: stri
   if (left) {
     await getDb(env).query(
       'UPDATE communities SET member_count = CASE WHEN member_count > 0 THEN member_count - 1 ELSE 0 END WHERE id = $1',
+      [communityId]
+    );
+    await getDb(env).query(
+      'UPDATE community_channels SET member_count = CASE WHEN member_count > 0 THEN member_count - 1 ELSE 0 END WHERE community_id = $1',
       [communityId]
     );
   }

@@ -29,6 +29,13 @@ const CURRENCIES: Record<string, { symbol: string; gateways: string[] }> = {
   AUD: { symbol: 'A$', gateways: ['flutterwave'] },
 };
 
+async function settingValue(env: Env, key: string): Promise<string | null> {
+  try {
+    const { rows } = await getDb(env).query<any>('SELECT value FROM system_settings WHERE key = $1', [key]);
+    return rows[0]?.value || null;
+  } catch { return null; }
+}
+
 async function platformCurrency(env: Env): Promise<string> {
   try {
     const { rows } = await getDb(env).query<{ value: string }>(
@@ -334,7 +341,7 @@ payments.post('/initialize', async (c) => {
       const json: any = await resp.json();
       if (!json.status) return fail(c, 502, json.message || 'Paystack initialization failed');
       data.authorizationUrl = json.data.authorization_url;
-      data.publicKey = c.env.PAYSTACK_PUBLIC_KEY;
+      data.publicKey = c.env.PAYSTACK_PUBLIC_KEY || await settingValue(c.env, 'paystack_public_key');
     } else if (provider === 'flutterwave' && gatewayConfigured(flutterwaveKey)) {
       const resp = await fetchWithTimeout('https://api.flutterwave.com/v3/payments', {
         method: 'POST',
@@ -352,7 +359,7 @@ payments.post('/initialize', async (c) => {
       const json: any = await resp.json();
       if (json.status === 'success' || json.status === '1') {
         data.authorizationUrl = json.data?.link;
-        data.publicKey = c.env.FLUTTERWAVE_PUBLIC_KEY;
+        data.publicKey = c.env.FLUTTERWAVE_PUBLIC_KEY || await settingValue(c.env, 'flutterwave_public_key');
         data.provider = 'flutterwave';
       } else {
         return fail(c, 502, json.message || 'Flutterwave initialization failed');
@@ -360,7 +367,7 @@ payments.post('/initialize', async (c) => {
     } else {
       // No gateway keys: dev mode — hand back a success URL so enrollment can be completed.
       data.authorizationUrl = `${c.env.FRONTEND_URL}/verify-payment?reference=${payment.reference}&status=success`;
-      data.publicKey = c.env.PAYSTACK_PUBLIC_KEY || '';
+      data.publicKey = c.env.PAYSTACK_PUBLIC_KEY || await settingValue(c.env, 'paystack_public_key') || '';
     }
 
     return c.json({ success: true, data });

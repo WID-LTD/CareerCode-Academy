@@ -12,7 +12,6 @@
 | Workers AI | Daily free neurons | Billed | Per-user caps on study assistant |
 | Email Sending | Workers Paid: 3,000/mo included | $0.35 per 1,000 after | Verification, welcome, reset, invoices, role changes |
 | **D1 (primary DB)** | 5 GB storage, **5M rows read/day**, **100k rows written/day** | Hard stop at daily cap (queries error until reset) | 106 tables, 45.8k rows, ~30 MB. Reads dominate; analytics is the only heavy writer |
-| Neon Postgres | ~0.5 GB, ~100 CU-h/mo | Throttled/cold | **Idle** — kept only as the `DB_BACKEND=neon` rollback target |
 | Hyperdrive | Included all plans | — | Not used |
 
 ## Forbidden (would create bills)
@@ -27,7 +26,6 @@ If it isn't in the table above, it doesn't get enabled.
 - Cloudflare dashboard → D1 → `careercode-academy` → rows read/written per day
   (the 100k writes/day cap is the one to watch; analytics batch writes are the
   main driver).
-- Neon dashboard → Billing (compute hours) — only while proxied routes remain.
 - R2 dashboard → bucket size.
 
 ## No-card rule
@@ -40,5 +38,4 @@ check are the safety net.
 2. R2: bucket GB vs 10 GB line; delete temp/pipeline artifacts.
 3. Realtime: `admin/usage` minutes vs ~500 classroom-hour equivalent.
 4. D1: rows written/day trend vs 100k; storage vs 5 GB.
-   Neon: compute hours vs 100 only if proxied routes still exist.
 5. Confirm no paid product was enabled (Images/Stream/Paid plan).

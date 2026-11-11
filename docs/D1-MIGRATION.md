@@ -1,6 +1,6 @@
 # Neon → Cloudflare D1 migration
 
-The API worker now reads and writes **Cloudflare D1** (SQLite). Neon is no
+The API worker reads and writes **Cloudflare D1** (SQLite) only. Neon is no
 longer used by any native worker route.
 
 ## What runs where
@@ -37,36 +37,16 @@ Postgres constructs this codebase uses into SQLite at runtime:
 These column maps are generated from the live schema into
 `workers/src/schema-types.ts`.
 
-## Switching back to Neon (manual rollback)
+## D1 only
 
-The worker supports both datastores behind the same `getDb()` interface. The
-switch is one variable — no code change, no redeploy of routes:
+Cloudflare D1 is the only runtime datastore. The Neon fallback, `DB_BACKEND`
+switch and `@neondatabase/serverless` dependency were removed from the Worker.
 
-```bash
-cd workers
-# rollback to Postgres
-npx wrangler secret put DB_BACKEND     # enter: neon
-# back to D1
-npx wrangler secret put DB_BACKEND     # enter: d1
-```
-
-`DB_BACKEND` also lives in `wrangler.toml` `[vars]` (default `d1`). Resolution
-order in `workers/src/db.ts`:
-
-1. `DB_BACKEND=neon` → `@neondatabase/serverless` with `DATABASE_URL`
-2. `DB_BACKEND=d1` → D1 binding `DB`
-3. unset → D1 if bound, otherwise Neon if `DATABASE_URL` exists
-
-`GET /db-health` reports the active backend (`{"backend":"d1"}`) and runs a real
-query, so a switch is verifiable in one request. Keep `DATABASE_URL` set as a
-secret while Neon remains a rollback option; the last proxied routes still use
-it on Render regardless.
-
-> Rollback caveat: writes made while on D1 do **not** flow back to Neon. A
-> rollback restores service from the last Neon state, so treat it as an
-> emergency lever, not a sync mechanism. Neon still holds the pre-migration
-> snapshot and receives the `notifications.link` migration, so `DB_BACKEND=neon`
-> works for every ported route.
+- `DATABASE_URL` and `DB_BACKEND` Worker secrets were deleted.
+- `workers/src/db.ts` binds only to the D1 `DB` binding.
+- `GET /db-health` always reports `{"backend":"d1"}`.
+- Neon remains only as an offline migration source; it is not reachable from
+  the request path.
 
 ## Backups (R2 / S3)
 

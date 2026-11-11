@@ -257,7 +257,7 @@ portfolio.get('/site', async (c) => {
     const s = await requireAuth(c);
     const site = await ensureSite(c.env, s.userId);
     const user = (await getDb(c.env).query<any>(
-      'SELECT id, name, username, avatar, bio FROM users WHERE id = $1', [s.userId]
+      'SELECT id, name, username, avatar, bio, portfolio_public FROM users WHERE id = $1', [s.userId]
     )).rows[0];
     return c.json({
       success: true,
@@ -473,7 +473,7 @@ portfolio.get('/directory', async (c) => {
     const q = (c.req.query('q') || '').trim();
     const limit = Math.min(60, Math.max(1, parseInt(c.req.query('limit') || '24', 10) || 24));
     const params: any[] = [];
-    let where = `s.is_published = 1`;
+    let where = `s.is_published = 1 AND COALESCE(u.portfolio_public, 1) = 1`;
     if (q) {
       params.push(`%${q}%`);
       where += ` AND (u.name ILIKE $${params.length} OR s.headline ILIKE $${params.length})`;
@@ -770,7 +770,7 @@ portfolio.get('/site/:username', async (c) => {
   try {
     const db = getDb(c.env);
     const user = (await db.query<any>(
-      'SELECT id, name, username, avatar, bio, headline, location, website, github, twitter, linkedin FROM users WHERE username = $1',
+      'SELECT id, name, username, avatar, bio, headline, location, website, github, twitter, linkedin FROM users WHERE username = $1 AND COALESCE(portfolio_public, 1) = 1',
       [c.req.param('username')]
     )).rows[0];
     if (!user) return fail(c, 404, 'Portfolio not found');

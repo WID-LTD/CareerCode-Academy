@@ -1,5 +1,5 @@
 # Cloudflare Workers config for the CareerCode Academy API.
-# Secrets (DATABASE_URL, JWT secrets, gateway keys) are set via
+# Secrets (JWT secrets, gateway keys) are set via
 #   wrangler secret put <NAME>
 # or .dev.vars locally (gitignored). NEVER commit secrets here.
 
@@ -9,9 +9,7 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 
 [vars]
-# Datastore switch: "d1" (Cloudflare D1) or "neon" (Postgres fallback).
-# Override with `wrangler secret put DB_BACKEND` for a no-code rollback.
-DB_BACKEND = "d1"
+# Datastore: Cloudflare D1 only.
 MAIL_FROM = "CareerCode Academy <noreply@careercode.com.ng>"
 VAPID_PUBLIC_KEY = "BOuBtoIywA3pMlggk60CZjANpKFJZJS4SdSLIzP24vw0MI2Q2lI18tFonLa1ikDbpZLf6gNbfxKFpjw_ytcGJmw"
 VAPID_SUBJECT = "mailto:contact@careercode.com.ng"

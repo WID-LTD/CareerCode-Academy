@@ -439,22 +439,26 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setUserRoleFilter: (role: string) => set({ userRoleFilter: role }),
   suspendUser: async (id: string, reason: string) => {
     await api.put(`/admin/users/${id}/suspend`, { reason });
-    get().fetchUsers(get().usersPagination?.page || 1);
+    const p = get().usersPagination;
+    await get().fetchUsers(p?.page || 1, p?.limit || 1000);
   },
   reactivateUser: async (id: string) => {
     await api.put(`/admin/users/${id}/reactivate`);
-    get().fetchUsers(get().usersPagination?.page || 1);
+    const p = get().usersPagination;
+    await get().fetchUsers(p?.page || 1, p?.limit || 1000);
   },
   deleteUser: async (id: string) => {
     await api.delete(`/admin/users/${id}`);
-    set({ users: get().users.filter(u => u._id !== id) });
+    const p = get().usersPagination;
+    await get().fetchUsers(p?.page || 1, p?.limit || 1000);
   },
   resetUserPassword: async (id: string) => {
     await api.post(`/admin/users/${id}/reset-password`);
   },
   updateUserRole: async (id: string, role: string) => {
     await api.put(`/admin/users/${id}/role`, { role });
-    get().fetchUsers(get().usersPagination?.page || 1);
+    const p = get().usersPagination;
+    await get().fetchUsers(p?.page || 1, p?.limit || 1000);
     if (get().userDetail?._id === id) {
       set({ userDetail: { ...get().userDetail!, role } });
     }
@@ -462,7 +466,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setUserDetail: (user: AdminUser | null) => set({ userDetail: user }),
   bulkUpdateUserRole: async (ids: string[], role: string) => {
     await Promise.all(ids.map(id => api.put(`/admin/users/${id}/role`, { role })));
-    get().fetchUsers(get().usersPagination?.page || 1);
+    const p = get().usersPagination;
+    await get().fetchUsers(p?.page || 1, p?.limit || 1000);
   },
 
   // ═══════════════════════════════════════

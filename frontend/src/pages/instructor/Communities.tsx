@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Loader2, X, Users, MessageSquare, Edit, Trash2, Archive, ArchiveRestore, Globe, Lock, EyeOff, Hash, Calendar, BookOpen } from 'lucide-react';
+import { Plus, Search, Loader2, X, Users, MessageSquare, Edit, Trash2, Archive, ArchiveRestore, Globe, Lock, EyeOff, Hash, Calendar, BookOpen, Link2, Copy, Check } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -25,10 +25,14 @@ export default function InstructorCommunities() {
   const [saving, setSaving] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; id: string; name: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('mine');
+  const [inviteFor, setInviteFor] = useState<Community | null>(null);
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   useEffect(() => { fetchCommunities(); }, [fetchCommunities]);
 
-  const myCommunities = useMemo(() => communities.filter(c => (c as any).created_by === user?.id || (c as any).my_role === 'owner'), [communities, user?.id]);
+  const myCommunities = useMemo(() => communities.filter(c => (c as any).is_member || (c as any).created_by === user?.id), [communities, user?.id]);
   const list = activeTab === 'mine' ? myCommunities : communities;
 
   const filtered = useMemo(() => {
@@ -54,7 +58,7 @@ export default function InstructorCommunities() {
     } finally { setSaving(false); }
   };
 
-  const canEdit = (c: Community) => (c as any).created_by === user?.id || (c as any).my_role === 'owner' || user?.role === 'admin' || user?.role === 'super_admin';
+  const canEdit = (c: Community) => (c as any).created_by === user?.id || ['owner', 'admin', 'moderator'].includes((c as any).my_role) || user?.role === 'admin' || user?.role === 'super_admin';
   const canDelete = (c: Community) => (c as any).created_by === user?.id || user?.role === 'admin' || user?.role === 'super_admin';
 
   return (
@@ -133,6 +137,17 @@ export default function InstructorCommunities() {
                       {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
                       {canEdit(community as Community) && (
                         <Button variant="ghost" size="sm" onClick={async () => {
+                          setInviteFor(community as Community); setInviteLink(''); setInviteCopied(false); setInviteLoading(true);
+                          try {
+                            const { data } = await api.post(`/community/communities/${community.id}/invites`, {});
+                            setInviteLink(`${window.location.origin}/community/join/${data.data.code}`);
+                          } catch (err: any) {
+                            setInviteLink('');
+                          } finally { setInviteLoading(false); }
+                        }} icon={<Link2 className="w-3.5 h-3.5" />}>Invite link</Button>
+                      )}
+                      {canEdit(community as Community) && (
+                        <Button variant="ghost" size="sm" onClick={async () => {
                           setRequestsFor(community as Community); setRequestsLoading(true);
                           try { const { data } = await api.get(`/community/communities/${community.id}/requests`); setRequests(data.data || []); }
                           catch { setRequests([]); } finally { setRequestsLoading(false); }
@@ -147,6 +162,33 @@ export default function InstructorCommunities() {
               </GlassCard>
             );
           })}
+        </div>
+      )}
+
+      {inviteFor && (
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm p-4 grid place-items-center" role="dialog" aria-label="Community invite link">
+          <div className="w-full max-w-md rounded-2xl bg-gray-900 border border-gray-800 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-lg">Invite to {inviteFor.name}</h3>
+              <button onClick={() => setInviteFor(null)} className="text-gray-400" aria-label="Close">✕</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">Anyone with this link can join this community, including invite-only communities.</p>
+            {inviteLoading ? <p className="text-sm text-gray-400">Creating link…</p> : inviteLink ? (
+              <>
+                <div className="flex gap-2">
+                  <input readOnly value={inviteLink} className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-200" />
+                  <Button size="sm" onClick={async () => { try { await navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 1500); } catch { /* ignore */ } }} icon={inviteCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}>{inviteCopied ? 'Copied' : 'Copy'}</Button>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    setInviteLoading(true);
+                    try { const { data } = await api.post(`/community/communities/${inviteFor.id}/invites`, {}); setInviteLink(`${window.location.origin}/community/join/${data.data.code}`); setInviteCopied(false); }
+                    finally { setInviteLoading(false); }
+                  }}>New link</Button>
+                </div>
+              </>
+            ) : <p className="text-sm text-red-400">Could not create an invite link.</p>}
+          </div>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Hash, Volume2, Megaphone, ChevronDown, ChevronRight, Plus, Users, Settings, LogOut, Search, Menu, ArrowLeft } from 'lucide-react';
 import { useCommunityStore, CommunityChannel, CommunityCategory } from '@/store/communityStore';
@@ -12,11 +12,15 @@ const channelIcons: Record<string, typeof Hash> = {
 };
 
 export function ChannelSidebar({ onToggleMembers, showMembers, onBack }: { onToggleMembers: () => void; showMembers: boolean; onBack?: () => void }) {
-  const { categories, channels, activeChannel, setActiveChannel, joinChannel, leaveChannel } = useCommunityStore();
+  const { categories, channels, activeChannel, setActiveChannel, joinChannel, leaveChannel, activeCommunity } = useCommunityStore();
   const { user } = useAuthStore();
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(categories.map((c) => c.slug)));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set([...categories.map((c) => c.slug), 'channels']));
   const [search, setSearch] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setExpandedCategories((prev) => new Set([...prev, ...categories.map((c) => c.slug), 'channels']));
+  }, [categories]);
 
   const toggleCategory = (slug: string) => {
     setExpandedCategories((prev) => {
@@ -27,16 +31,21 @@ export function ChannelSidebar({ onToggleMembers, showMembers, onBack }: { onTog
     });
   };
 
-  const groupedChannels = categories.map((cat) => ({
+  const categorized = categories.map((cat) => ({
     ...cat,
-    channels: channels.filter((ch) => ch.category_id === cat.id),
+    channels: channels.filter((ch: CommunityChannel) => ch.category_id === cat.id),
   }));
+  const uncategorized = channels.filter((ch: CommunityChannel) => !ch.category_id || !categories.some((cat) => cat.id === ch.category_id));
+  const groupedChannels = [
+    ...categorized,
+    ...(uncategorized.length ? [{ id: 'uncategorized', name: 'Channels', slug: 'channels', channels: uncategorized } as any] : []),
+  ];
 
   const filteredGrouped = search
     ? groupedChannels.map((g) => ({
         ...g,
         channels: g.channels.filter(
-          (ch) => ch.name.toLowerCase().includes(search.toLowerCase()) || ch.description?.toLowerCase().includes(search.toLowerCase())
+          (ch: CommunityChannel) => ch.name.toLowerCase().includes(search.toLowerCase()) || ch.description?.toLowerCase().includes(search.toLowerCase())
         ),
       })).filter((g) => g.channels.length > 0)
     : groupedChannels;
@@ -56,7 +65,7 @@ export function ChannelSidebar({ onToggleMembers, showMembers, onBack }: { onTog
             </button>
           )}
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="gradient-text">Community</span>
+            <span className="gradient-text">{activeCommunity?.name || 'Community'}</span>
           </h2>
         </div>
         <div className="relative">
@@ -97,10 +106,10 @@ export function ChannelSidebar({ onToggleMembers, showMembers, onBack }: { onTog
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  {group.channels.map((ch) => {
+                  {group.channels.map((ch: CommunityChannel) => {
                     const Icon = channelIcons[ch.type] || Hash;
                     const isActive = activeChannel?.id === ch.id;
-                    const isMember = ch.is_member;
+                    const isMember = ch.is_member !== false;
 
                     return (
                       <button

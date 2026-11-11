@@ -110,6 +110,7 @@ async function call(pathname: string, opts: { token?: string; method?: string; b
 }
 
 async function main() {
+  try { raw.exec('DELETE FROM ai_usage;'); } catch { /* table may not exist */ }
   const user: any = raw.prepare(
     `SELECT u.id, u.role FROM users u JOIN enrollments e ON e.user_id = u.id
      WHERE u.role = 'student' GROUP BY u.id ORDER BY COUNT(*) DESC LIMIT 1`
@@ -450,6 +451,32 @@ async function main() {
       if (!rid) return { status: 200, json: { success: true, skipped: true } };
       return call(`/api/v1/community/communities/${id}/requests/${rid}`, { method: 'PUT', token: adminToken, body: { status: 'approved' } });
     }, (r) => (r.json?.skipped || r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/community/communities (instructor/admin create)', async () => {
+      const slug = `qa-community-${Date.now()}`;
+      const r = await call('/api/v1/community/communities', { method: 'POST', token: adminToken, body: { name: 'QA Community', slug, description: 'QA community', category: 'Tech', visibility: 'private', join_policy: 'invite_only' } });
+      (globalThis as any).__commNewId = r.json?.data?.id;
+      (globalThis as any).__commNewSlug = slug;
+      return r;
+    }, (r) => (r.json?.data?.id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/community/communities/:id/channels (default General)', async () => {
+      const id = (globalThis as any).__commNewId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      const r = await call(`/api/v1/community/communities/${id}/channels`, { token: adminToken });
+      (globalThis as any).__commChannelId = r.json?.data?.[0]?.id;
+      return r;
+    }, (r) => (r.json?.skipped || (Array.isArray(r.json?.data) && r.json.data.length >= 1 && r.json.data[0].name === 'General') ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/community/communities/:id/invites', async () => {
+      const id = (globalThis as any).__commNewId;
+      if (!id) return { status: 200, json: { success: true, skipped: true } };
+      const r = await call(`/api/v1/community/communities/${id}/invites`, { method: 'POST', token: adminToken, body: {} });
+      (globalThis as any).__commInvite = r.json?.data?.code;
+      return r;
+    }, (r) => (r.json?.skipped || r.json?.data?.code ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/community/communities/invites/:code/join', async () => {
+      const code = (globalThis as any).__commInvite;
+      if (!code) return { status: 200, json: { success: true, skipped: true } };
+      return call(`/api/v1/community/communities/invites/${code}/join`, { method: 'POST', token });
+    }, (r) => (r.json?.skipped || r.json?.data?.community?.id ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/community/my-requests', () => call('/api/v1/community/my-requests', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/portfolio/directory', () => call('/api/v1/portfolio/directory'), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/payments/:ref/receipt (PDF)', async () => {

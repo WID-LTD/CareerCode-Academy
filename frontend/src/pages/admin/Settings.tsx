@@ -97,26 +97,26 @@ export default function AdminSettings() {
                 <Input label="Platform Name" value={getSetting('platform_name', 'CareerCode Academy')} onChange={(e) => handleChange('platform_name', e.target.value)} />
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Platform Description</label>
-                  <textarea rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all" value={getSetting('platform_description', 'Empowering the next generation of developers...')} onChange={(e) => handleChange('platform_description', e.target.value)} />
+                  <textarea rows={3} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all" value={getSetting('platform_description', 'CareerCode Academy is the education venture of WID LTD, delivering practical, project-based technology education.')} onChange={(e) => handleChange('platform_description', e.target.value)} />
                 </div>
                 <Input label="Support Email" type="email" value={getSetting('support_email', 'hello@careercode.com.ng')} onChange={(e) => handleChange('support_email', e.target.value)} icon={<Mail className="w-4 h-4" />} />
                 <Input label="Website URL" value={getSetting('website_url', 'https://careercode.com.ng')} onChange={(e) => handleChange('website_url', e.target.value)} icon={<Globe className="w-4 h-4" />} />
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Default Language</label>
-                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('default_language', 'English (US)')} onChange={(e) => handleChange('default_language', e.target.value)}>
+                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('default_language', 'English (Nigeria)')} onChange={(e) => handleChange('default_language', e.target.value)}>
+                    <option>English (Nigeria)</option>
                     <option>English (US)</option>
-                    <option>Spanish</option>
-                    <option>French</option>
-                    <option>German</option>
+                    <option>English (UK)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Timezone</label>
-                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('timezone', 'Pacific Time (PT)')} onChange={(e) => handleChange('timezone', e.target.value)}>
-                    <option>Pacific Time (PT)</option>
-                    <option>Eastern Time (ET)</option>
+                  <select className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" value={getSetting('timezone', 'West Africa Time (WAT)')} onChange={(e) => handleChange('timezone', e.target.value)}>
+                    <option>West Africa Time (WAT)</option>
+                    <option>UTC</option>
                     <option>Central European Time (CET)</option>
-                    <option>Greenwich Mean Time (GMT)</option>
+                    <option>Eastern Time (ET)</option>
+                    <option>Pacific Time (PT)</option>
                   </select>
                 </div>
               </div>
@@ -265,7 +265,7 @@ export default function AdminSettings() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                <Input label="Organization Name" value={getSetting('certificate_org_name', 'Career Code WID Ltd')}
+                <Input label="Organization Name" value={getSetting('certificate_org_name', 'WID LTD')}
                   onChange={(e) => handleChange('certificate_org_name', e.target.value)} />
                 <Input label="Organization RC Number" value={getSetting('certificate_org_rc', 'RC 8824091')}
                   onChange={(e) => handleChange('certificate_org_rc', e.target.value)} />

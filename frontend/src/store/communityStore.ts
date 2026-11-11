@@ -175,6 +175,7 @@ interface CommunityState {
   removeMessage: (msgId: string) => void;
   fetchCommunities: () => Promise<void>;
   fetchCommunityById: (id: string) => Promise<void>;
+  fetchCommunityChannels: (communityId: string) => Promise<void>;
   createCommunity: (data: { name: string; slug: string; description?: string; category: string; visibility?: string; join_policy?: string; image_url?: string }) => Promise<Community | null>;
   updateCommunity: (id: string, data: Partial<Community>) => Promise<void>;
   deleteCommunity: (id: string) => Promise<void>;
@@ -548,6 +549,16 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
       set({ activeCommunity: data.data || null });
     } catch (error) {
       console.error('Failed to fetch community', error);
+    }
+  },
+
+  fetchCommunityChannels: async (communityId) => {
+    try {
+      const { data } = await api.get(`/community/communities/${communityId}/channels`);
+      set({ channels: data.data || [] });
+    } catch (error) {
+      console.error('Failed to fetch community channels', error);
+      set({ channels: [] });
     }
   },
 

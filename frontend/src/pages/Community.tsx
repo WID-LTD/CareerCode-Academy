@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
 import { useCommunityStore, Community as CommunityType } from '@/store/communityStore';
@@ -12,7 +12,7 @@ import { Users, Globe, Lock, Key, ArrowLeft, MessageSquare, Search, ChevronRight
 function CommunityCard({ community, onJoin, onEnter }: {
   community: CommunityType;
   onJoin: (id: string) => void;
-  onEnter: () => void;
+  onEnter: (id: string) => void;
 }) {
   const categoryColors: Record<string, string> = {
     General: 'from-blue-500 to-cyan-500',
@@ -60,7 +60,7 @@ function CommunityCard({ community, onJoin, onEnter }: {
       <div className="flex gap-2">
         {community.is_member ? (
           <button
-            onClick={onEnter}
+            onClick={() => onEnter(community.id)}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-sm font-medium transition-colors"
           >
             Enter <ChevronRight size={16} />
@@ -82,7 +82,7 @@ function CommunityCard({ community, onJoin, onEnter }: {
   );
 }
 
-function CommunityBrowser({ onSelectCommunity }: { onSelectCommunity: () => void }) {
+function CommunityBrowser({ onEnter }: { onEnter: (id: string) => void }) {
   const { communities, fetchCommunities, joinCommunity } = useCommunityStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'joined' | 'discover'>('all');
@@ -153,7 +153,7 @@ function CommunityBrowser({ onSelectCommunity }: { onSelectCommunity: () => void
                 key={community.id}
                 community={community}
                 onJoin={(id) => joinCommunity(id)}
-                onEnter={onSelectCommunity}
+                onEnter={onEnter}
               />
             ))}
           </div>
@@ -164,75 +164,98 @@ function CommunityBrowser({ onSelectCommunity }: { onSelectCommunity: () => void
 }
 
 export default function Community() {
-  const { id: channelId } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const {
     fetchCategories,
-    fetchChannels,
     channels,
+    activeChannel,
     setActiveChannel,
     initializeSocket,
     disconnectSocket,
-    activeChannel,
     activeThread,
+    fetchCommunityById,
+    fetchCommunityChannels,
+    activeCommunity,
+    joinCommunity,
   } = useCommunityStore();
 
   const [showMembers, setShowMembers] = useState(true);
-  const [initialized, setInitialized] = useState(false);
-  const [view, setView] = useState<'browse' | 'chat'>(channelId ? 'chat' : 'browse');
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
       initializeSocket();
       fetchCategories();
-      fetchChannels();
     }
-    return () => {
-      disconnectSocket();
-    };
+    return () => { disconnectSocket(); };
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (channelId && channels.length > 0 && !initialized) {
-      const channel = channels.find((c) => c.id === channelId);
-      if (channel) {
-        setActiveChannel(channel);
-        setInitialized(true);
-        setView('chat');
-      }
+    if (id && isAuthenticated) {
+      fetchCommunityById(id);
+      fetchCommunityChannels(id);
     }
-  }, [channelId, channels]);
+  }, [id, isAuthenticated]);
 
   useEffect(() => {
-    if (!channelId) {
-      setView('browse');
-      setInitialized(false);
-    }
-  }, [channelId]);
+    if (!id || !channels.length) return;
+    const currentStillExists = activeChannel && channels.some((c) => c.id === activeChannel.id);
+    if (!currentStillExists) setActiveChannel(channels[0]);
+  }, [id, channels, activeChannel]);
 
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center max-w-md px-4">
-          <h1 className="text-3xl font-bold mb-3">
-            <span className="gradient-text">Community Forums</span>
-          </h1>
-          <p className="text-gray-400 mb-6">
-            Join the CareerCode Academy community to connect with fellow developers, ask questions, and grow together.
-          </p>
-          <a
-            href="/login"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium transition-colors"
-          >
-            Log In to Join
-          </a>
+          <h1 className="text-3xl font-bold mb-3"><span className="gradient-text">Community Forums</span></h1>
+          <p className="text-gray-400 mb-6">Join the CareerCode Academy community to connect with fellow developers, ask questions, and grow together.</p>
+          <a href="/login" className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium transition-colors">Log In to Join</a>
         </div>
       </div>
     );
   }
 
-  if (view === 'browse') {
-    return <CommunityBrowser onSelectCommunity={() => setView('chat')} />;
+  if (!id) {
+    return <CommunityBrowser onEnter={(communityId) => navigate(`/community/${communityId}`)} />;
+  }
+
+  if (activeCommunity && !activeCommunity.is_member) {
+    return (
+      <div className="h-[calc(100vh-64px)] flex items-center justify-center bg-gray-950 px-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-2xl font-bold text-white mb-2">{activeCommunity.name}</h1>
+          <p className="text-gray-400 text-sm mb-5">{activeCommunity.description || 'Join this community to see its channels and discussions.'}</p>
+          <button
+            onClick={async () => {
+              setJoining(true);
+              await joinCommunity(id);
+              await fetchCommunityById(id);
+              await fetchCommunityChannels(id);
+              setJoining(false);
+            }}
+            disabled={joining || activeCommunity.join_policy === 'invite_only'}
+            className="px-5 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {joining ? 'Joining…' : activeCommunity.join_policy === 'invite_only' ? 'Invite only' : activeCommunity.join_policy === 'approval' ? 'Request to join' : 'Join Community'}
+          </button>
+          <button onClick={() => navigate('/community')} className="ml-2 px-5 py-2.5 rounded-xl border border-white/10 text-gray-300 text-sm">Back</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!channels.length) {
+    return (
+      <div className="h-[calc(100vh-64px)] flex items-center justify-center bg-gray-950 px-4">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold text-white mb-2">{activeCommunity?.name || 'Community'}</h1>
+          <p className="text-gray-400 text-sm mb-4">This community has no channels yet.</p>
+          <button onClick={() => navigate('/community')} className="px-4 py-2 rounded-xl border border-white/10 text-gray-300 text-sm">Back to communities</button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -240,13 +263,11 @@ export default function Community() {
       <ChannelSidebar
         onToggleMembers={() => setShowMembers(!showMembers)}
         showMembers={showMembers}
-        onBack={() => setView('browse')}
+        onBack={() => navigate('/community')}
       />
       <MessageFeed />
       <AnimatePresence mode="wait">
-        {activeThread ? (
-          <ThreadPanel key="thread" />
-        ) : null}
+        {activeThread ? <ThreadPanel key="thread" /> : null}
       </AnimatePresence>
       <MemberSidebar showMembers={showMembers} />
     </div>

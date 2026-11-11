@@ -12,6 +12,7 @@ import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { PwaBridge } from '@/components/pwa/PwaBridge';
 import { GigoWidget } from '@/components/ai/GigoWidget';
 import { MaintenanceBanner } from '@/components/layout/MaintenanceBanner';
+import { PlatformConfig } from '@/components/layout/PlatformConfig';
 import { ScrollToTop, ErrorBoundary } from '@/components/ui';
 import { SkeletonLine, SkeletonBlock } from '@/components/ui/Skeleton';
 
@@ -95,6 +96,7 @@ const Contact = lazy(() => import('@/pages/Contact'));
 const Pricing = lazy(() => import('@/pages/Pricing'));
 const Community = lazy(() => import('@/pages/Community'));
 const CommunityDetail = lazy(() => import('@/pages/CommunityDetail'));
+const CommunityInvite = lazy(() => import('@/pages/CommunityInvite'));
 const Login = lazy(() => import('@/pages/Login'));
 const Signup = lazy(() => import('@/pages/Signup'));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
@@ -285,6 +287,7 @@ function App() {
   return (
     <OnboardingProvider>
       <AnalyticsTracker />
+      <PlatformConfig />
       <NotificationBridge />
       <RoleWatcher />
       <PwaBridge />
@@ -315,6 +318,7 @@ function App() {
           <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
           <Route path="/pricing" element={<SuspenseWrapper><Pricing /></SuspenseWrapper>} />
           <Route path="/community" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
+          <Route path="/community/join/:code" element={<SuspenseWrapper><CommunityInvite /></SuspenseWrapper>} />
           <Route path="/community/:id" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
           <Route path="/login" element={<SuspenseWrapper><Login /></SuspenseWrapper>} />
           <Route path="/signup" element={<SuspenseWrapper><Signup /></SuspenseWrapper>} />

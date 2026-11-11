@@ -433,6 +433,21 @@ export async function getTemplateById(env: Env, id: string): Promise<any | null>
 }
 
 export async function createTemplate(env: Env, input: any): Promise<any> {
+  const db = getDb(env);
+  let settings: Record<string, string> = {};
+  try {
+    const res = await db.query<any>(
+      `SELECT key, value FROM system_settings WHERE key IN
+       ('certificate_org_name','certificate_org_rc','certificate_default_stamp_url','certificate_default_signature_url','certificate_show_stamp','certificate_show_signature')`
+    );
+    settings = Object.fromEntries(res.rows.map((r: any) => [r.key, r.value]));
+  } catch { /* use input/defaults */ }
+  const showStamp = input.show_stamp !== undefined
+    ? input.show_stamp
+    : settings.certificate_show_stamp !== undefined ? settings.certificate_show_stamp === 'true' : true;
+  const showSignature = input.show_signature !== undefined
+    ? input.show_signature
+    : settings.certificate_show_signature !== undefined ? settings.certificate_show_signature === 'true' : true;
   const { rows } = await getDb(env).query<any>(
     `INSERT INTO certificate_templates (name, course_id, layout_style, stamp_url, signature_url, logo_url, show_stamp, show_signature, instructor_name, org_name, org_rc, requires_exam)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -441,14 +456,14 @@ export async function createTemplate(env: Env, input: any): Promise<any> {
       input.name,
       input.course_id,
       input.layout_style || 'professional',
-      input.stamp_url || null,
-      input.signature_url || null,
+      input.stamp_url || settings.certificate_default_stamp_url || null,
+      input.signature_url || settings.certificate_default_signature_url || null,
       input.logo_url || null,
-      input.show_stamp ?? true,
-      input.show_signature ?? true,
-      input.instructor_name || 'Udokamma Emmanuel',
-      input.org_name || 'Career Code WID Ltd',
-      input.org_rc || 'RC 8824091',
+      showStamp,
+      showSignature,
+      input.instructor_name || 'Ike Wisdom Okemsinachi',
+      input.org_name || settings.certificate_org_name || 'WID LTD',
+      input.org_rc || settings.certificate_org_rc || 'RC 8824091',
       input.requires_exam ?? false,
     ]
   );

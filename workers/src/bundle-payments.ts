@@ -21,6 +21,13 @@ function gatewayConfigured(key: string | undefined): boolean {
   return !!key && key.length > 20 && !key.includes('xxxx');
 }
 
+async function settingValue(env: Env, key: string): Promise<string | null> {
+  try {
+    const { rows } = await getDb(env).query<any>('SELECT value FROM system_settings WHERE key = $1', [key]);
+    return rows[0]?.value || null;
+  } catch { return null; }
+}
+
 async function platformCurrency(env: Env): Promise<string> {
   try {
     const { rows } = await getDb(env).query<any>(`SELECT value FROM system_settings WHERE key='platform_currency'`);
@@ -182,7 +189,7 @@ export async function initializeBundlePayment(env: Env, userId: string, path: an
     const json: any = await resp.json();
     if (!json.status) throw Object.assign(new Error(json.message || 'Paystack initialization failed'), { statusCode: 502 });
     data.authorizationUrl = json.data.authorization_url;
-    data.publicKey = env.PAYSTACK_PUBLIC_KEY;
+    data.publicKey = env.PAYSTACK_PUBLIC_KEY || await settingValue(env, 'paystack_public_key');
   } else if (provider === 'flutterwave' && gatewayConfigured(flutterwaveKey)) {
     const resp = await fetchWithTimeout('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
@@ -200,14 +207,14 @@ export async function initializeBundlePayment(env: Env, userId: string, path: an
     const json: any = await resp.json();
     if (json.status === 'success' || json.status === '1') {
       data.authorizationUrl = json.data?.link;
-      data.publicKey = env.FLUTTERWAVE_PUBLIC_KEY;
+      data.publicKey = env.FLUTTERWAVE_PUBLIC_KEY || await settingValue(env, 'flutterwave_public_key');
       data.provider = 'flutterwave';
     } else {
       throw Object.assign(new Error(json.message || 'Flutterwave initialization failed'), { statusCode: 502 });
     }
   } else {
     data.authorizationUrl = `${env.FRONTEND_URL}/verify-payment?reference=${reference}&status=success`;
-    data.publicKey = env.PAYSTACK_PUBLIC_KEY || '';
+    data.publicKey = env.PAYSTACK_PUBLIC_KEY || await settingValue(env, 'paystack_public_key') || '';
   }
 
   return data;

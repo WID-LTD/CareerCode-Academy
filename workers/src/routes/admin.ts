@@ -343,30 +343,33 @@ admin.post('/users', async (c) => {
 
 admin.get('/users', async (c) => {
   try {
-    const { page, limit, offset } = pageParams(c, 50);
+    const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+    const limit = Math.min(1000, Math.max(1, parseInt(c.req.query('limit') || '50', 10) || 50));
+    const offset = (page - 1) * limit;
     const role = c.req.query('role');
     const search = c.req.query('search');
     const db = getDb(c.env);
 
-    let sql = `SELECT u.id, u.name, u.email, u.role, u.avatar, u.bio, u.is_verified, u.is_suspended, u.created_at, u.last_login, u.allowed_dashboards,
-      (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id)::int as enrolled_courses_count,
-      (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id AND completed = true)::int as completed_courses_count
-      FROM users u WHERE 1=1`;
-    const params: any[] = [];
-
+    const where: string[] = [];
+    const filterParams: any[] = [];
     if (role) {
-      params.push(role);
-      sql += ` AND role = $${params.length}`;
+      filterParams.push(role);
+      where.push(`role = $${filterParams.length}`);
     }
     if (search) {
-      params.push(`%${search}%`);
-      sql += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+      filterParams.push(`%${search}%`);
+      where.push(`(name ILIKE $${filterParams.length} OR email ILIKE $${filterParams.length})`);
     }
-    sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const params = [...filterParams, limit, offset];
+    const sql = `SELECT u.id, u.name, u.email, u.role, u.avatar, u.bio, u.is_verified, u.is_suspended, u.created_at, u.last_login, u.allowed_dashboards,
+      (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id)::int as enrolled_courses_count,
+      (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id AND completed = true)::int as completed_courses_count
+      FROM users u ${whereSql}
+      ORDER BY created_at DESC LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`;
 
     const { rows } = await db.query<any>(sql, params);
-    const { rows: countRows } = await db.query<any>('SELECT COUNT(*) as count FROM users');
+    const { rows: countRows } = await db.query<any>(`SELECT COUNT(*) as count FROM users ${whereSql}`, filterParams);
     const total = intCount(countRows[0]?.count);
 
     return c.json({
@@ -402,6 +405,14 @@ admin.put('/users/:id/role', async (c) => {
 
     if (!['student', 'instructor', 'admin', 'super_admin'].includes(role)) {
       return fail(c, 400, 'Invalid role');
+    }
+    if (id === session.userId) return fail(c, 400, 'You cannot change your own role');
+    const target = (await getDb(c.env).query<any>('SELECT role FROM users WHERE id = $1', [id])).rows[0];
+    if (!target) return fail(c, 404, 'User not found');
+    if (target.role === 'super_admin' && session.role !== 'super_admin') return forbidden(c);
+    if (target.role === 'super_admin' && role !== 'super_admin') {
+      const count = await getDb(c.env).query<any>(`SELECT COUNT(*)::int AS n FROM users WHERE role = 'super_admin'`);
+      if ((Number(count.rows[0]?.n) || 0) <= 1) return fail(c, 400, 'Cannot demote the last super admin');
     }
 
     const user = await M.updateUser(c.env, id, { role });
@@ -444,6 +455,13 @@ admin.delete('/users/:id', async (c) => {
     const id = c.req.param('id');
 
     if (id === session.userId) return fail(c, 400, 'Cannot delete yourself');
+    const target = (await getDb(c.env).query<any>('SELECT role FROM users WHERE id = $1', [id])).rows[0];
+    if (!target) return fail(c, 404, 'User not found');
+    if (target.role === 'super_admin') {
+      if (session.role !== 'super_admin') return forbidden(c);
+      const count = await getDb(c.env).query<any>(`SELECT COUNT(*)::int AS n FROM users WHERE role = 'super_admin'`);
+      if ((Number(count.rows[0]?.n) || 0) <= 1) return fail(c, 400, 'Cannot delete the last super admin');
+    }
 
     const deleted = await M.deleteUser(c.env, id);
     if (!deleted) return fail(c, 404, 'User not found');
@@ -1035,6 +1053,10 @@ admin.put('/users/:id/suspend', async (c) => {
   try {
     const session = c.get('session');
     const id = c.req.param('id');
+    if (id === session.userId) return fail(c, 400, 'You cannot suspend yourself');
+    const target = (await getDb(c.env).query<any>('SELECT role FROM users WHERE id = $1', [id])).rows[0];
+    if (!target) return fail(c, 404, 'User not found');
+    if (target.role === 'super_admin' && session.role !== 'super_admin') return forbidden(c);
     const body = await jsonBody(c);
     const { rows } = await getDb(c.env).query<any>(
       `UPDATE users SET is_suspended = true, suspended_at = NOW(), suspended_reason = $1
@@ -1825,7 +1847,7 @@ admin.put('/users/:id/demote-admin', async (c) => {
     const target = await db.query<any>(`SELECT id, role FROM users WHERE id = $1`, [id]);
     if (target.rows.length === 0) return fail(c, 404, 'User not found');
     if (target.rows[0].role !== 'admin') return fail(c, 400, 'User is not an admin');
-    if (String(parseInt(id, 10)) === String(session.userId)) return fail(c, 400, 'Cannot demote yourself');
+    if (id === session.userId) return fail(c, 400, 'Cannot demote yourself');
 
     await db.query(`UPDATE users SET role = 'student' WHERE id = $1`, [id]);
     await logAudit(c.env, { adminId: session.userId, action: 'demote_admin', resourceType: 'user', resourceId: id, ...AUDIT_META(c) });

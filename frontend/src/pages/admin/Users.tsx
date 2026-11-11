@@ -139,6 +139,9 @@ export default function AdminUsers() {
     } finally {
       setActionLoading(null);
       setConfirmAction(null);
+      setRoleFilter('all');
+      setStatusFilter('all');
+      setPage(1);
     }
   }, [suspendUser, reactivateUser, deleteUser]);
 
@@ -156,6 +159,9 @@ export default function AdminUsers() {
     } finally {
       setActionLoading(null);
       setConfirmAction(null);
+      setRoleFilter('all');
+      setStatusFilter('all');
+      setPage(1);
     }
   }, [selected, suspendUser, reactivateUser, deleteUser, bulkUpdateUserRole, bulkRoleTarget]);
 
@@ -608,6 +614,9 @@ export default function AdminUsers() {
                   await updateUserRole(roleEdit.id, roleEdit.role);
                   toast.success('Role updated');
                   setRoleEdit(null);
+                  setRoleFilter('all');
+                  setStatusFilter('all');
+                  setPage(1);
                 } finally { setRoleSaving(false); }
               }}>{roleSaving ? 'Saving…' : 'Save role'}</Button>
             </div>
