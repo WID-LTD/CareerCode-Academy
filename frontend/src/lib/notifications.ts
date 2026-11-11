@@ -17,7 +17,7 @@ const TYPE_LINKS: Record<string, string> = {
   live_session: '/student/live',
   live: '/student/live',
   message: '/student/messages',
-  community: '/student/community',
+  community: '/community',
   payment: '/student/payments',
   payment_success: '/student/payments',
   badge: '/student/achievements',
