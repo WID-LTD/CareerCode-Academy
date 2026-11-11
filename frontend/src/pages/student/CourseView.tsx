@@ -23,6 +23,7 @@ import {
   ChevronDown, ChevronUp, PenLine, HelpCircle, Code,
   Bookmark, BookmarkCheck, PartyPopper,
   Megaphone, BarChart3, Brain, GitBranch, Layers, GraduationCap, Target, Sparkles,
+  Github, ShieldCheck, XCircle, RefreshCw, Wrench, ListChecks, ExternalLink,
   Bold, Italic, Underline, Highlighter, Undo, Redo,
 } from 'lucide-react';
 import SEO from '@/components/seo/SEO';
@@ -85,60 +86,141 @@ const TAB_CONFIG: { key: Tab; label: string; icon: any }[] = [
   { key: 'analytics', label: 'Progress', icon: BarChart3 },
 ];
 
-function ProjectSubmitForm({ project, submitted, onSubmitted }: { project: any; submitted: boolean; onSubmitted: () => void }) {
-  const [githubUrl, setGithubUrl] = useState('');
-  const [liveUrl, setLiveUrl] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+function VerificationPanel({ verification }: { verification: any }) {
+  if (!verification || typeof verification !== 'object') return null;
+  const checks = Array.isArray(verification.checks) ? verification.checks : [];
+  const score = Number(verification.score) || 0;
+  const passed = !!verification.verified;
+  return (
+    <div className={`mt-3 rounded-xl border p-3 ${passed ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+      <div className="flex items-center gap-2">
+        {passed ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-amber-400" />}
+        <p className={`text-xs font-semibold ${passed ? 'text-emerald-300' : 'text-amber-300'}`}>
+          {passed ? 'GitHub verified' : 'Needs work'} — {score}/100
+        </p>
+        {verification.repo?.html_url && (
+          <a href={verification.repo.html_url} target="_blank" rel="noreferrer" className="ml-auto text-[11px] text-primary-400 inline-flex items-center gap-1">
+            Open repo <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+      </div>
+      {verification.feedback && <p className="text-[11px] text-gray-400 mt-1">{verification.feedback}</p>}
+      {checks.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {checks.map((c: any) => (
+            <li key={c.key || c.label} className="flex items-start gap-1.5 text-[11px]">
+              {c.passed ? <CheckCircle className="w-3 h-3 text-emerald-400 mt-0.5 flex-shrink-0" /> : <XCircle className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />}
+              <span className={c.passed ? 'text-gray-400' : 'text-amber-300'}>{c.label}{c.detail ? ` — ${c.detail}` : ''}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {verification.latest_commit && (
+        <p className="text-[11px] text-gray-500 mt-2">Latest commit: {String(verification.latest_commit.message || '').slice(0, 80)} · {verification.latest_commit.author || 'unknown'}</p>
+      )}
+    </div>
+  );
+}
 
-  const handleSubmit = async () => {
+function ProjectSubmitForm({ project, submission, onSubmitted }: { project: any; submission: any; onSubmitted: () => void }) {
+  const [githubUrl, setGithubUrl] = useState(submission?.source_url || '');
+  const [liveUrl, setLiveUrl] = useState(submission?.demo_url || '');
+  const [notes, setNotes] = useState(submission?.notes || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [showForm, setShowForm] = useState(!submission);
+  const [verification, setVerification] = useState<any>(submission?.verification || null);
+
+  const submit = async () => {
     if (!githubUrl.trim()) { toast.error('GitHub repository URL is required'); return; }
-    try {
-      new URL(githubUrl);
-      if (liveUrl) new URL(liveUrl);
-    } catch { toast.error('Please enter valid URLs'); return; }
+    try { new URL(githubUrl); if (liveUrl) new URL(liveUrl); } catch { toast.error('Enter valid URLs'); return; }
     setSubmitting(true);
     try {
-      const fileUrl = liveUrl ? `${githubUrl}\nLive: ${liveUrl}` : githubUrl;
-      await api.post(`/assignments/${project.id}/submit`, { fileUrl });
-      toast.success('Project submitted successfully! Awaiting review.');
-      setShowForm(false);
+      const { data } = await api.post(`/course-projects/${project.id}/submit`, {
+        source_url: githubUrl.trim(),
+        demo_url: liveUrl.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+      const v = data.data?.verification || null;
+      setVerification(v);
+      if (v?.verified) {
+        toast.success(`Project verified — ${v.score}/100`);
+        setShowForm(false);
+      } else {
+        toast.error(`Submitted, but ${v?.score || 0}/100. Fix the checks below and re-submit.`);
+      }
       onSubmitted();
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.response?.data?.error || 'Failed to submit';
-      toast.error(msg);
+      const v = err?.response?.data?.data;
+      if (v) setVerification(v);
+      toast.error(err?.response?.data?.message || 'Failed to verify project');
     } finally { setSubmitting(false); }
   };
 
-  if (submitted) {
-    return (
-      <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400">
-        <CheckCircle className="w-4 h-4" /> Submitted — under review
-      </div>
-    );
-  }
+  const reVerify = async () => {
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/course-projects/${project.id}/verify`);
+      setVerification(data.data?.verification || null);
+      if (data.data?.repo_verified) toast.success('GitHub verified');
+      else toast.error('Still needs work — check the list below');
+      onSubmitted();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not verify the repository');
+    } finally { setSubmitting(false); }
+  };
+
+  const checkGithub = async () => {
+    setChecking(true);
+    try {
+      const { data } = await api.get('/course-projects/github/status');
+      const d = data.data;
+      toast.success(d.reachable ? `GitHub reachable${d.remaining != null ? ` · ${d.remaining} API calls left` : ''}` : d.message);
+    } catch {
+      toast.error('Could not reach GitHub from CareerCode right now');
+    } finally { setChecking(false); }
+  };
 
   return (
     <div className="mt-3">
-      {!showForm ? (
-        <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="w-full sm:w-auto">
-          <Target className="w-4 h-4 mr-1" /> Submit Project
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+          <Github className="w-4 h-4 mr-1" /> {submission ? 'Update submission' : 'Submit project'}
         </Button>
-      ) : (
-        <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 space-y-3">
+        {submission && (
+          <Button size="sm" variant="ghost" onClick={reVerify} loading={submitting} disabled={submitting}>
+            <RefreshCw className="w-4 h-4 mr-1" /> Re-verify GitHub
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={checkGithub} loading={checking} disabled={checking}>
+          <ShieldCheck className="w-4 h-4 mr-1" /> Check GitHub access
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('gigo:open', { detail: { prompt: project.gigo_prompt || `Help me plan the project "${project.title}". Ask for my brief, then give me milestones and the first step.` } }))}>
+          <Sparkles className="w-4 h-4 mr-1" /> Ask GiGo
+        </Button>
+      </div>
+
+      {verification && <VerificationPanel verification={verification} />}
+
+      {showForm && (
+        <div className="mt-3 p-3 rounded-xl bg-gray-900 border border-gray-800 space-y-3">
           <div>
-            <label className="text-xs font-medium text-gray-300">GitHub Repository URL *</label>
-            <input value={githubUrl} onChange={e=>setGithubUrl(e.target.value)} placeholder="https://github.com/username/repo" className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
+            <label className="text-xs font-medium text-gray-300">Public GitHub repository URL *</label>
+            <input value={githubUrl} onChange={e => setGithubUrl(e.target.value)} placeholder="https://github.com/username/project" className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-300">Live Deployment URL (optional)</label>
-            <input value={liveUrl} onChange={e=>setLiveUrl(e.target.value)} placeholder="https://your-live-project-url" className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
+            <label className="text-xs font-medium text-gray-300">Live deployment URL {project.requires_demo ? '*' : '(optional)'}</label>
+            <input value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder="https://your-project.example.com" className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-300">What did you build? (optional)</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Key decisions, features and anything you want the reviewer to know." className="mt-1 w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none" />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={handleSubmit} loading={submitting} disabled={submitting}>Submit</Button>
-            <Button size="sm" variant="ghost" onClick={()=>setShowForm(false)}>Cancel</Button>
+            <Button size="sm" onClick={submit} loading={submitting} disabled={submitting}>Verify & submit</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
           </div>
-          <p className="text-[11px] text-gray-500">Your GitHub repo should include README, screenshots, and deployment instructions.</p>
+          <p className="text-[11px] text-gray-500">The verifier checks that the repo is public, has at least {project.min_commits || 1} commits, has a README and uses {Array.isArray(project.required_languages) && project.required_languages.length ? project.required_languages.join(' or ') : 'the expected project files'}. Your local machine is not inspected by the browser; use the “Check GitHub access” button and the Git commands in GiGo.</p>
         </div>
       )}
     </div>
@@ -157,6 +239,7 @@ export default function CourseView() {
   const [loading, setLoading] = useState(true);
   const [accessChecked, setAccessChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('notes');
+  useEffect(() => { if (window.location.hash === '#projects') setActiveTab('projects'); }, []);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | ''>('');
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -165,7 +248,6 @@ export default function CourseView() {
   const [lessonQuiz, setLessonQuiz] = useState<any>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [projectSubmissions, setProjectSubmissions] = useState<Record<string, any>>({});
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -291,17 +373,10 @@ export default function CourseView() {
         setAnnouncements(annRes.data.data || []);
       } catch { setAnnouncements([]); }
 
-      // Fetch projects (assignments) for this course
+      // Fetch verifiable course projects for this course
       try {
-        const projRes = await api.get(`/assignments/course/${courseData.id}`);
+        const projRes = await api.get(`/course-projects?courseId=${courseData.id}`);
         setProjects(projRes.data.data || []);
-        // also fetch student submissions status via /student/assignments
-        try {
-          const subRes = await api.get('/student/assignments?page=1&limit=100');
-          const map: Record<string, any> = {};
-          (subRes.data.data || []).forEach((a: any) => { map[a.id] = a; });
-          setProjectSubmissions(map);
-        } catch {}
       } catch { setProjects([]); }
 
       setAccessChecked(true);
@@ -897,13 +972,14 @@ export default function CourseView() {
                       <p className="text-gray-500 text-xs mt-1">Projects help you Build → Prove your skills with real-world deliverables.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {projects.map((proj: any) => {
-                        const sub = projectSubmissions[proj.id];
+                        const sub = proj.submission;
                         const status = sub?.status || 'not-started';
                         const statusColor: Record<string, string> = {
-                          'graded': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                          'submitted': 'bg-warning-500/20 text-warning-400 border-warning-500/30',
+                          verified: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                          needs_work: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                          submitted: 'bg-warning-500/20 text-warning-400 border-warning-500/30',
                           'not-started': 'bg-gray-700/50 text-gray-400 border-gray-600',
                         };
                         return (
@@ -912,35 +988,37 @@ export default function CourseView() {
                               <div className="flex-1 min-w-0">
                                 <h4 className="text-white font-medium text-sm">{proj.title}</h4>
                                 <p className="text-gray-400 text-xs mt-1 line-clamp-3 whitespace-pre-wrap">{proj.description}</p>
-                                {proj.due_date && <p className="text-xs text-gray-500 mt-2 flex items-center gap-1"><Clock className="w-3 h-3" /> Due {new Date(proj.due_date).toLocaleDateString()}</p>}
                               </div>
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold border ${statusColor[status] || statusColor['not-started']}`}>
-                                {status === 'graded' ? `Graded: ${sub?.grade ?? ''}/${proj.max_score}` : status === 'submitted' ? 'Submitted' : 'Not Started'}
+                                {status === 'verified' ? `Verified · ${sub?.verification?.score ?? 0}/100` : status === 'needs_work' ? 'Needs work' : status === 'submitted' ? 'Submitted' : 'Not started'}
                               </span>
                             </div>
-                            <div className="mt-3 p-3 rounded-lg bg-gray-900/50 border border-gray-800">
-                              <p className="text-xs font-medium text-gray-300 mb-2">Deliverables</p>
-                              <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
-                                <li>GitHub Repository URL</li>
-                                <li>Live Deployment URL (if applicable)</li>
-                                <li>README with setup instructions</li>
-                                <li>Screenshots (optional)</li>
-                              </ul>
-                            </div>
-                            {sub?.feedback && (
-                              <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                <p className="text-xs font-medium text-blue-300 mb-1">Instructor Feedback</p>
-                                <p className="text-xs text-gray-300">{sub.feedback}</p>
-                                {sub.grade != null && <p className="text-xs text-white mt-1 font-medium">Score: {sub.grade}/{proj.max_score}</p>}
+
+                            <div className="mt-3 grid sm:grid-cols-2 gap-3">
+                              <div className="p-3 rounded-lg bg-gray-900/50 border border-gray-800">
+                                <p className="text-xs font-medium text-gray-300 mb-2 flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5 text-primary-400" /> Requirements</p>
+                                <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+                                  {(proj.requirements || []).map((r: string) => <li key={r}>{r}</li>)}
+                                </ul>
                               </div>
-                            )}
-                            <ProjectSubmitForm project={proj} submitted={!!sub && status !== 'not-started'} onSubmitted={() => {
-                              api.get('/student/assignments?page=1&limit=100').then(r => {
-                                const m: Record<string, any> = {};
-                                (r.data.data || []).forEach((a: any) => { m[a.id] = a; });
-                                setProjectSubmissions(m);
-                              }).catch(()=>{});
-                              api.get(`/progress/detailed?courseId=${course?.id}`).then(r=>{ if(r.data.data) setDetailed(r.data.data); }).catch(()=>{});
+                              <div className="p-3 rounded-lg bg-gray-900/50 border border-gray-800">
+                                <p className="text-xs font-medium text-gray-300 mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5 text-secondary-400" /> Tools</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(proj.tools || []).map((t: string) => <span key={t} className="px-2 py-0.5 rounded-full bg-gray-800 text-[10px] text-gray-300 border border-gray-700">{t}</span>)}
+                                </div>
+                              </div>
+                            </div>
+
+                            <details className="mt-3 rounded-lg bg-gray-900/50 border border-gray-800">
+                              <summary className="px-3 py-2 text-xs font-medium text-gray-300 cursor-pointer">Project procedure — step by step</summary>
+                              <ol className="px-5 pb-3 text-xs text-gray-400 space-y-1 list-decimal list-inside">
+                                {(proj.steps || []).map((step: string) => <li key={step}>{step}</li>)}
+                              </ol>
+                            </details>
+
+                            <ProjectSubmitForm project={proj} submission={sub} onSubmitted={() => {
+                              api.get(`/course-projects?courseId=${course?.id}`).then(r => setProjects(r.data.data || [])).catch(() => {});
+                              api.get(`/progress/detailed?courseId=${course?.id}`).then(r => { if (r.data.data) setDetailed(r.data.data); }).catch(() => {});
                             }} />
                           </div>
                         );

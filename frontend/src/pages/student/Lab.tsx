@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Camera, ClipboardList, Code2, ExternalLink, FlaskConical, Loader2,
-  MonitorUp, Sparkles, CheckCircle2, Clock3, ArrowRight,
+  MonitorUp, Sparkles, CheckCircle2, Clock3, ArrowRight, Github, ShieldCheck, RefreshCw,
 } from 'lucide-react';
 import api from '@/lib/axios';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 
 type Task = {
   id: string;
-  kind: 'assignment' | 'challenge';
+  kind: 'assignment' | 'challenge' | 'project';
   title: string;
   description?: string;
   instructions?: string;
@@ -21,6 +21,10 @@ type Task = {
   lesson_title?: string;
   status?: string;
   submission_passed?: boolean;
+  submission?: any;
+  gigo_prompt?: string;
+  tools?: string[];
+  steps?: string[];
   due?: string;
 };
 
@@ -38,15 +42,25 @@ Give me a step-by-step plan, the tools I need, and the first command or file I s
 export default function StudentLab() {
   const [assignments, setAssignments] = useState<Task[]>([]);
   const [challenges, setChallenges] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'all' | 'assignments' | 'challenges'>('all');
+  const [github, setGithub] = useState<any>(null);
+  const [checkingGithub, setCheckingGithub] = useState(false);
+  const [tab, setTab] = useState<'all' | 'assignments' | 'challenges' | 'projects'>('all');
+
+  const loadGithub = () => {
+    setCheckingGithub(true);
+    api.get('/course-projects/github/status').then(({ data }) => setGithub(data.data)).catch(() => setGithub({ reachable: false, message: 'GitHub check unavailable' })).finally(() => setCheckingGithub(false));
+  };
 
   useEffect(() => {
     let alive = true;
+    loadGithub();
     Promise.all([
       api.get('/student/assignments?limit=100').then((r) => r.data?.data || []).catch(() => []),
       api.get('/student/challenges?limit=100').then((r) => r.data?.data || []).catch(() => []),
-    ]).then(([a, c]) => {
+      api.get('/course-projects').then((r) => r.data?.data || []).catch(() => []),
+    ]).then(([a, c, p]) => {
       if (!alive) return;
       setAssignments(a.map((x: any) => ({ ...x, kind: 'assignment' as const })));
       setChallenges(c.map((x: any) => ({
@@ -55,16 +69,25 @@ export default function StudentLab() {
         course_title: x.course_title,
         course_slug: x.course_slug,
       })));
+      setProjects(p.map((x: any) => ({
+        ...x,
+        kind: 'project' as const,
+        course_title: x.course_title,
+        course_slug: x.course_slug,
+        submission_passed: x.submission?.status === 'verified',
+        status: x.submission?.status || 'not-started',
+      })));
     }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
 
   const tasks = useMemo(() => {
-    const all = [...assignments, ...challenges];
+    const all = [...assignments, ...challenges, ...projects];
     if (tab === 'assignments') return assignments;
     if (tab === 'challenges') return challenges;
+    if (tab === 'projects') return projects;
     return all;
-  }, [assignments, challenges, tab]);
+  }, [assignments, challenges, projects, tab]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -100,8 +123,40 @@ export default function StudentLab() {
         ))}
       </div>
 
+      <GlassCard className="p-5" hover={false}>
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gray-900 text-white grid place-items-center flex-shrink-0"><Github className="w-5 h-5" /></div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-sm">GitHub access check</p>
+              {github && (
+                <Badge variant={github.reachable ? 'success' : 'danger'} size="sm">
+                  {github.reachable ? 'Reachable' : 'Unreachable'}
+                </Badge>
+              )}
+              <button onClick={loadGithub} disabled={checkingGithub} className="ml-auto inline-flex items-center gap-1 text-xs text-indigo-500 disabled:opacity-50">
+                <RefreshCw className={`w-3.5 h-3.5 ${checkingGithub ? 'animate-spin' : ''}`} /> Refresh
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {github?.message || 'Checking whether CareerCode can reach GitHub...'}
+              {github?.remaining != null ? ` · ${github.remaining}/${github.limit} API calls left` : ''}
+            </p>
+            <div className="mt-3 grid sm:grid-cols-2 gap-2">
+              {(github?.local_commands || []).map((c: any) => (
+                <div key={c.command} className="rounded-lg border border-gray-200 dark:border-gray-800 p-2">
+                  <code className="text-[11px] font-mono text-indigo-500">{c.command}</code>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{c.purpose}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2">The browser cannot inspect your laptop directly. Run these commands in your terminal, then paste the output into GiGo if a command fails.</p>
+          </div>
+        </div>
+      </GlassCard>
+
       <div className="flex items-center gap-2 flex-wrap">
-        {(['all', 'assignments', 'challenges'] as const).map((key) => (
+        {(['all', 'assignments', 'challenges', 'projects'] as const).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -111,7 +166,7 @@ export default function StudentLab() {
                 : 'border-gray-200 dark:border-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            {key === 'all' ? `All tasks (${assignments.length + challenges.length})` : key === 'assignments' ? `Assignments (${assignments.length})` : `Challenges (${challenges.length})`}
+            {key === 'all' ? `All tasks (${assignments.length + challenges.length + projects.length})` : key === 'assignments' ? `Assignments (${assignments.length})` : key === 'challenges' ? `Challenges (${challenges.length})` : `Projects (${projects.length})`}
           </button>
         ))}
       </div>
@@ -128,14 +183,14 @@ export default function StudentLab() {
       ) : (
         <div className="grid lg:grid-cols-2 gap-4">
           {tasks.map((task) => {
-            const done = task.status === 'graded' || task.submission_passed === true;
+            const done = task.status === 'graded' || task.status === 'verified' || task.submission_passed === true;
             return (
               <GlassCard key={`${task.kind}-${task.id}`} className="p-5 flex flex-col" hover={false}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <Badge variant={task.kind === 'challenge' ? 'primary' : 'warning'} size="sm">
-                        {task.kind === 'challenge' ? <><Code2 className="w-3 h-3 mr-1" /> Challenge</> : <><ClipboardList className="w-3 h-3 mr-1" /> Assignment</>}
+                      <Badge variant={task.kind === 'challenge' ? 'primary' : task.kind === 'project' ? 'success' : 'warning'} size="sm">
+                        {task.kind === 'challenge' ? <><Code2 className="w-3 h-3 mr-1" /> Challenge</> : task.kind === 'project' ? <><FlaskConical className="w-3 h-3 mr-1" /> Project</> : <><ClipboardList className="w-3 h-3 mr-1" /> Assignment</>}
                       </Badge>
                       {done && <Badge variant="success" size="sm"><CheckCircle2 className="w-3 h-3 mr-1" /> Done</Badge>}
                     </div>
@@ -160,7 +215,7 @@ export default function StudentLab() {
                     <Camera className="w-3.5 h-3.5" /> Upload screenshot
                   </button>
                   {task.course_slug && (
-                    <Link to={`/student/courses/${task.course_slug}`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300">
+                    <Link to={`/student/courses/${task.course_slug}${task.kind === 'project' ? '#projects' : ''}`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300">
                       Open course <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
                   )}

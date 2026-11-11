@@ -34,6 +34,7 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_CALLBACK_URL?: string;
   CLOUDFLARE_AI_TOKEN?: string;
+  GITHUB_TOKEN?: string;
   // Cloudflare API automation (portfolio custom domains)
   CF_API_TOKEN?: string;
   CF_ACCOUNT_ID?: string;

@@ -54,7 +54,7 @@ calendar.get('/', async (c) => {
     if (!['admin', 'super_admin'].includes(s.role)) {
       vals.push(s.userId);
       const p = `$${vals.length}`;
-      conds.push(`(ce.visibility = 'public' OR ce.created_by = ${p} OR ce.instructor_id = ${p})`);
+      conds.push(`(ce.visibility = 'public' OR ce.created_by = ${p} OR ce.instructor_id = ${p} OR (ce.visibility = 'course' AND ce.course_id IN (SELECT course_id FROM enrollments WHERE user_id = ${p})))`);
     }
     for (const [key, col] of [
       ['event_type', 'event_type'], ['status', 'status'], ['course_id', 'course_id'],
@@ -107,7 +107,7 @@ calendar.get('/range', async (c) => {
     if (!['admin', 'super_admin'].includes(s.role)) {
       vals.push(s.userId);
       const p = `$${vals.length}`;
-      conds.push(`(ce.visibility = 'public' OR ce.created_by = ${p} OR ce.instructor_id = ${p})`);
+      conds.push(`(ce.visibility = 'public' OR ce.created_by = ${p} OR ce.instructor_id = ${p} OR (ce.visibility = 'course' AND ce.course_id IN (SELECT course_id FROM enrollments WHERE user_id = ${p})))`);
     }
     const { rows } = await getDb(c.env).query<any>(
       `SELECT ${EVENT_COLS} ${EVENT_FROM} WHERE ${conds.join(' AND ')} ORDER BY ce.start_datetime ASC`,

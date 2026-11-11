@@ -419,7 +419,7 @@ student.get('/calendar', async (c) => {
   try {
     const s = await authenticate(c);
     const db = getDb(c.env);
-    const [assignments, live, quizzes, exams, certs] = await Promise.all([
+    const [assignments, live, quizzes, exams, certs, calendarEvents] = await Promise.all([
       db.query<any>(`SELECT a.id, a.title, a.due_date as date, c.title as course_title, 'assignment' as type
         FROM assignments a JOIN courses c ON c.id = a.course_id
         WHERE a.due_date >= NOW() AND a.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)
@@ -440,9 +440,15 @@ student.get('/calendar', async (c) => {
         FROM certificates c JOIN courses co ON co.id = c.course_id
         WHERE c.user_id = $1 AND c.issued_at >= NOW() - INTERVAL '30 days'
         ORDER BY c.issued_at DESC LIMIT 20`, [s.userId]),
+      db.query<any>(`SELECT ce.id, ce.title, ce.start_datetime as date, c.title as course_title, 'live-class' as type,
+        ce.meeting_url, ce.location
+        FROM calendar_events ce LEFT JOIN courses c ON c.id = ce.course_id
+        WHERE ce.start_datetime >= NOW() AND ce.status = 'scheduled'
+          AND (ce.visibility = 'public' OR (ce.visibility = 'course' AND ce.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)))
+        ORDER BY ce.start_datetime ASC LIMIT 30`, [s.userId]),
     ]);
     const events = [
-      ...assignments.rows, ...live.rows, ...quizzes.rows, ...exams.rows, ...certs.rows,
+      ...assignments.rows, ...live.rows, ...quizzes.rows, ...exams.rows, ...certs.rows, ...calendarEvents.rows,
     ].map((r: any) => ({ ...r, time: new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }))
       .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return c.json({ success: true, data: events });
