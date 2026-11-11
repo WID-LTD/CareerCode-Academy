@@ -117,6 +117,7 @@ const JobBoard = lazy(() => import('@/pages/public/JobBoard'));
 const InternshipsPage = lazy(() => import('@/pages/public/InternshipsPage'));
 const AlumniDirectory = lazy(() => import('@/pages/public/AlumniDirectory'));
 const PublicProfile = lazy(() => import('@/pages/public/PortfolioSite'));
+const PortfolioDirectory = lazy(() => import('@/pages/public/PortfolioDirectory'));
 const FAQ = lazy(() => import('@/pages/FAQ'));
 const Careers = lazy(() => import('@/pages/Careers'));
 const Partners = lazy(() => import('@/pages/Partners'));
@@ -311,6 +312,7 @@ function App() {
           <Route path="/career/jobs" element={<SuspenseWrapper><JobBoard /></SuspenseWrapper>} />
           <Route path="/career/internships" element={<SuspenseWrapper><InternshipsPage /></SuspenseWrapper>} />
           <Route path="/career/alumni" element={<SuspenseWrapper><AlumniDirectory /></SuspenseWrapper>} />
+          <Route path="/portfolios" element={<SuspenseWrapper><PortfolioDirectory /></SuspenseWrapper>} />
           <Route path="/u/:username" element={<SuspenseWrapper><PublicProfile /></SuspenseWrapper>} />
           <Route path="/u/:username/:projectSlug" element={<SuspenseWrapper><PublicProfile /></SuspenseWrapper>} />
           <Route path="/faq" element={<SuspenseWrapper><FAQ /></SuspenseWrapper>} />

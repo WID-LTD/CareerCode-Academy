@@ -461,6 +461,39 @@ portfolio.get('/site/analytics', async (c) => {
   }
 });
 
+// GET /portfolio/directory — published portfolios (opt-in by publishing)
+portfolio.get('/directory', async (c) => {
+  try {
+    const q = (c.req.query('q') || '').trim();
+    const limit = Math.min(60, Math.max(1, parseInt(c.req.query('limit') || '24', 10) || 24));
+    const params: any[] = [];
+    let where = `s.is_published = 1`;
+    if (q) {
+      params.push(`%${q}%`);
+      where += ` AND (u.name ILIKE $${params.length} OR s.headline ILIKE $${params.length})`;
+    }
+    params.push(limit);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT u.username, u.name, u.avatar, s.headline, s.template, s.theme, s.views,
+        (SELECT COUNT(*)::int FROM portfolio_projects p WHERE p.site_id = s.id) AS project_count
+       FROM portfolio_sites s JOIN users u ON u.id = s.user_id
+       WHERE ${where} AND u.username IS NOT NULL
+       ORDER BY s.views DESC, s.updated_at DESC LIMIT $${params.length}`,
+      params
+    );
+    return c.json({
+      success: true,
+      data: rows.map((r: any) => ({
+        ...r,
+        theme: safeJson(r.theme, {}),
+        project_count: Number(r.project_count) || 0,
+      })),
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load directory');
+  }
+});
+
 // GET /portfolio/site/:username — public portfolio
 portfolio.get('/site/:username', async (c) => {
   try {

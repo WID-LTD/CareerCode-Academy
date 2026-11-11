@@ -3,6 +3,8 @@ import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, statusOf } from '../route-utils';
 import { validateDiscountCode, markDiscountCodeUsed } from '../gamification';
+import { receiptPdf } from '../receipt';
+import { mail } from '../email';
 
 const payments = new Hono<{ Bindings: Env }>();
 
@@ -93,11 +95,45 @@ async function enrollIfMissing(env: Env, userId: string, courseId: string): Prom
   }
 }
 
+async function sendReceipt(env: Env, payment: any, itemTitle: string): Promise<void> {
+  try {
+    const db = getDb(env);
+    const user = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [payment.user_id])).rows[0];
+    if (!user?.email) return;
+    const date = new Date(payment.created_at || Date.now()).toISOString().slice(0, 10);
+    const amount = `${payment.currency || 'NGN'} ${Number(payment.amount || 0).toFixed(2)}`;
+    const pdf = receiptPdf({
+      reference: payment.reference,
+      date,
+      customer: user.name || 'Student',
+      email: user.email,
+      item: itemTitle,
+      amount,
+      method: payment.provider || 'online',
+      status: 'Paid',
+    });
+    if (env.R2) {
+      await env.R2.put(`receipts/${payment.reference}.pdf`, pdf, {
+        httpMetadata: { contentType: 'application/pdf' },
+      }).catch(() => {});
+    }
+    await mail.invoice(env, user.email, user.name, {
+      reference: payment.reference,
+      amount,
+      course: itemTitle,
+      date,
+    }, pdf.slice().buffer as ArrayBuffer);
+  } catch (e: any) {
+    console.log(JSON.stringify({ src: 'receipt', error: e?.message }));
+  }
+}
+
 async function verifyPaymentByReference(env: Env, reference: string) {
   const db = getDb(env);
   const { rows } = await db.query<any>('SELECT * FROM payments WHERE reference = $1', [reference]);
   const payment = rows[0];
   if (!payment) throw Object.assign(new Error('Payment not found'), { statusCode: 404 });
+  const wasPending = payment.status === 'pending';
 
   if (payment.status === 'pending') {
     const paystackKey = env.PAYSTACK_SECRET_KEY || '';
@@ -138,7 +174,12 @@ async function verifyPaymentByReference(env: Env, reference: string) {
   }
 
   const updated = await db.query<any>('SELECT * FROM payments WHERE reference = $1', [reference]);
-  return updated.rows[0];
+  const fresh = updated.rows[0];
+  if (wasPending && fresh?.status === 'completed') {
+    const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [fresh.course_id]);
+    await sendReceipt(env, fresh, course.rows[0]?.title || 'Course enrollment');
+  }
+  return fresh;
 }
 
 async function courseSlug(env: Env, courseId: string | null): Promise<string | null> {
@@ -374,6 +415,10 @@ payments.post('/webhook', async (c) => {
     if (finalStatus === 'completed') {
       if (payment.discount_code_id) await markDiscountCodeUsed(c.env, payment.discount_code_id, payment.id);
       await enrollIfMissing(c.env, payment.user_id, payment.course_id);
+      if (payment.status !== 'completed') {
+        const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [payment.course_id]);
+        c.executionCtx.waitUntil(sendReceipt(c.env, payment, course.rows[0]?.title || 'Course enrollment'));
+      }
     }
     return c.json({ success: true });
   } catch {
@@ -409,6 +454,38 @@ payments.post('/validate-discount', async (c) => {
     });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to validate discount');
+  }
+});
+
+// GET /api/v1/payments/:reference/receipt
+payments.get('/:reference/receipt', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const payment = (await db.query<any>('SELECT * FROM payments WHERE reference = $1', [c.req.param('reference')])).rows[0];
+    if (!payment) return fail(c, 404, 'Payment not found');
+    if (payment.user_id !== s.userId && !['admin', 'super_admin'].includes(s.role)) return fail(c, 403, 'Forbidden');
+
+    const user = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [payment.user_id])).rows[0];
+    const course = (await db.query<any>('SELECT title FROM courses WHERE id = $1', [payment.course_id])).rows[0];
+    const pdf = receiptPdf({
+      reference: payment.reference,
+      date: new Date(payment.created_at || Date.now()).toISOString().slice(0, 10),
+      customer: user?.name || 'Student',
+      email: user?.email || '',
+      item: course?.title || 'Course enrollment',
+      amount: `${payment.currency || 'NGN'} ${Number(payment.amount || 0).toFixed(2)}`,
+      method: payment.provider || 'online',
+      status: payment.status === 'completed' ? 'Paid' : String(payment.status),
+    });
+    return new Response(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="receipt-${payment.reference}.pdf"`,
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to build receipt');
   }
 });
 

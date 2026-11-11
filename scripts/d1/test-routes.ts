@@ -443,6 +443,16 @@ async function main() {
       return call(`/api/v1/community/communities/${id}/requests/${rid}`, { method: 'PUT', token: adminToken, body: { status: 'approved' } });
     }, (r) => (r.json?.skipped || r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/community/my-requests', () => call('/api/v1/community/my-requests', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/portfolio/directory', () => call('/api/v1/portfolio/directory'), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/payments/:ref/receipt (PDF)', async () => {
+      const pay: any = raw.prepare('SELECT reference FROM payments LIMIT 1').get();
+      if (!pay) return { status: 200, json: { success: true, skipped: true } };
+      const res = await app.request(`/api/v1/payments/${pay.reference}/receipt`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }, env, ctx);
+      const text = await res.text();
+      return { status: res.status, json: { success: text.startsWith('%PDF'), skipped: false } };
+    }, (r) => (r.json?.skipped || r.json?.success ? null : `status ${r.status}`)],
     ['GET /api/v1/notifications (no auth)', () => call('/api/v1/notifications'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/student/dashboard (no auth)', () => call('/api/v1/student/dashboard'), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
   ];
