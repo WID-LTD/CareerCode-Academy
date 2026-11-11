@@ -52,8 +52,8 @@ export default function Partners() {
               and we will be straight about whether we are the right fit.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a href="mailto:partners@careercode.com.ng">
-                <Button><Mail className="w-4 h-4 mr-2" /> partners@careercode.com.ng</Button>
+              <a href="mailto:contact@widltd.com.ng">
+                <Button><Mail className="w-4 h-4 mr-2" /> contact@widltd.com.ng</Button>
               </a>
               <Link to="/contact">
                 <Button variant="outline">Contact us <ArrowRight className="w-4 h-4 ml-2" /></Button>

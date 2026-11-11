@@ -434,6 +434,9 @@ export function GigoWidget() {
   // ── Drag ────────────────────────────────────────────────────────────────
   const beginDrag = (e: React.PointerEvent, kind: 'launcher' | 'panel') => {
     if (window.innerWidth < 640) return;
+    // Do not start a drag from header controls (close, minimize, mute, etc.);
+    // pointer capture on the header would swallow their click events.
+    if (kind === 'panel' && (e.target as HTMLElement).closest('button, a, input, textarea, select, [data-no-drag]')) return;
     const el = e.currentTarget as HTMLElement;
     const rect = (kind === 'launcher' ? el : el.closest('[data-gigo-panel]') as HTMLElement)?.getBoundingClientRect();
     if (!rect) return;

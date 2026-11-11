@@ -38,7 +38,7 @@ export default function Cookies() {
               Cookie <span className="gradient-text">Policy</span>
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Last updated: January 1, 2026
+              Last updated: November 11, 2026
             </p>
           </motion.div>
 

@@ -9,6 +9,8 @@ const facts = [
   { icon: Newspaper, label: 'Product', value: 'CareerCode Academy' },
   { icon: MapPin, label: 'Location', value: 'Agbara, Ogun State, Nigeria' },
   { icon: FileText, label: 'Focus', value: 'Project-based tech education, learning paths and verifiable certificates' },
+  { icon: Building2, label: 'Registered', value: 'September 2025 · Federal Republic of Nigeria (CAC)' },
+  { icon: FileText, label: 'Chief Executive', value: 'Ike Wisdom Okemsinachi' },
 ];
 
 export default function Press() {
@@ -50,8 +52,8 @@ export default function Press() {
             <p className="text-sm text-gray-500 mb-6">
               Email us with your outlet, deadline and the topic you want to cover. We will respond if we can help.
             </p>
-            <a href="mailto:press@careercode.com.ng">
-              <Button><Mail className="w-4 h-4 mr-2" /> press@careercode.com.ng</Button>
+            <a href="mailto:contact@widltd.com.ng">
+              <Button><Mail className="w-4 h-4 mr-2" /> contact@widltd.com.ng</Button>
             </a>
           </GlassCard>
         </div>

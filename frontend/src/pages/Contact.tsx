@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MapPin, Send, MessageSquare, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, MapPin, Send, MessageSquare, Clock, CheckCircle, AlertCircle, Phone } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,9 +9,11 @@ import toast from 'react-hot-toast';
 import SEO from '@/components/seo/SEO';
 
 const contactInfo = [
-  { icon: Mail, label: 'Email', value: 'hello@careercode.com.ng', href: 'mailto:hello@careercode.com.ng' },
+  { icon: Mail, label: 'Email', value: 'contact@widltd.com.ng', href: 'mailto:contact@widltd.com.ng' },
+  { icon: Mail, label: 'Learner support', value: 'hello@careercode.com.ng', href: 'mailto:hello@careercode.com.ng' },
+  { icon: Phone, label: 'Phone', value: '+234 816 496 1457', href: 'tel:+2348164961457' },
   { icon: MapPin, label: 'Office', value: 'Agbara, Ogun State, Nigeria', href: 'https://maps.google.com/?q=Agbara,+Ogun+State,+Nigeria' },
-  { icon: Clock, label: 'Hours', value: 'Mon-Fri, 9AM-6PM PST', href: '#' },
+  { icon: Clock, label: 'Hours', value: 'Mon–Fri, 8:00 AM – 6:00 PM WAT', href: '' },
 ];
 
 export default function Contact() {
@@ -35,7 +37,7 @@ export default function Contact() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <SEO title="Contact" description="Get in touch with CareerCode Academy. We'd love to hear from you." />
+      <SEO title="Contact" description="Contact CareerCode Academy, the education venture of WID LTD (RC 8824091), Agbara, Ogun State, Nigeria." />
       <section className="py-20 relative">
         <div className="absolute inset-0 gradient-bg-subtle" />
         <div className="max-w-screen-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -50,9 +52,9 @@ export default function Contact() {
 
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="space-y-4">
-              {contactInfo.map((info) => (
-                <GlassCard key={info.label} className="p-5" hover={false}>
-                  <a href={info.href} className="flex items-center gap-4">
+              {contactInfo.map((info) => {
+                const content = (
+                  <>
                     <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center flex-shrink-0">
                       <info.icon className="w-5 h-5 text-primary-500" />
                     </div>
@@ -60,9 +62,18 @@ export default function Contact() {
                       <div className="text-sm text-gray-500">{info.label}</div>
                       <div className="font-medium text-sm text-gray-900 dark:text-white">{info.value}</div>
                     </div>
-                  </a>
-                </GlassCard>
-              ))}
+                  </>
+                );
+                return (
+                  <GlassCard key={info.label} className="p-5" hover={false}>
+                    {info.href ? (
+                      <a href={info.href} className="flex items-center gap-4">{content}</a>
+                    ) : (
+                      <div className="flex items-center gap-4">{content}</div>
+                    )}
+                  </GlassCard>
+                );
+              })}
             </div>
 
             <div className="lg:col-span-2">

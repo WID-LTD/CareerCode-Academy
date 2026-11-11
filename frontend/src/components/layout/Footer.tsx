@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, MapPin } from 'lucide-react';
+import { Mail, MapPin, Phone, Clock, Globe, Linkedin } from 'lucide-react';
 
 const footerLinks = {
   Platform: [
@@ -36,20 +35,44 @@ export function Footer() {
       <div className="max-w-screen-4xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16 relative">
         <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 sm:gap-8">
           <div className="col-span-1 xs:col-span-2 sm:col-span-2 md:col-span-2 lg:col-span-2">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 gradient-bg rounded-xl flex items-center justify-center overflow-hidden">
-                <img src="/screen.png" alt="CareerCode Logo" className="w-full h-full object-contain" />
-              </div>
+            <Link to="/" className="flex items-center gap-2.5 mb-4">
+              <img src="/wid-ltd-logo.png" alt="WID LTD" className="h-8 sm:h-9 w-auto" />
               <span className="text-lg sm:text-xl font-bold gradient-text">CareerCode</span>
             </Link>
-            <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed max-w-xs sm:max-w-sm mb-6">
-              Empowering the next generation of developers with industry-focused,
-              project-based learning. Transform your career with hands-on coding
-              experience and expert mentorship.
+            <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed max-w-xs sm:max-w-sm mb-4">
+              CareerCode Academy is the education venture of <strong>WID LTD</strong> (RC 8824091) —
+              practical, project-based learning for people building technology careers.
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              CareerCode Academy is a venture of <strong>WID LTD</strong> (RC 8824091).
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
+              WID LTD — “The Motivation for Innovation.” Registered in Nigeria, September 2025.
             </p>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://widltd.com.ng"
+                target="_blank"
+                rel="noreferrer"
+                className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 hover:text-primary-600 transition-all"
+                aria-label="WID LTD website"
+              >
+                <Globe className="w-4 h-4" />
+              </a>
+              <a
+                href="https://ng.linkedin.com/in/ike-wisdom-31804b336"
+                target="_blank"
+                rel="noreferrer"
+                className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 hover:text-primary-600 transition-all"
+                aria-label="Ike Wisdom Okemsinachi on LinkedIn"
+              >
+                <Linkedin className="w-4 h-4" />
+              </a>
+              <a
+                href="mailto:contact@widltd.com.ng"
+                className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 hover:text-primary-600 transition-all"
+                aria-label="Email WID LTD"
+              >
+                <Mail className="w-4 h-4" />
+              </a>
+            </div>
           </div>
 
           {Object.entries(footerLinks).map(([title, links]) => (
@@ -75,14 +98,22 @@ export function Footer() {
 
         <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200 dark:border-gray-800">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-col xs:flex-row items-center gap-3 xs:gap-4 sm:gap-6 text-xs sm:text-sm text-gray-500">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-col xs:flex-row flex-wrap items-center gap-3 xs:gap-4 sm:gap-6 text-xs sm:text-sm text-gray-500">
+              <a href="mailto:contact@widltd.com.ng" className="flex items-center gap-1.5 hover:text-primary-600">
                 <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                hello@careercode.com.ng
-              </div>
+                contact@widltd.com.ng
+              </a>
+              <a href="tel:+2348164961457" className="flex items-center gap-1.5 hover:text-primary-600">
+                <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                +234 816 496 1457
+              </a>
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Agbara, Ogun State, Nigeria
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                Mon–Fri, 8:00 AM – 6:00 PM WAT
               </div>
             </div>
             <p className="text-xs sm:text-sm text-gray-400 text-center xs:text-left">

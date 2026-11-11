@@ -13,7 +13,7 @@ const sections = [
   { title: '7. Limitation of Liability', content: 'CareerCode Academy provides educational content "as is" without warranties of any kind. We are not liable for any damages arising from your use of the Platform, including but not limited to loss of data or missed employment opportunities.' },
   { title: '8. Termination', content: 'We may suspend or terminate accounts for violations of these terms. You may delete your account at any time through settings. Upon termination, your access to paid content will cease.' },
   { title: '9. Governing Law', content: 'These terms are governed by the laws of the Federal Republic of Nigeria. Any disputes shall be resolved in the courts of Ogun State, Nigeria.' },
-  { title: '10. Contact', content: 'For questions about these terms, please contact us at legal@careercode.com.ng or through our Contact page.' },
+  { title: '10. Contact', content: 'CareerCode Academy is operated by WID LTD (RC 8824091), Agbara, Ogun State, Nigeria. For questions about these terms, contact contact@widltd.com.ng or +234 816 496 1457, or use our Contact page.' },
 ];
 
 export default function Terms() {
@@ -30,7 +30,7 @@ export default function Terms() {
               Terms of <span className="gradient-text">Service</span>
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Last updated: January 1, 2026
+              Last updated: November 11, 2026
             </p>
           </motion.div>
 

@@ -14,6 +14,7 @@ const sections = [
   { title: '8. Children Privacy', content: 'The Platform is not intended for children under 13. We do not knowingly collect data from children. If you believe a child has provided us with personal data, please contact us immediately.' },
   { title: '9. International Transfers', content: 'Your data may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place through standard contractual clauses and data processing agreements.' },
   { title: '10. Changes to This Policy', content: 'We may update this Privacy Policy periodically. Material changes will be notified via email or platform notice. Continued use after changes constitutes acceptance of the updated policy.' },
+  { title: '11. Contact', content: 'The data controller is WID LTD (RC 8824091), Agbara, Ogun State, Nigeria. Contact contact@widltd.com.ng or +234 816 496 1457 for privacy requests.' },
 ];
 
 export default function Privacy() {
@@ -30,7 +31,7 @@ export default function Privacy() {
               Privacy <span className="gradient-text">Policy</span>
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Last updated: January 1, 2026
+              Last updated: November 11, 2026
             </p>
           </motion.div>
 
