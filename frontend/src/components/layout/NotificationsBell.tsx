@@ -14,6 +14,16 @@ export function NotificationsBell() {
 
   useEffect(() => {
     fetchNotifications();
+    const timer = window.setInterval(() => fetchNotifications(), 30000);
+    const onFocus = () => fetchNotifications();
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchNotifications(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchNotifications]);
 
   useEffect(() => {
