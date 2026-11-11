@@ -347,10 +347,11 @@ export async function getEnrollmentsByUser(env: Env, userId: string): Promise<an
 // ── payments (backend/src/models/payment.ts) ─────────────────────────────
 export async function getAllPayments(env: Env, limit = 50, offset = 0): Promise<any[]> {
   const { rows } = await getDb(env).query<any>(
-    `SELECT p.*, u.name as user_name, u.email as user_email, c.title as course_title
+    `SELECT p.*, u.name as user_name, u.email as user_email,
+            COALESCE(c.title, 'Learning path bundle') as course_title
      FROM payments p
      JOIN users u ON p.user_id = u.id
-     JOIN courses c ON p.course_id = c.id
+     LEFT JOIN courses c ON p.course_id = c.id
      ORDER BY p.created_at DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
