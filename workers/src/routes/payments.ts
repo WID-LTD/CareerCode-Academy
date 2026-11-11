@@ -209,6 +209,24 @@ async function courseSlug(env: Env, courseId: string | null): Promise<string | n
 }
 
 // POST /api/v1/payments/initialize
+// GET /api/v1/payments/gateways — which providers are live on this deployment
+payments.get('/gateways', async (c) => {
+  try {
+    const currency = (await settingValue(c.env, 'platform_currency')) || 'NGN';
+    const info = CURRENCIES[currency] || CURRENCIES.NGN;
+    const gateways = info.gateways.map((id) => ({
+      id,
+      name: id === 'paystack' ? 'Paystack' : 'Flutterwave',
+      configured: id === 'paystack'
+        ? gatewayConfigured(c.env.PAYSTACK_SECRET_KEY)
+        : gatewayConfigured(c.env.FLUTTERWAVE_SECRET_KEY),
+    }));
+    return c.json({ success: true, data: { currency, gateways } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load payment gateways');
+  }
+});
+
 payments.post('/initialize', async (c) => {
   try {
     const s = await requireAuth(c);

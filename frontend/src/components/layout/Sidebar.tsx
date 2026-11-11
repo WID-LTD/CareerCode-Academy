@@ -19,6 +19,7 @@ import {
   Monitor,
   ShieldAlert,
   Map,
+  FlaskConical,
   Target,
   User,
   Plus,
@@ -51,6 +52,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   student: [
     { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
     { label: 'To-Do', path: '/student/todos', icon: ListChecks },
+    { label: 'Guided Lab', path: '/student/lab', icon: FlaskConical },
     { label: 'My Courses', path: '/student/courses', icon: BookOpen },
     { label: 'Learning Paths', path: '/student/learning-paths', icon: GitBranch },
     { label: 'Pathway Finder', path: '/student/pathway-finder', icon: Compass },

@@ -161,6 +161,7 @@ const StudentApplications = lazy(() => import('@/pages/student/Applications'));
 const StudentPortfolio = lazy(() => import('@/pages/student/Portfolio'));
 const StudentPortfolioBuilder = lazy(() => import('@/pages/student/PortfolioBuilder'));
 const StudentGuidedMode = lazy(() => import('@/pages/student/GuidedMode'));
+const StudentLab = lazy(() => import('@/pages/student/Lab'));
 const StudentLiveRoom = lazy(() => import('@/pages/student/LiveRoom'));
 const StudentPathwayFinder = lazy(() => import('@/pages/student/PathwayFinder'));
 
@@ -383,6 +384,7 @@ function App() {
           <Route path="portfolio" element={<SuspenseWrapper><StudentPortfolio /></SuspenseWrapper>} />
           <Route path="portfolio/site" element={<SuspenseWrapper><StudentPortfolioBuilder /></SuspenseWrapper>} />
           <Route path="guided" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
+          <Route path="lab" element={<SuspenseWrapper><StudentLab /></SuspenseWrapper>} />
           <Route path="guided/:slug" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
           <Route path="live/:sessionId" element={<SuspenseWrapper><StudentLiveRoom /></SuspenseWrapper>} />
           <Route path="pathway-finder" element={<SuspenseWrapper><StudentPathwayFinder /></SuspenseWrapper>} />

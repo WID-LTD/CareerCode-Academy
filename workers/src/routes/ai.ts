@@ -15,6 +15,8 @@ const TEXT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const WHISPER_MODEL = '@cf/openai/whisper-large-v3-turbo';
 const TTS_MODEL = '@cf/myshell-ai/melotts';
 const TTS_FALLBACK = '@cf/deepgram/aura-1';
+const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+const VISION_FALLBACK = '@cf/llava-hf/llava-1.5-7b-hf';
 
 export type AiBlock =
   | { type: 'text'; markdown: string }
@@ -426,6 +428,53 @@ ai.post('/voice', async (c) => {
     return c.json({ success: true, data: { ...data, transcript } });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Voice transcription failed');
+  }
+});
+
+// POST /ai/vision — screenshot / screen-frame analysis, then a normal GiGo reply.
+ai.post('/vision', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    if (!(await flag(c.env, 'ai_enabled'))) return fail(c, 503, 'GiGo is currently disabled');
+    if (!c.env.AI) return fail(c, 503, 'AI is not configured on this deployment');
+    await checkQuota(c.env, s.userId, s.role, 'text');
+
+    const { fields, file } = await parseBody(c as any);
+    if (!file) return fail(c, 400, 'An image file is required');
+    if (file.size > 8 * 1024 * 1024) return fail(c, 413, 'Image is too large (max 8MB)');
+    if (!String(file.type || '').startsWith('image/')) return fail(c, 415, 'Only image files are supported');
+
+    const question = String(fields.prompt || fields.question || 'What is wrong in this screenshot and how do I fix it?').slice(0, 1200);
+    let context: any = undefined;
+    if (fields.context) { try { context = JSON.parse(String(fields.context)); } catch { /* ignore */ } }
+    const contextHint = context?.courseSlug ? ` The learner is working in course "${context.courseSlug}" on page ${context.page || 'unknown'}.` : '';
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const image = Array.from(bytes);
+    const visionPrompt = `You are GiGo's visual analysis engine for CareerCode Academy. Analyse the screenshot carefully.${contextHint}
+Read every visible error message exactly. Identify the file, line, terminal command, browser panel or UI element involved. Do not invent details that are not visible. Return a concise but specific analysis with: (1) what is on screen, (2) the likely problem, (3) the exact next steps the learner should try. Learner question: ${question}`;
+
+    let vision: any = null;
+    let usedModel = VISION_MODEL;
+    try {
+      vision = await c.env.AI.run(VISION_MODEL as any, { image, prompt: visionPrompt, max_tokens: 700 } as any);
+    } catch {
+      usedModel = VISION_FALLBACK;
+      vision = await c.env.AI.run(VISION_FALLBACK as any, { image, prompt: visionPrompt, max_tokens: 700 } as any);
+    }
+    const analysis = String(vision?.response || vision?.description || vision?.result?.response || '').trim();
+    if (!analysis) return fail(c, 502, 'GiGo could not read that image. Try a clearer screenshot.');
+
+    const prior = Array.isArray(fields.messages) ? (() => { try { return JSON.parse(String(fields.messages)); } catch { return []; } })() : [];
+    const messages = [
+      ...(Array.isArray(prior) ? prior.slice(-8) : []),
+      { role: 'user', content: `I uploaded a screenshot. Visual analysis: ${analysis}
+
+My question: ${question}` },
+    ];
+    const data = await runChat(c.env, s, { messages, context, conversationId: fields.conversationId });
+    return c.json({ success: true, data: { ...data, vision: analysis, visionModel: usedModel } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'GiGo could not analyse that image');
   }
 });
 

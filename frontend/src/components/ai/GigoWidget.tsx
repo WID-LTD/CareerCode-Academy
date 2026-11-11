@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import {
   Send, X, Minimize2, GripVertical, CheckCircle2, XCircle, Mic, MicOff,
   Volume2, VolumeX, Plus, History, Loader2, Sparkles, ListChecks,
-  BookOpen, Briefcase, MessageSquare, RotateCcw, Square,
+  BookOpen, Briefcase, MessageSquare, RotateCcw, Square, ImagePlus, Monitor,
 } from 'lucide-react';
 import api from '@/lib/axios';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,38 @@ function loadDock(): Dock {
     if (raw && (raw.side === 'left' || raw.side === 'right') && Number.isFinite(raw.bottom)) return raw;
   } catch { /* ignore */ }
   return { side: 'right', bottom: 88 };
+}
+
+async function extractFrames(blob: Blob, count = 2): Promise<Blob[]> {
+  const url = URL.createObjectURL(blob);
+  const video = document.createElement('video');
+  video.src = url;
+  video.muted = true;
+  video.playsInline = true;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('Could not read screen recording'));
+    });
+    const duration = Number.isFinite(video.duration) ? Math.min(video.duration, 45) : 1;
+    const frames: Blob[] = [];
+    for (let i = 0; i < count; i++) {
+      const t = Math.max(0.1, duration * ((i + 1) / (count + 1)));
+      video.currentTime = t;
+      await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 1280 / Math.max(1, video.videoWidth));
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.72));
+      if (frame) frames.push(frame);
+    }
+    return frames;
+  } finally {
+    URL.revokeObjectURL(url);
+    video.removeAttribute('src');
+  }
 }
 
 function messageText(m: Msg): string {
@@ -233,6 +265,8 @@ export function GigoWidget() {
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [screenRecording, setScreenRecording] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try { return localStorage.getItem(STORAGE_TTS) !== 'false'; } catch { return true; }
   });
@@ -250,13 +284,16 @@ export function GigoWidget() {
   const chunksRef = useRef<Blob[]>([]);
   const recordTimer = useRef<number | null>(null);
   const recordingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const screenRecRef = useRef<MediaRecorder | null>(null);
+  const screenChunksRef = useRef<Blob[]>([]);
 
   const context = useMemo(() => {
     const m = location.pathname.match(/\/courses\/([^/]+)/);
     return { page: location.pathname, courseSlug: m?.[1] };
   }, [location.pathname]);
 
-  const gigoState: GigoState = recording ? 'listening' : loading ? 'thinking' : speaking ? 'speaking' : 'idle';
+  const gigoState: GigoState = (recording || screenRecording) ? 'listening' : loading ? 'thinking' : speaking ? 'speaking' : 'idle';
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_CHAT, JSON.stringify(messages.slice(-40))); } catch { /* ignore */ }
@@ -330,6 +367,83 @@ export function GigoWidget() {
       setLoading(false);
     }
   }, [input, loading, messages, conversationId, context, ttsEnabled, speak, stopAudio]);
+
+  useEffect(() => {
+    const openGigo = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      setOpen(true);
+      setMinimized(false);
+      if (detail.prompt) void send(String(detail.prompt));
+    };
+    window.addEventListener('gigo:open', openGigo as EventListener);
+    return () => window.removeEventListener('gigo:open', openGigo as EventListener);
+  }, [send]);
+
+  const sendVision = useCallback(async (file: Blob, label: string) => {
+    setLoading(true);
+    stopAudio();
+    setAttaching(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file, `gigo-${Date.now()}.jpg`);
+      fd.append('prompt', label);
+      fd.append('messages', JSON.stringify(messages.map((m) => ({ role: m.role, content: messageText(m) }))));
+      fd.append('context', JSON.stringify(context));
+      if (conversationId) fd.append('conversationId', conversationId);
+      const { data } = await api.post('/ai/vision', fd);
+      const d = data.data;
+      setConversationId(d.conversationId || conversationId);
+      setMessages((m) => [
+        ...m,
+        { role: 'user', content: `📷 ${label}` },
+        { role: 'assistant', content: d.reply || '', blocks: d.blocks, followups: d.followups },
+      ]);
+      if (ttsEnabled && d.reply) void speak(d.reply);
+    } catch (e: any) {
+      setMessages((m) => [...m, {
+        role: 'assistant',
+        content: e?.response?.data?.message || 'I could not analyse that image. Please try a clearer screenshot.',
+        blocks: [{ type: 'text', markdown: e?.response?.data?.message || 'I could not analyse that image. Please try a clearer screenshot.' }],
+      }]);
+    } finally {
+      setLoading(false);
+      setAttaching(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [messages, conversationId, context, ttsEnabled, speak, stopAudio]);
+
+  const startScreenRecording = useCallback(async () => {
+    if (screenRecording) {
+      screenRecRef.current?.stop();
+      return;
+    }
+    if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === 'undefined') {
+      setMessages((m) => [...m, { role: 'assistant', content: 'Screen recording is not supported in this browser.', blocks: [{ type: 'text', markdown: 'Screen recording is not supported in this browser. Try uploading a screenshot instead.' }] }]);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType: mime });
+      screenChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size) screenChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setScreenRecording(false);
+        const blob = new Blob(screenChunksRef.current, { type: recorder.mimeType || 'video/webm' });
+        if (!blob.size) return;
+        const frames = await extractFrames(blob, 2);
+        for (let i = 0; i < frames.length; i++) {
+          await sendVision(frames[i], `This is frame ${i + 1} of ${frames.length} from my screen recording. Tell me what is wrong and the exact next steps.`);
+        }
+      };
+      recorder.start(1000);
+      screenRecRef.current = recorder;
+      setScreenRecording(true);
+    } catch {
+      setScreenRecording(false);
+    }
+  }, [screenRecording, sendVision]);
 
   const sendVoice = useCallback(async (blob: Blob, mime: string) => {
     setLoading(true);
@@ -606,6 +720,12 @@ export function GigoWidget() {
                         Listening… tap the mic to stop
                       </div>
                     )}
+                    {screenRecording && (
+                      <div className="flex items-center gap-2 text-xs text-rose-500">
+                        <Monitor className="w-4 h-4 animate-pulse" />
+                        Recording your screen… stop to let GiGo analyse it
+                      </div>
+                    )}
                   </div>
 
                   <div className="px-3 pb-2 flex flex-wrap gap-1.5">
@@ -617,6 +737,13 @@ export function GigoWidget() {
                   </div>
 
                   <form onSubmit={(e) => { e.preventDefault(); void send(); }} className="p-3 border-t border-gray-100 dark:border-gray-800 flex items-end gap-2">
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void sendVision(f, input.trim() || 'Review this screenshot and tell me what to fix.'); }} />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={loading || attaching} aria-label="Attach screenshot" title="Attach a screenshot" className="h-10 w-10 rounded-xl grid place-items-center flex-shrink-0 bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-40">
+                      {attaching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                    </button>
+                    <button type="button" onClick={() => void startScreenRecording()} disabled={loading} aria-label={screenRecording ? 'Stop screen recording' : 'Record screen for GiGo'} title={screenRecording ? 'Stop screen recording' : 'Record screen for GiGo'} className={cn('h-10 w-10 rounded-xl grid place-items-center flex-shrink-0 transition-colors', screenRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-40')}>
+                      {screenRecording ? <Square className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
+                    </button>
                     <button type="button" onClick={toggleRecording} aria-label={recording ? 'Stop recording' : 'Talk to GiGo'} title={recording ? 'Stop recording' : 'Talk to GiGo'}
                       className={cn('h-10 w-10 rounded-xl grid place-items-center flex-shrink-0 transition-colors', recording ? 'bg-rose-500 text-white animate-pulse' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800')}>
                       {recording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}

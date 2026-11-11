@@ -494,6 +494,8 @@ async function main() {
       const text = await res.text();
       return { status: res.status, json: { success: text.startsWith('%PDF'), skipped: false } };
     }, (r) => (r.json?.skipped || r.json?.success ? null : `status ${r.status}`)],
+    ['GET /api/v1/payments/gateways', () => call('/api/v1/payments/gateways'), (r) => (Array.isArray(r.json?.data?.gateways) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/ai/vision (no auth)', () => call('/api/v1/ai/vision', { method: 'POST', body: {} }), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['POST /api/v1/push/subscribe', () => call('/api/v1/push/subscribe', { method: 'POST', token, body: { endpoint: 'https://example.com/push/qa', keys: { p256dh: 'B'.repeat(87), auth: 'A'.repeat(22) } } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['DELETE /api/v1/push/unsubscribe', () => call('/api/v1/push/unsubscribe', { method: 'DELETE', token, body: { endpoint: 'https://example.com/push/qa' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['POST /api/v1/portfolio/site/:username/like', async () => {

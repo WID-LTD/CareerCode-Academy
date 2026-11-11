@@ -43,6 +43,7 @@ export default function Checkout() {
   const [course, setCourse] = useState<any>(null);
   const [bundle, setBundle] = useState<any>(null);
   const [provider, setProvider] = useState('paystack');
+  const [enabledGateways, setEnabledGateways] = useState<string[]>(['paystack', 'flutterwave']);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [xpBalance, setXpBalance] = useState<any>(null);
@@ -52,6 +53,17 @@ export default function Checkout() {
   const [codeMessage, setCodeMessage] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [redeemAmount, setRedeemAmount] = useState(1000);
+
+  useEffect(() => {
+    api.get('/payments/gateways').then(({ data }) => {
+      const live = (data?.data?.gateways || []).filter((g: any) => g.configured).map((g: any) => g.id);
+      if (live.length) setEnabledGateways(live);
+    }).catch(() => { /* keep the default pair */ });
+  }, []);
+
+  useEffect(() => {
+    if (!enabledGateways.includes(provider)) setProvider(enabledGateways[0] || 'paystack');
+  }, [enabledGateways, provider]);
 
   useEffect(() => {
     if (!user) {
@@ -234,7 +246,7 @@ export default function Checkout() {
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Wallet className="w-5 h-5 text-blue-500" /> Payment Method</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {providers.map((p) => {
+                  {providers.filter((p) => enabledGateways.includes(p.id)).map((p) => {
                     const isSelected = provider === p.id;
                     return (
                       <div key={p.id} onClick={() => setProvider(p.id)} className={`cursor-pointer rounded-2xl p-6 border transition-all ${isSelected ? `bg-gradient-to-br ${p.color} ring-1 ${p.ring} scale-[1.02] shadow-lg` : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400'}`}>
@@ -339,7 +351,7 @@ export default function Checkout() {
               </h2>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {providers.map((p) => {
+                {providers.filter((p) => enabledGateways.includes(p.id)).map((p) => {
                   const isSelected = provider === p.id;
                   return (
                     <div
