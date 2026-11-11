@@ -38,6 +38,10 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_CALLBACK_URL?: string;
   CLOUDFLARE_AI_TOKEN?: string;
+  // Cloudflare API automation (portfolio custom domains)
+  CF_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
+  CF_PAGES_PROJECT?: string;
   // Bindings (phased in)
   // HYPERDRIVE?: Hyperdrive;
   // R2?: R2Bucket;

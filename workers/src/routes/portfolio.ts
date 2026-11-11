@@ -5,6 +5,7 @@ import { getDb } from '../db';
 import * as PortfolioModel from '../portfolio';
 import { parseBody, storeOrLink } from '../uploads';
 import { authenticate } from '../auth-helpers';
+import { attachPagesDomain, pagesDomainStatus, detachPagesDomain } from '../portfolio-domains';
 
 // Portfolio routes ported from backend/src/routes/portfolio.routes.ts.
 // Mounted at /api/v1/portfolio.
@@ -622,7 +623,8 @@ portfolio.put('/site/custom-domain', async (c) => {
         status: 'pending',
         instructions: [
           `Add a TXT record on _careercode.${domain} with value: ${token}`,
-          'Then press Verify. Serving the domain also requires it to be attached to CareerCode (Cloudflare for SaaS).',
+          `Add a CNAME record for ${domain} pointing to career-code-academy.pages.dev (proxied).`,
+          'Then press Verify. CareerCode attaches the domain to the portfolio site and Cloudflare provisions SSL automatically.',
         ],
       },
     });
@@ -643,22 +645,88 @@ portfolio.post('/site/custom-domain/verify', async (c) => {
     const json: any = await res.json().catch(() => ({}));
     const answers: string[] = (json?.Answer || []).map((a: any) => String(a.data || ''));
     const verified = answers.some((a) => a.includes(site.domain_token));
-    await getDb(c.env).query(
-      `UPDATE portfolio_sites SET domain_status = $1, domain_verified_at = CASE WHEN $1 = 'verified' THEN COALESCE(domain_verified_at, NOW()) ELSE domain_verified_at END, updated_at = NOW() WHERE id = $2`,
-      [verified ? 'verified' : 'pending', site.id]
-    );
+    let attach: any = null;
+    let status = 'pending';
+    if (verified) {
+      attach = await attachPagesDomain(c.env, site.custom_domain);
+      status = attach.ok ? 'attached' : 'verified';
+      await getDb(c.env).query(
+        `UPDATE portfolio_sites SET domain_status = $1, domain_verified_at = COALESCE(domain_verified_at, NOW()),
+           custom_hostname_id = COALESCE($2, custom_hostname_id), domain_last_error = $3, updated_at = NOW()
+         WHERE id = $4`,
+        [status, attach.id || null, attach.ok ? null : attach.error || 'Attach failed', site.id]
+      );
+    } else {
+      await getDb(c.env).query(`UPDATE portfolio_sites SET domain_status = 'pending', updated_at = NOW() WHERE id = $1`, [site.id]);
+    }
     return c.json({
       success: true,
       data: {
         verified,
-        status: verified ? 'verified' : 'pending',
-        message: verified
-          ? 'DNS verified. Ask an admin to attach the domain for serving.'
-          : 'TXT record not found yet. DNS can take a few minutes.',
+        status,
+        attach,
+        message: !verified
+          ? 'TXT record not found yet. DNS can take a few minutes.'
+          : attach?.ok
+            ? 'Domain verified and attached. Cloudflare is provisioning SSL; it usually becomes active within a few minutes.'
+            : 'DNS verified, but attaching the domain to Pages failed. Check the CNAME and press Verify again.',
       },
     });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to verify domain');
+  }
+});
+
+// GET /portfolio/site/custom-domain/status — poll Pages attachment/SSL
+portfolio.get('/site/custom-domain/status', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const site = await ensureSite(c.env, s.userId);
+    if (!site.custom_domain) return c.json({ success: true, data: { status: 'none' } });
+    const res = await pagesDomainStatus(c.env, site.custom_domain);
+    const status = res.ok
+      ? (res.status === 'active' ? 'active' : res.status === 'error' ? 'error' : 'attached')
+      : 'verified';
+    await getDb(c.env).query(
+      `UPDATE portfolio_sites SET domain_status = $1, domain_last_error = $2, custom_hostname_id = COALESCE($3, custom_hostname_id), updated_at = NOW() WHERE id = $4`,
+      [status, res.ok ? null : res.error || null, res.id || null, site.id]
+    );
+    return c.json({
+      success: true,
+      data: {
+        domain: site.custom_domain,
+        status,
+        pages_status: res.status,
+        error: res.error || null,
+        cname_target: 'career-code-academy.pages.dev',
+        url: `https://${site.custom_domain}`,
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to check domain status');
+  }
+});
+
+// GET /portfolio/resolve-host?host=... — public host → username lookup for Pages Functions
+portfolio.get('/resolve-host', async (c) => {
+  try {
+    const host = String(c.req.query('host') || '').trim().toLowerCase().replace(/:\d+$/, '');
+    if (!host) return fail(c, 400, 'host is required');
+    const db = getDb(c.env);
+    if (host.endsWith('.careercode.com.ng')) {
+      const sub = host.split('.')[0];
+      if (['api', 'www', 'portfolio'].includes(sub)) return c.json({ success: true, data: null });
+      const { rows } = await db.query<any>('SELECT username FROM users WHERE lower(username) = $1 LIMIT 1', [sub]);
+      return c.json({ success: true, data: rows[0] ? { username: rows[0].username, source: 'subdomain' } : null });
+    }
+    const { rows } = await db.query<any>(
+      `SELECT u.username FROM portfolio_sites ps JOIN users u ON u.id = ps.user_id
+       WHERE lower(ps.custom_domain) = $1 AND ps.domain_status IN ('verified','attached','active') AND ps.is_published = 1 LIMIT 1`,
+      [host]
+    );
+    return c.json({ success: true, data: rows[0] ? { username: rows[0].username, source: 'custom_domain' } : null });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Host lookup failed');
   }
 });
 

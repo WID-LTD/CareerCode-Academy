@@ -9,42 +9,39 @@ https://<username>.careercode.com.ng
 https://<username>.careercode.com.ng/<project-slug>
 ```
 
-This uses:
+This uses a proxied wildcard DNS record `*.careercode.com.ng`, the Worker route
+`*.careercode.com.ng/*`, and host routing in `workers/src/index.ts`.
 
-- a proxied wildcard DNS record `*.careercode.com.ng`
-- the Worker route `*.careercode.com.ng/*`
-- host routing in `workers/src/index.ts`, which looks up the username and
-  redirects to the public portfolio.
+## External custom domains (live)
 
-The wildcard is covered by Cloudflare's certificate for `careercode.com.ng`.
-`api`, `www` and `portfolio` subdomains are excluded and keep their own routes.
+External domains are attached to the **Cloudflare Pages** project
+`career-code-academy`. Cloudflare provisions the certificate automatically.
 
-## External domains
+User steps in **Portfolio Builder → Portfolio domain**:
 
-The builder can verify an external domain with a TXT record:
+1. Add `_careercode.<domain>` TXT `careercode-verify-<token>`.
+2. Add `<domain>` CNAME → `career-code-academy.pages.dev` (proxied).
+3. Press **Verify**. The API checks DNS, then calls the Pages custom-domain API.
+4. Press **Check status** until Pages reports `active`.
 
-```
-_careercode.<domain>  TXT  careercode-verify-<token>
-```
+Serving path:
 
-`POST /api/v1/portfolio/site/custom-domain/verify` checks DNS over HTTPS and
-marks the domain verified.
+- Pages custom domain receives the request.
+- `frontend/functions/[[path]].ts` resolves the hostname through
+  `GET /api/v1/portfolio/resolve-host?host=...`.
+- The function redirects `/` to `/u/<username>` on the same custom domain.
+- Assets and `/u/...` paths pass through to the SPA.
+- The API CORS middleware allows verified custom-domain origins dynamically.
 
-Serving an external hostname directly requires **Cloudflare for SaaS (SSL for
-SaaS)**. On this account the custom-hostnames API authenticates correctly but
-returns:
+Verified live with `https://portfolio.widltd.com.ng` →
+`https://portfolio.widltd.com.ng/u/ikewisdom-2d35f3` (200, SSL active).
 
-```
-1404 No quota has been allocated for this zone or for this account
-```
+## Configuration
 
-That is a Cloudflare sales/quota enrollment, not a token-permission problem.
-Until the quota is allocated, use one of these:
+Worker secrets:
 
-1. A **301 redirect** at the registrar/DNS provider to
-   `https://<username>.careercode.com.ng` (works immediately, SSL handled by
-   the registrar).
-2. Keep the domain verified and attach it once SSL for SaaS is enabled.
+- `CF_API_TOKEN` — token with Pages Write + DNS/SSL/Workers permissions
+- `CF_ACCOUNT_ID`
+- `CF_PAGES_PROJECT=career-code-academy`
 
-The API token used for platform automation is stored outside the repository in
-`~/.config/cloudflare/`; never commit it.
+The token is stored outside the repository in `~/.config/cloudflare/`.

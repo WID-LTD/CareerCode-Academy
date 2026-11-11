@@ -106,7 +106,7 @@ app.use('*', async (c, next) => {
       if (!host.endsWith('careercode.com.ng') && !host.endsWith('pages.dev')) {
         const site = await getDb(c.env).query<any>(
           `SELECT u.username FROM portfolio_sites ps JOIN users u ON u.id = ps.user_id
-           WHERE lower(ps.custom_domain) = $1 AND ps.domain_status = 'verified' AND ps.is_published = 1 LIMIT 1`,
+           WHERE lower(ps.custom_domain) = $1 AND ps.domain_status IN ('verified','attached','active') AND ps.is_published = 1 LIMIT 1`,
           [host]
         );
         if (site.rows.length) {
@@ -121,10 +121,27 @@ app.use('*', async (c, next) => {
   } catch { /* host routing must never break the API */ }
 
   const allowed = allowedOrigins(c.env);
+  const requestOrigin = c.req.header('Origin') || '';
+  let dynamicOrigin = false;
+  if (requestOrigin && !allowed.includes(requestOrigin)) {
+    try {
+      const originHost = new URL(requestOrigin).host.toLowerCase();
+      if (originHost.endsWith('.careercode.com.ng')) {
+        dynamicOrigin = true;
+      } else {
+        const site = await getDb(c.env).query<any>(
+          `SELECT 1 FROM portfolio_sites WHERE lower(custom_domain) = $1 AND domain_status IN ('verified','attached','active') LIMIT 1`,
+          [originHost]
+        );
+        dynamicOrigin = site.rows.length > 0;
+      }
+    } catch { /* ignore malformed origin */ }
+  }
   return cors({
     origin: (origin) => {
       if (!origin) return origin;
       if (allowed.includes(origin)) return origin;
+      if (dynamicOrigin && origin === requestOrigin) return origin;
       return null;
     },
     credentials: true,

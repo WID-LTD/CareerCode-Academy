@@ -221,7 +221,7 @@ export default function PortfolioBuilder() {
               {user.username}.careercode.com.ng
             </a>
           ) : 'created with your profile'}.
-          {' '}It is live now with SSL. External domains can be verified below; serving one directly requires Cloudflare for SaaS on our account (currently awaiting quota) — until then, set a 301 redirect from your registrar to your CareerCode subdomain.
+          {' '}It is live now with SSL. To use an external domain, add the TXT and CNAME records below, press Verify, and CareerCode will attach it to the portfolio site. Cloudflare provisions SSL automatically.
         </p>
         <div className="mt-3 flex flex-col sm:flex-row gap-2">
           <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="yourname.com"
@@ -239,9 +239,20 @@ export default function PortfolioBuilder() {
               toast[data.data.verified ? 'success' : 'error'](data.data.message);
             } catch (e: any) { toast.error(e?.response?.data?.message || 'Verification failed'); }
           }} className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm">Verify</button>
+          <button onClick={async () => {
+            try {
+              const { data } = await api.get('/portfolio/site/custom-domain/status');
+              setDomainStatus(data.data.status); setDomainMsg(data.data.error || `Pages status: ${data.data.pages_status || data.data.status}`);
+              toast[data.data.status === 'active' ? 'success' : 'loading'](data.data.status === 'active' ? 'Domain is live' : 'Domain status checked');
+            } catch (e: any) { toast.error(e?.response?.data?.message || 'Status check failed'); }
+          }} className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm">Check status</button>
         </div>
         {domainStatus !== 'none' && (
-          <p className="text-xs mt-2 text-gray-500">Status: <strong className={domainStatus === 'verified' ? 'text-emerald-500' : 'text-amber-500'}>{domainStatus}</strong>{domainMsg ? ` — ${domainMsg}` : ''}</p>
+          <p className="text-xs mt-2 text-gray-500">
+            Status: <strong className={['verified','attached','active'].includes(domainStatus) ? 'text-emerald-500' : 'text-amber-500'}>{domainStatus}</strong>
+            {domainMsg ? ` — ${domainMsg}` : ''}
+            {domain && <span className="block mt-1">CNAME: <code className="font-mono">{domain}</code> → <code className="font-mono">career-code-academy.pages.dev</code> (proxied)</span>}
+          </p>
         )}
       </section>
 
