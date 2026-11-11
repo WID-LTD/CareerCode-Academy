@@ -269,6 +269,7 @@ export default function Community() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    useCommunityStore.setState({ channels: [], activeChannel: null, activeCommunity: null });
     if (id) {
       setResolvedId(id);
       fetchCommunityById(id);

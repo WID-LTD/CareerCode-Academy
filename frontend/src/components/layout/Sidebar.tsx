@@ -300,7 +300,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             <nav className="space-y-1" role="navigation">
               {links.map((link) => {
                 const isActive = location.pathname === link.path;
-                const badgeCount = link.label === 'Certificates' ? newCertCount : link.label === 'Community' ? communityUnread : 0;
+                const isCommunityLink = link.label === 'Community' || link.label === 'Communities';
+                const badgeCount = link.label === 'Certificates' ? newCertCount : isCommunityLink ? communityUnread : 0;
                 const showBadge = badgeCount > 0;
                 return (
                   <Link
@@ -309,6 +310,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     onClick={() => {
                       if (window.innerWidth < 1024) onToggle();
                       if (link.label === 'Certificates' && showBadge) setNewCertCount(0);
+                      if (isCommunityLink) setCommunityUnread(0);
                     }}
                     className={cn(
                       'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative',
