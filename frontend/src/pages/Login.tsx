@@ -28,6 +28,8 @@ export default function Login() {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [needs2fa, setNeeds2fa] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginTimeout, setLoginTimeout] = useState(false);
@@ -48,7 +50,12 @@ export default function Login() {
     setLoginTimeout(false);
     const timer = setTimeout(() => setLoginTimeout(true), 30000);
     try {
-      await login(email, password, captchaToken || undefined);
+      await login(email, password, captchaToken || undefined, needs2fa ? twoFactorCode : undefined);
+    } catch (err: any) {
+      if (err?.response?.data?.twoFactorRequired) {
+        setNeeds2fa(true);
+        toast.error('Enter the 6-digit code from your authenticator app.');
+      }
     } finally {
       clearTimeout(timer);
     }
@@ -112,6 +119,17 @@ export default function Login() {
                 <Link to="/forgot-password" className="text-primary-600 dark:text-primary-400 hover:underline">Forgot password?</Link>
               </div>
 
+              {needs2fa && (
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="6-digit authenticator code"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  icon={<Shield className="w-4 h-4" />}
+                  maxLength={9}
+                />
+              )}
               <Turnstile onToken={setCaptchaToken} />
               <Button type="submit" className="w-full" loading={isLoading}>Sign In</Button>
               {isLoading && loginTimeout && (

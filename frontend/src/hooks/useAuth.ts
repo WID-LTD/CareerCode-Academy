@@ -16,9 +16,9 @@ export function useAuth() {
     fetchUser,
   } = useAuthStore();
 
-  const login = async (email: string, password: string, turnstileToken?: string) => {
+  const login = async (email: string, password: string, turnstileToken?: string, twoFactorCode?: string) => {
     try {
-      await storeLogin(email, password, turnstileToken);
+      await storeLogin(email, password, turnstileToken, twoFactorCode);
       toast.success('Welcome back!');
       const role = useAuthStore.getState().user?.role;
       if (role === 'admin' || role === 'super_admin') navigate('/admin/dashboard');
@@ -45,6 +45,7 @@ export function useAuth() {
       } else {
         toast.error(err.response.data?.message || 'An unexpected error occurred.');
       }
+      throw err;
     }
   };
 

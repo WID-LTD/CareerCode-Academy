@@ -2097,3 +2097,9 @@ CREATE TABLE IF NOT EXISTS "community_join_requests" (
   "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(community_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS "user_preferences" (
+  "user_id" TEXT PRIMARY KEY,
+  "data" TEXT DEFAULT '{}',
+  "updated_at" TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);

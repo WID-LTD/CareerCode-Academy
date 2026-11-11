@@ -28,7 +28,7 @@ interface AuthState {
   initialized: boolean;
   setUser: (user: User | null) => void;
   setTokens: (token: string, refreshToken: string) => Promise<void>;
-  login: (email: string, password: string, turnstileToken?: string) => Promise<void>;
+  login: (email: string, password: string, turnstileToken?: string, twoFactorCode?: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: string, turnstileToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
@@ -73,10 +73,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      login: async (email, password, turnstileToken) => {
+      login: async (email, password, turnstileToken, twoFactorCode) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post('/auth/login', { email, password, turnstileToken });
+          const { data } = await api.post('/auth/login', { email, password, turnstileToken, twoFactorCode });
           const userData = data.data;
           set({
             user: {

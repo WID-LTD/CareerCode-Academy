@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getDb } from '../db';
 import { verifyTurnstile } from '../turnstile';
+import { backupCodes, generateSecret, otpauthUrl, sha256Hex as totpHash, verifyTotp } from '../totp';
 import { getCookie } from 'hono/cookie';
 import type { Env } from '../env';
 import {
@@ -116,6 +117,27 @@ auth.post('/login', async (c) => {
   if (!ok) return err(c, 401, 'Invalid email or password');
   if (!(user as any).is_verified) return err(c, 401, 'Please verify your email address.');
   if ((user as any).is_suspended) return err(c, 403, 'Your account has been suspended. Please contact support.');
+
+  if ((user as any).two_factor_enabled) {
+    const code = String(body.twoFactorCode || '').trim();
+    if (!code) {
+      return c.json({ success: false, message: 'Two-factor code required', twoFactorRequired: true }, 401 as any);
+    }
+    let passed = await verifyTotp((user as any).two_factor_secret, code);
+    if (!passed) {
+      const hash = await totpHash(code.toUpperCase());
+      const { rows } = await getDb(c.env).query<any>(
+        `SELECT id FROM two_factor_backup_codes
+         WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL LIMIT 1`,
+        [(user as any).id, hash]
+      );
+      if (rows.length) {
+        await getDb(c.env).query('UPDATE two_factor_backup_codes SET used_at = NOW() WHERE id = $1', [rows[0].id]);
+        passed = true;
+      }
+    }
+    if (!passed) return err(c, 401, 'Invalid two-factor code');
+  }
 
   await getDb(c.env).query('UPDATE users SET last_login = NOW() WHERE id = $1', [(user as any).id]);
 
@@ -554,6 +576,70 @@ auth.post('/oauth/exchange', async (c) => {
   } catch (e: any) {
     return err(c, 401, 'Invalid or expired OAuth code');
   }
+});
+
+// ── Two-factor authentication (TOTP) ─────────────────────────────────────
+auth.get('/2fa/status', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const { rows } = await getDb(c.env).query<any>('SELECT two_factor_enabled FROM users WHERE id = $1', [s.userId]);
+    return c.json({ success: true, data: { enabled: !!rows[0]?.two_factor_enabled } });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to load status'); }
+});
+
+auth.post('/2fa/setup', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const user = await getUserById(c.env, s.userId);
+    const secret = generateSecret();
+    await getDb(c.env).query('UPDATE users SET two_factor_secret = $1 WHERE id = $2', [secret, s.userId]);
+    return c.json({
+      success: true,
+      data: { secret, otpauth: otpauthUrl(secret, (user as any)?.email || s.userId) },
+    });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to start 2FA setup'); }
+});
+
+auth.post('/2fa/enable', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const { rows } = await getDb(c.env).query<any>('SELECT two_factor_secret FROM users WHERE id = $1', [s.userId]);
+    const secret = rows[0]?.two_factor_secret;
+    if (!secret) return err(c, 400, 'Start 2FA setup first');
+    if (!(await verifyTotp(secret, String(body.code || '')))) return err(c, 400, 'Invalid authenticator code');
+
+    await getDb(c.env).query('UPDATE users SET two_factor_enabled = true WHERE id = $1', [s.userId]);
+    await getDb(c.env).query('DELETE FROM two_factor_backup_codes WHERE user_id = $1', [s.userId]);
+    const codes = backupCodes();
+    for (const code of codes) {
+      await getDb(c.env).query(
+        'INSERT INTO two_factor_backup_codes (user_id, code_hash) VALUES ($1, $2)',
+        [s.userId, await totpHash(code.toUpperCase())]
+      );
+    }
+    return c.json({ success: true, data: { enabled: true, backupCodes: codes } });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to enable 2FA'); }
+});
+
+auth.post('/2fa/disable', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const db = getDb(c.env);
+    const { rows } = await db.query<any>('SELECT two_factor_secret, two_factor_enabled, password FROM users WHERE id = $1', [s.userId]);
+    const user = rows[0];
+    if (!user?.two_factor_enabled) return c.json({ success: true, data: { enabled: false } });
+
+    let ok = false;
+    if (body.code) ok = await verifyTotp(user.two_factor_secret, String(body.code));
+    if (!ok && body.password) ok = await verifyPassword(c.env, String(body.password), user.password);
+    if (!ok) return err(c, 400, 'Provide a valid authenticator code or your password');
+
+    await db.query('UPDATE users SET two_factor_enabled = false, two_factor_secret = NULL WHERE id = $1', [s.userId]);
+    await db.query('DELETE FROM two_factor_backup_codes WHERE user_id = $1', [s.userId]);
+    return c.json({ success: true, data: { enabled: false } });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to disable 2FA'); }
 });
 
 export default auth;

@@ -11,6 +11,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
+import { totpCode } from '../../workers/src/totp';
 
 const require = createRequire(import.meta.url);
 
@@ -273,6 +274,33 @@ async function main() {
       const tok = login.json?.data?.token;
       return call('/api/v1/auth/change-password', { method: 'POST', token: tok, body: { currentPassword: 'NewPass1234!', newPassword: 'FinalPass1234!' } });
     }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/users/me/preferences', () => call('/api/v1/users/me/preferences', { token }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['PUT /api/v1/users/me/preferences', () => call('/api/v1/users/me/preferences', { method: 'PUT', token, body: { data: { 'Course Updates': true, theme: 'dark' } } }), (r) => (r.json?.data?.['Course Updates'] ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/login (for 2FA setup)', async () => {
+      const r = await call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'FinalPass1234!' } });
+      (globalThis as any).__smokeToken = r.json?.data?.token;
+      return r;
+    }, (r) => (r.json?.data?.token ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/auth/2fa/status', () => call('/api/v1/auth/2fa/status', { token: (globalThis as any).__smokeToken }), (r) => (typeof r.json?.data?.enabled === 'boolean' ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/2fa/setup', async () => {
+      const r = await call('/api/v1/auth/2fa/setup', { method: 'POST', token: (globalThis as any).__smokeToken });
+      (globalThis as any).__totpSecret = r.json?.data?.secret;
+      return r;
+    }, (r) => (r.json?.data?.secret ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/2fa/enable', async () => {
+      const secret = (globalThis as any).__totpSecret;
+      if (!secret) return { status: 200, json: { success: true, skipped: true } };
+      return call('/api/v1/auth/2fa/enable', { method: 'POST', token: (globalThis as any).__smokeToken, body: { code: await totpCode(secret) } });
+    }, (r) => (r.json?.skipped || r.json?.data?.enabled ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/login (2FA required)', () => call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'FinalPass1234!' } }), (r) => (r.json?.twoFactorRequired ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/login (with 2FA code)', async () => {
+      const secret = (globalThis as any).__totpSecret;
+      return call('/api/v1/auth/login', { method: 'POST', body: { email: (globalThis as any).__email, password: 'FinalPass1234!', twoFactorCode: secret ? await totpCode(secret) : '' } });
+    }, (r) => (r.json?.data?.token ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/auth/2fa/disable', async () => {
+      const secret = (globalThis as any).__totpSecret;
+      return call('/api/v1/auth/2fa/disable', { method: 'POST', token: (globalThis as any).__smokeToken, body: { password: 'FinalPass1234!', code: secret ? await totpCode(secret) : undefined } });
+    }, (r) => (r.json?.data?.enabled === false ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/auth/google (unconfigured)', () => call('/api/v1/auth/google'), (r) => (r.status === 503 || r.status === 302 ? null : `unexpected ${r.status}`)],
     ['POST /api/v1/auth/oauth/exchange (bad code)', () => call('/api/v1/auth/oauth/exchange', { method: 'POST', body: { code: 'nope' } }), (r) => (r.status === 401 ? null : `expected 401, got ${r.status}`)],
     ['GET /api/v1/notifications exposes deep links', async () => {

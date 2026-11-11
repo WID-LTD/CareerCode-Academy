@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Bell, Shield, Eye, Globe, Volume2, Palette,
@@ -7,6 +7,8 @@ import {
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/store/themeStore';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 import {
   browserNotificationSupport,
   browserNotificationsEnabled,
@@ -95,6 +97,58 @@ export default function Settings() {
     const next = { ...toggles, [label]: !toggles[label] };
     setToggles(next);
     try { localStorage.setItem('careercode-settings', JSON.stringify(next)); } catch {}
+    api.put('/users/me/preferences', { data: next }).catch(() => {});
+  };
+
+  const [twoFactor, setTwoFactor] = useState<{ enabled: boolean } | null>(null);
+  const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string; otpauth: string } | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [twoFaBusy, setTwoFaBusy] = useState(false);
+
+  useEffect(() => {
+    api.get('/users/me/preferences').then(({ data }) => {
+      if (data?.data && typeof data.data === 'object') {
+        setToggles((t) => ({ ...t, ...data.data }));
+      }
+    }).catch(() => {});
+    api.get('/auth/2fa/status').then(({ data }) => setTwoFactor(data.data)).catch(() => {});
+  }, []);
+
+  const startTwoFa = async () => {
+    setTwoFaBusy(true);
+    try {
+      const { data } = await api.post('/auth/2fa/setup');
+      setTwoFaSetup(data.data);
+      setBackupCodes([]);
+    } catch { toast.error('Could not start 2FA setup'); }
+    finally { setTwoFaBusy(false); }
+  };
+
+  const enableTwoFa = async () => {
+    setTwoFaBusy(true);
+    try {
+      const { data } = await api.post('/auth/2fa/enable', { code: twoFaCode });
+      setBackupCodes(data.data.backupCodes || []);
+      setTwoFactor({ enabled: true });
+      setTwoFaSetup(null);
+      setTwoFaCode('');
+      toast.success('Two-factor authentication enabled');
+    } catch (e: any) { toast.error(e?.response?.data?.message || 'Invalid code'); }
+    finally { setTwoFaBusy(false); }
+  };
+
+  const disableTwoFa = async () => {
+    const password = window.prompt('Enter your password to disable 2FA');
+    if (!password) return;
+    setTwoFaBusy(true);
+    try {
+      await api.post('/auth/2fa/disable', { password });
+      setTwoFactor({ enabled: false });
+      setBackupCodes([]);
+      toast.success('Two-factor authentication disabled');
+    } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to disable 2FA'); }
+    finally { setTwoFaBusy(false); }
   };
 
   return (
@@ -157,6 +211,48 @@ export default function Settings() {
             </div>
           </GlassCard>
         ))}
+
+        <GlassCard className="p-5" hover={false}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Two-Factor Authentication</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Protect your account with an authenticator app (TOTP).</p>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-lg ${twoFactor?.enabled ? 'bg-emerald-500/10 text-emerald-500' : 'bg-gray-500/10 text-gray-500'}`}>
+              {twoFactor?.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+
+          {twoFactor?.enabled ? (
+            <button onClick={disableTwoFa} disabled={twoFaBusy} className="mt-4 px-3 py-2 rounded-xl border border-red-300 text-red-500 text-sm">
+              Disable 2FA
+            </button>
+          ) : twoFaSetup ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-gray-500">Add this secret to your authenticator app:</p>
+              <code className="block text-sm font-mono break-all rounded-xl bg-gray-100 dark:bg-gray-900 px-3 py-2">{twoFaSetup.secret}</code>
+              <a href={twoFaSetup.otpauth} className="text-xs text-primary-500 break-all">Open in authenticator app</a>
+              <div className="flex gap-2">
+                <input value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value)} placeholder="6-digit code" inputMode="numeric"
+                  className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+                <button onClick={enableTwoFa} disabled={twoFaBusy} className="px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-semibold">Enable</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={startTwoFa} disabled={twoFaBusy} className="mt-4 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-semibold">
+              Set up 2FA
+            </button>
+          )}
+
+          {backupCodes.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium">Backup codes (save these now)</p>
+              <div className="mt-2 grid grid-cols-2 gap-1 text-xs font-mono">
+                {backupCodes.map((c) => <span key={c} className="rounded bg-gray-100 dark:bg-gray-900 px-2 py-1">{c}</span>)}
+              </div>
+            </div>
+          )}
+        </GlassCard>
       </div>
     </motion.div>
   );

@@ -32,6 +32,39 @@ users.get('/', async (c) => {
   }
 });
 
+// GET /api/v1/users/me/preferences (before /:id)
+users.get('/me/preferences', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT data FROM user_preferences WHERE user_id = $1',
+      [s.userId]
+    );
+    let data: any = {};
+    try { data = rows[0]?.data ? JSON.parse(rows[0].data) : {}; } catch { data = {}; }
+    return c.json({ success: true, data });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load preferences');
+  }
+});
+
+// PUT /api/v1/users/me/preferences
+users.put('/me/preferences', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const data = body?.data ?? body ?? {};
+    await getDb(c.env).query(
+      `INSERT INTO user_preferences (user_id, data, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET data = $2, updated_at = NOW()`,
+      [s.userId, JSON.stringify(data)]
+    );
+    return c.json({ success: true, data });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to save preferences');
+  }
+});
+
 // GET /api/v1/users/:id
 users.get('/:id', async (c) => {
   try {
