@@ -33,8 +33,12 @@ Serving path:
 - Assets and `/u/...` paths pass through to the SPA.
 - The API CORS middleware allows verified custom-domain origins dynamically.
 
-Verified live with `https://portfolio.widltd.com.ng` →
-`https://portfolio.widltd.com.ng/u/ikewisdom-2d35f3` (200, SSL active).
+Verified live with `https://portfolio.careercode.com.ng/ikewisdom-2d35f3`
+→ `https://portfolio.careercode.com.ng/u/ikewisdom-2d35f3` (200, SSL active).
+
+The `portfolio.careercode.com.ng` host proxies the Pages SPA through the Worker
+so the URL stays on the CareerCode domain. No third-party test domain is
+attached.
 
 ## Configuration
 

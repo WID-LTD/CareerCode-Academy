@@ -72,9 +72,24 @@ function allowedOrigins(env: Env): string[] {
     .map((s) => s.trim());
 }
 
-// Portfolio host routing: portfolio.careercode.com.ng/<username> redirects to
-// the public portfolio. Verified custom domains use the same path when the
-// host is attached through Cloudflare for SaaS.
+// Proxy SPA requests to the Pages deployment while keeping the careercode
+// portfolio host in the address bar.
+async function proxyPages(path: string, request: Request): Promise<Response> {
+  const target = `https://career-code-academy.pages.dev${path}`;
+  const res = await fetch(target, {
+    method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+    headers: {
+      Accept: request.headers.get('Accept') || 'text/html,application/xhtml+xml',
+      'Accept-Language': request.headers.get('Accept-Language') || 'en',
+    },
+  });
+  const headers = new Headers(res.headers);
+  headers.delete('content-security-policy');
+  return new Response(res.body, { status: res.status, headers });
+}
+
+// Portfolio host routing: portfolio.careercode.com.ng/<username> serves the
+// public portfolio at that host. Per-user subdomains redirect to the main site.
 app.use('*', async (c, next) => {
   try {
     const url = new URL(c.req.url);
@@ -83,10 +98,14 @@ app.use('*', async (c, next) => {
     if (!isApi && host !== 'api.careercode.com.ng' && !host.endsWith('workers.dev')) {
       const parts = url.pathname.split('/').filter(Boolean);
       if (host === 'portfolio.careercode.com.ng') {
-        const target = parts.length
-          ? `${c.env.FRONTEND_URL}/u/${encodeURIComponent(parts[0])}${parts[1] ? `/${encodeURIComponent(parts[1])}` : ''}`
-          : `${c.env.FRONTEND_URL}/portfolios`;
-        return c.redirect(target, 302);
+        if (!parts.length) return c.redirect(`${c.env.FRONTEND_URL}/portfolios`, 302);
+        const asset = /^\/(assets|icons|fonts|wasm)\//.test(url.pathname) ||
+          ['/manifest.webmanifest', '/sw.js', '/offline.html', '/favicon.svg', '/screen.png'].includes(url.pathname);
+        if (asset || parts[0] === 'u') {
+          return proxyPages(url.pathname + url.search, c.req.raw);
+        }
+        const project = parts[1] ? `/${encodeURIComponent(parts[1])}` : '';
+        return c.redirect(`https://${host}/u/${encodeURIComponent(parts[0])}${project}${url.search}`, 302);
       }
       // Per-user portfolio subdomains: username.careercode.com.ng
       if (host.endsWith('.careercode.com.ng')) {
