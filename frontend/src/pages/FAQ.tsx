@@ -64,8 +64,8 @@ const faqs = [
   {
     category: 'Career Services',
     items: [
-      { q: 'Do you offer job placement assistance?', a: 'Pro and Enterprise plans include career services such as resume reviews, portfolio building, mock interviews, and direct connections with 500+ hiring partners.' },
-      { q: 'What is the job placement rate?', a: 'Our job placement rate is 95% within 6 months of graduation. This includes full-time roles, internships, and freelance opportunities.' },
+      { q: 'Do you offer job placement assistance?', a: 'Career services include CV and portfolio guidance, interview practice and access to job listings. We do not guarantee a job or claim a placement rate we cannot verify.' },
+      { q: 'What is the job placement rate?', a: 'We do not publish a placement percentage. Outcomes depend on your work, experience and the market. We focus on helping you build evidence of skill and apply effectively.' },
       { q: 'Do you help with interview preparation?', a: 'Absolutely! We offer mock interviews with industry professionals, system design practice sessions, and access to our interview question bank.' },
     ],
   },

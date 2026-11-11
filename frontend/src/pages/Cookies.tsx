@@ -8,7 +8,7 @@ const sections = [
   { title: '1. What Are Cookies', content: 'Cookies are small text files stored on your device by your web browser. They help websites remember your preferences, login status, and other information to provide a better browsing experience.' },
   { title: '2. How We Use Cookies', content: 'We use cookies to authenticate your account, remember your preferences (including theme and language settings), analyze platform usage to improve our services, deliver relevant content and marketing, and maintain session state during course playback.' },
   { title: '3. Types of Cookies We Use', content: 'Essential cookies are required for the platform to function (login, security). Analytics cookies help us understand how you interact with our platform. Preference cookies remember your settings. Marketing cookies track your engagement with our campaigns.' },
-  { title: '4. Third-Party Cookies', content: 'Some third-party services we use may place cookies on your device. These include payment processors (Stripe), analytics providers, and video hosting platforms. We do not control these cookies and recommend reviewing their privacy policies.' },
+  { title: '4. Third-Party Cookies', content: 'Some third-party services we use may place cookies on your device. These include payment processors (Paystack and Flutterwave), analytics providers, and video hosting platforms. We do not control these cookies and recommend reviewing their privacy policies.' },
   { title: '5. Managing Cookies', content: 'You can control and delete cookies through your browser settings. Most browsers allow you to block or delete cookies. Note that disabling essential cookies may affect platform functionality, including login and course progress tracking.' },
   { title: '6. Cookie Retention', content: 'Session cookies expire when you close your browser. Persistent cookies remain on your device for up to 12 months or until manually deleted. You can clear cookies at any time through your browser settings.' },
   { title: '7. Do Not Track', content: 'Our platform does not respond to Do Not Track (DNT) signals at this time. We follow industry standards and provide you with control over cookies through browser settings.' },
@@ -44,7 +44,7 @@ export default function Cookies() {
 
           <GlassCard className="p-8 mb-8">
             <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-              This Cookie Policy explains how CareerCode Academy uses cookies and similar tracking 
+              This Cookie Policy explains how WID LTD (RC 8824091), which operates CareerCode Academy, uses cookies and similar tracking 
               technologies to enhance your experience on our platform.
             </p>
           </GlassCard>

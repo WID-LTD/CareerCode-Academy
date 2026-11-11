@@ -67,12 +67,12 @@ export default function StudentRoadmap() {
 
   useEffect(() => { setStoredGoal(weeklyGoal); }, [weeklyGoal]);
 
-  const schoolCareers: Record<string, { careers: string[]; placement: string; salary: string }> = {
-    'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'], placement: '92%', salary: '$95K' },
-    'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'], placement: '94%', salary: '$110K' },
-    'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'], placement: '88%', salary: '$85K' },
-    'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'], placement: '90%', salary: '$90K' },
-    'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'], placement: '95%', salary: '$75K' },
+  const schoolCareers: Record<string, { careers: string[] }> = {
+    'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'] },
+    'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'] },
+    'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'] },
+    'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'] },
+    'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'] },
   };
 
   useEffect(() => {
@@ -219,16 +219,16 @@ export default function StudentRoadmap() {
           <div className="space-y-6">
             {grouped.map((group:any)=>{
               const school = group.school || { name: group.category, slug: group.categorySlug, program_count: 0 };
-              const sc = schoolCareers[school.name] || { careers: ['Developer'], placement: '90%', salary: '$85K' };
+              const sc = schoolCareers[school.name] || { careers: ['Developer'] };
               return (
               <GlassCard key={school.slug || group.category} className="p-0 overflow-hidden" hover={false}>
                 <div className="p-4 border-b border-gray-100 dark:border-gray-800">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="font-bold flex items-center gap-2">{school.name} <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{school.program_count || 0} programs • {sc.placement} placement</span></h3>
+                      <h3 className="font-bold flex items-center gap-2">{school.name} <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{school.program_count || 0} programs • self-paced</span></h3>
                       <div className="flex flex-wrap gap-1 mt-1">{sc.careers.map((c:string)=><span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-primary-500/10 text-primary-500 border border-primary-500/20">{c}</span>)}</div>
                     </div>
-                    <div className="flex flex-col items-end gap-1"><span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">{sc.salary} avg</span><Link to={`/schools/${school.slug}`} className="text-xs text-primary-500 hover:underline">Explore Programs →</Link></div>
+                    <div className="flex flex-col items-end gap-1"><Link to={`/schools/${school.slug}`} className="text-xs text-primary-500 hover:underline">Explore Programs →</Link></div>
                   </div>
                   <div className="text-[11px] text-gray-400 mt-2">{Object.values(group.zones).filter(Boolean).length} zones • empty hidden • Beginner → Intermediate → Advanced</div>
                 </div>

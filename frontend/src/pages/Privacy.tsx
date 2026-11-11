@@ -36,7 +36,7 @@ export default function Privacy() {
 
           <GlassCard className="p-8 mb-8">
             <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-              At CareerCode Academy, we take your privacy seriously. This policy describes how we collect, 
+              At CareerCode Academy, a venture of WID LTD (RC 8824091), we take your privacy seriously. This policy describes how we collect, 
               use, and protect your personal information when you use our platform.
             </p>
           </GlassCard>

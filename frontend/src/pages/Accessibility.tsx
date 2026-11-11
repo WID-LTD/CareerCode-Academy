@@ -32,7 +32,7 @@ export default function Accessibility() {
               <span className="gradient-text">Accessibility</span>
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-              CareerCode Academy is committed to making our platform accessible to everyone, 
+              CareerCode Academy, a venture of WID LTD (RC 8824091), is committed to making our platform accessible to everyone, 
               regardless of ability. We continuously work to improve the user experience for all learners.
             </p>
           </motion.div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MapPin, Phone, Send, MessageSquare, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, MapPin, Send, MessageSquare, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,8 +10,7 @@ import SEO from '@/components/seo/SEO';
 
 const contactInfo = [
   { icon: Mail, label: 'Email', value: 'hello@careercode.com.ng', href: 'mailto:hello@careercode.com.ng' },
-  { icon: Phone, label: 'Phone', value: '+1 (555) 123-4567', href: 'tel:+15551234567' },
-  { icon: MapPin, label: 'Office', value: 'San Francisco, CA 94105', href: '#' },
+  { icon: MapPin, label: 'Office', value: 'Agbara, Ogun State, Nigeria', href: 'https://maps.google.com/?q=Agbara,+Ogun+State,+Nigeria' },
   { icon: Clock, label: 'Hours', value: 'Mon-Fri, 9AM-6PM PST', href: '#' },
 ];
 

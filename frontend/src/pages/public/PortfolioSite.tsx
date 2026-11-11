@@ -175,6 +175,7 @@ export default function PortfolioSite({ username: forcedUsername, projectSlug: f
     setMeta('description', description);
     setMeta('author', data.user.name);
     setMeta('generator', 'CareerCode Academy');
+    setMeta('copyright', 'WID LTD (RC 8824091)');
     setMeta('robots', 'index,follow');
     setMeta('og:title', cleanTitle, 'property');
     setMeta('og:description', description, 'property');
@@ -216,6 +217,7 @@ export default function PortfolioSite({ username: forcedUsername, projectSlug: f
         sameAs: Object.values(data.site?.socials || {}).filter(Boolean),
       },
       isPartOf: { '@type': 'WebSite', name: 'CareerCode Academy', url: 'https://careercode.com.ng' },
+      copyrightHolder: { '@type': 'Organization', name: 'WID LTD', identifier: 'RC 8824091' },
     });
 
     return () => {
@@ -605,7 +607,7 @@ export default function PortfolioSite({ username: forcedUsername, projectSlug: f
             </div>
           </section>
         )}
-        <footer className="mt-14 text-xs opacity-40">© {new Date().getFullYear()} {user.name}</footer>
+        <footer className="mt-14 text-xs opacity-40">© {new Date().getFullYear()} WID LTD. All rights reserved.</footer>
 
         {reviewOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm grid place-items-center p-4">

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Turnstile } from '@/components/security/Turnstile';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Code2, Star, Shield, Award, TrendingUp, Quote } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Code2, Shield, Award, Users, BookOpen, CheckCircle } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,19 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/hooks/useAuth';
 import SEO from '@/components/seo/SEO';
 import toast from 'react-hot-toast';
-
-const testimonials = [
-  {
-    quote: 'CareerCode completely transformed my career. Within 6 months I went from knowing basic HTML to landing a job at Google.',
-    name: 'Sarah Johnson',
-    role: 'Frontend Developer at Google',
-  },
-  {
-    quote: 'The project-based approach and mentorship helped me build a portfolio that stood out to top tech companies.',
-    name: 'Marcus Chen',
-    role: 'Full-Stack Developer at Stripe',
-  },
-];
+import { usePublicStats } from '@/hooks/usePublicStats';
 
 export default function Login() {
   const location = useLocation();
@@ -35,6 +23,12 @@ export default function Login() {
   const [loginTimeout, setLoginTimeout] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { login, isLoading } = useAuth();
+  const publicStats = usePublicStats();
+  const statItems = [
+    { value: publicStats.students, label: 'Learners' },
+    { value: publicStats.courses, label: 'Courses' },
+    { value: publicStats.certificates, label: 'Certificates' },
+  ].filter((s) => s.value > 0);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -171,40 +165,36 @@ export default function Login() {
         <div className="hidden lg:block space-y-6">
           <div className="glass-card p-6">
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold gradient-text tabular-nums">15K+</div>
-                <div className="text-xs text-gray-500 mt-1">Students</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold gradient-text tabular-nums">4.9</div>
-                <div className="text-xs text-gray-500 mt-1">Avg Rating</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold gradient-text tabular-nums">95%</div>
-                <div className="text-xs text-gray-500 mt-1">Placement</div>
-              </div>
+              {(statItems.length ? statItems : [
+                { value: null, label: 'Project-based' },
+                { value: null, label: 'Mentorship' },
+                { value: null, label: 'Certificates' },
+              ]).map((item) => (
+                <div key={item.label}>
+                  <div className="text-2xl font-bold gradient-text tabular-nums">{item.value ?? '—'}</div>
+                  <div className="text-xs text-gray-500 mt-1">{item.label}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {testimonials.map((t, i) => (
+          {[
+            { icon: BookOpen, title: 'Project-based learning', desc: 'Build real work you can show, not just watch videos.' },
+            { icon: Users, title: 'Mentors and community', desc: 'Get help from instructors and other learners when you are stuck.' },
+            { icon: CheckCircle, title: 'Verifiable certificates', desc: 'Certificates can be checked on our public verification page.' },
+          ].map((t, i) => (
             <motion.div
-              key={i}
+              key={t.title}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 + i * 0.1 }}
             >
               <GlassCard className="p-5" hover>
-                <Quote className="w-6 h-6 text-primary-500/30 mb-2" />
-                <p className="text-sm text-gray-600 dark:text-gray-400 italic mb-3">"{t.quote}"</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full gradient-bg flex items-center justify-center text-white text-xs font-bold">
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{t.name}</p>
-                    <p className="text-xs text-gray-500">{t.role}</p>
-                  </div>
+                <div className="w-9 h-9 rounded-xl bg-primary-500/10 grid place-items-center mb-3">
+                  <t.icon className="w-4 h-4 text-primary-500" />
                 </div>
+                <p className="text-sm font-semibold mb-1">{t.title}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t.desc}</p>
               </GlassCard>
             </motion.div>
           ))}
@@ -217,7 +207,7 @@ export default function Login() {
               <Award className="w-3 h-3" /> Verifiable certificates
             </Badge>
             <Badge variant="default" size="sm" className="px-3 py-1">
-              <TrendingUp className="w-3 h-3" /> Career Guarantee
+              <BookOpen className="w-3 h-3" /> Self-paced
             </Badge>
           </div>
         </div>

@@ -1,16 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  Code2,
-  Github,
-  Twitter,
-  Linkedin,
-  Youtube,
-  Mail,
-  MapPin,
-  Phone,
-} from 'lucide-react';
+import { Mail, MapPin } from 'lucide-react';
 
 const footerLinks = {
   Platform: [
@@ -38,13 +29,6 @@ const footerLinks = {
   ],
 };
 
-const socialLinks = [
-  { icon: Github, href: '#', label: 'GitHub' },
-  { icon: Twitter, href: '#', label: 'Twitter' },
-  { icon: Linkedin, href: '#', label: 'LinkedIn' },
-  { icon: Youtube, href: '#', label: 'YouTube' },
-];
-
 export function Footer() {
   return (
     <footer className="relative border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-xl">
@@ -63,18 +47,9 @@ export function Footer() {
               project-based learning. Transform your career with hands-on coding
               experience and expert mentorship.
             </p>
-            <div className="flex items-center gap-3">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 hover:text-primary-600 dark:hover:text-primary-400 transition-all duration-200"
-                  aria-label={social.label}
-                >
-                  <social.icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              CareerCode Academy is a venture of <strong>WID LTD</strong> (RC 8824091).
+            </p>
           </div>
 
           {Object.entries(footerLinks).map(([title, links]) => (
@@ -107,15 +82,11 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                San Francisco, CA
-              </div>
-              <div className="hidden sm:flex items-center gap-1.5">
-                <Phone className="w-4 h-4" />
-                +1 (555) 123-4567
+                Agbara, Ogun State, Nigeria
               </div>
             </div>
             <p className="text-xs sm:text-sm text-gray-400 text-center xs:text-left">
-              &copy; {new Date().getFullYear()} CareerCode Academy. All rights reserved.
+              &copy; {new Date().getFullYear()} WID LTD. All rights reserved.
             </p>
           </div>
         </div>

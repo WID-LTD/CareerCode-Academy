@@ -15,15 +15,15 @@ const iconMap: Record<string, any> = {
   Code2, Database, Palette, Briefcase, GraduationCap, BookOpen,
 };
 
-const schoolCareers: Record<string, { careers: string[]; placement: string; salary: string }> = {
-  'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'], placement: '92%', salary: '$95K' },
-  'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'], placement: '94%', salary: '$110K' },
-  'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'], placement: '88%', salary: '$85K' },
-  'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'], placement: '90%', salary: '$90K' },
-  'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'], placement: '95%', salary: '$75K' },
+const schoolCareers: Record<string, { careers: string[] }> = {
+  'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'] },
+  'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'] },
+  'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'] },
+  'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'] },
+  'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'] },
 };
 
-const defaultCareers = { careers: ['Software Developer'], placement: '90%', salary: '$85K' };
+const defaultCareers = { careers: ['Software Developer'] };
 
 export default function Schools() {
   const [schools, setSchools] = useState<any[]>([]);
@@ -88,7 +88,7 @@ export default function Schools() {
                               <h2 className="text-lg font-bold text-white group-hover:text-primary-500 transition-colors">{school.name}</h2>
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant="default" size="sm">{school.program_count || 0} programs</Badge>
-                                <Badge variant="primary" size="sm">{careers.placement} placement</Badge>
+                                <Badge variant="primary" size="sm">Self-paced</Badge>
                               </div>
                             </div>
                           </div>
@@ -96,10 +96,7 @@ export default function Schools() {
 
                           <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>Estimated: {school.duration || '6-12 months'}</span>
-                            <span className="text-gray-700">·</span>
-                            <Award className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-amber-400">Avg Salary: {careers.salary}</span>
+                            <span>Self-paced learning path</span>
                           </div>
 
                           <div className="flex flex-wrap gap-1.5 mb-4">

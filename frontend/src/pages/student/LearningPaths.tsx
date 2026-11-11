@@ -21,12 +21,12 @@ const zoneMeta: Record<string, { label: string; icon: any; color: string; bg: st
   advanced: { label: 'Advanced', icon: Rocket, color: 'from-purple-500 to-pink-600', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
 };
 
-const schoolCareers: Record<string, { careers: string[]; placement: string; salary: string; duration: string; description: string }> = {
-  'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'], placement: '92%', salary: '$95K', duration: '6-12 months', description: 'Focused on preparing students for careers in software engineering and application development.' },
-  'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'], placement: '94%', salary: '$110K', duration: '6-12 months', description: 'Focused on data-driven careers and emerging technologies.' },
-  'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'], placement: '88%', salary: '$85K', duration: '6-12 months', description: 'Focused on creating digital experiences and visual communication.' },
-  'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'], placement: '90%', salary: '$90K', duration: '6-12 months', description: 'Focused on modern business and digital economy skills.' },
-  'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'], placement: '95%', salary: '$75K', duration: '6-12 months', description: 'Focused on preparing students for employment and professional success.' },
+const schoolCareers: Record<string, { careers: string[]; description: string }> = {
+  'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'], description: 'Focused on preparing students for careers in software engineering and application development.' },
+  'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'], description: 'Focused on data-driven careers and emerging technologies.' },
+  'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'], description: 'Focused on creating digital experiences and visual communication.' },
+  'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'], description: 'Focused on modern business and digital economy skills.' },
+  'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'], description: 'Focused on preparing students for employment and professional success.' },
 };
 
 export default function LearningPaths() {
@@ -231,18 +231,16 @@ export default function LearningPaths() {
           <div className="space-y-6">
             {grouped.map((group: any) => {
               const school = group.school || { name: group.category, slug: group.categorySlug, description: '', program_count: group.totalCourses || 0, sort_order: 0 };
-              const sc = schoolCareers[school.name] || { careers: ['Software Developer'], placement: '90%', salary: '$85K', duration: '6-12 months', description: school.description || '' };
+              const sc = schoolCareers[school.name] || { careers: ['Software Developer'], description: school.description || '' };
               return (
               <GlassCard key={school.slug || group.category} className="p-0 overflow-hidden" hover={false}>
                 <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex-1 min-w-[220px]">
-                      <h3 className="text-lg font-bold flex items-center gap-2">{school.name} <Badge variant="default" size="sm">{school.program_count ?? group.totalCourses ?? 0} programs</Badge> <Badge variant="primary" size="sm">{sc.placement} placement</Badge></h3>
+                      <h3 className="text-lg font-bold flex items-center gap-2">{school.name} <Badge variant="default" size="sm">{school.program_count ?? group.totalCourses ?? 0} programs</Badge></h3>
                       <p className="text-sm text-gray-500 mt-1 line-clamp-2">{sc.description}</p>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-2">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Estimated: {sc.duration}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className="flex items-center gap-1 text-amber-600"><Award className="w-3 h-3" /> Avg Salary: {sc.salary}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Self-paced</span>
                         <span className="text-gray-300">·</span>
                         <span>{group.totalCourses ?? Object.values(group.zones).filter(Boolean).length} courses</span>
                       </div>

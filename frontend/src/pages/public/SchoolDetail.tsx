@@ -78,15 +78,7 @@ const programRoadmaps: Record<string, string[]> = {
   'cloud-computing': ['Cloud Basics', 'AWS', 'Azure', 'Serverless', 'Architecture'],
 };
 
-const programSalaries: Record<string, string> = {
-  'frontend-development': '$75K',
-  'backend-development': '$80K',
-  'full-stack-development': '$85K',
-  'mobile-app-development': '$80K',
-  'devops-engineering': '$90K',
-  'cybersecurity': '$85K',
-  'cloud-computing': '$95K',
-};
+
 
 export default function SchoolDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -213,15 +205,15 @@ export default function SchoolDetail() {
                 <span className="flex items-center gap-1.5"><BookOpen className="w-4 h-4 text-blue-400" /> {programs.length} Programs</span>
                 <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-blue-400" /> {totalCourses} Courses</span>
                 <span className="flex items-center gap-1.5"><Award className="w-4 h-4 text-blue-400" /> {allOutcomes.size} Career Outcomes</span>
-                <span className="flex items-center gap-1.5"><TrendingUp className="w-4 h-4 text-blue-400" /> 15K+ Alumni</span>
+
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
                 {[
-                  { value: '92%', label: 'Placement Rate', icon: Award, color: 'text-emerald-400' },
-                  { value: '4.8/5', label: 'Student Rating', icon: Star, color: 'text-yellow-400' },
-                  { value: '95%', label: 'Completion Rate', icon: CheckCircle, color: 'text-blue-400' },
-                  { value: '15K+', label: 'Alumni Worldwide', icon: Users, color: 'text-purple-400' },
+                  { value: programs.length, label: 'Programs', icon: Award, color: 'text-emerald-400' },
+                  { value: totalCourses, label: 'Courses', icon: BookOpen, color: 'text-yellow-400' },
+                  { value: allOutcomes.size, label: 'Career outcomes', icon: CheckCircle, color: 'text-blue-400' },
+                  { value: 3, label: 'Learning levels', icon: Users, color: 'text-purple-400' },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-xl bg-white/5 dark:bg-gray-800/50 border border-white/10 dark:border-gray-700/50 p-3 sm:p-4 text-center">
                     <stat.icon className={`w-5 h-5 ${stat.color} mx-auto mb-1.5`} />
@@ -243,7 +235,6 @@ export default function SchoolDetail() {
                 const popularity = Object.prototype.hasOwnProperty.call(programPopularity, slugKey) ? programPopularity[slugKey] : null;
                 const demand = Object.prototype.hasOwnProperty.call(programDemand, slugKey) ? programDemand[slugKey] : null;
                 const roadmap = Object.prototype.hasOwnProperty.call(programRoadmaps, slugKey) ? programRoadmaps[slugKey] : null;
-                const avgSalary = Object.prototype.hasOwnProperty.call(programSalaries, slugKey) ? programSalaries[slugKey] : null;
 
                 return (
                   <motion.div
@@ -321,11 +312,6 @@ export default function SchoolDetail() {
                                   </div>
                                 )}
                               </div>
-                              {avgSalary && (
-                                <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1">
-                                  <DollarSign className="w-3 h-3" /> Avg starting: {avgSalary}
-                                </p>
-                              )}
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-gray-500 mb-3">

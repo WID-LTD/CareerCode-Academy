@@ -4,15 +4,15 @@ import { Scale, FileText } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 
 const sections = [
-  { title: '1. Acceptance of Terms', content: 'By accessing or using CareerCode Academy ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use the Platform. We reserve the right to update these terms at any time, and continued use constitutes acceptance of changes.' },
+  { title: '1. Acceptance of Terms', content: 'CareerCode Academy is a venture of WID LTD (RC 8824091). By accessing or using CareerCode Academy ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use the Platform. We reserve the right to update these terms at any time, and continued use constitutes acceptance of changes.' },
   { title: '2. Account Registration', content: 'You must create an account to access certain features. You are responsible for maintaining the confidentiality of your credentials and for all activities under your account. You must be at least 13 years old to use the Platform.' },
   { title: '3. Subscriptions & Billing', content: 'Paid plans are billed in advance on a monthly or annual basis. You may cancel at any time, and access will continue until the end of the billing period. Refunds are handled in accordance with our 30-day money-back guarantee.' },
-  { title: '4. Intellectual Property', content: 'All course materials, including videos, code samples, exercises, and documentation, are the intellectual property of CareerCode Academy. You may not redistribute, resell, or publicly share course content without written permission.' },
+  { title: '4. Intellectual Property', content: 'All course materials, including videos, code samples, exercises, and documentation, are the intellectual property of WID LTD (RC 8824091), which operates CareerCode Academy. You may not redistribute, resell, or publicly share course content without written permission.' },
   { title: '5. User Conduct', content: 'You agree to use the Platform responsibly. Prohibited activities include harassment, cheating on assessments, attempting to bypass security measures, and using the Platform for any illegal purpose.' },
   { title: '6. Certification', content: 'Certificates are awarded upon successful completion of course requirements. We reserve the right to revoke certificates if fraud or policy violations are discovered. Certificate verification is available to employers.' },
   { title: '7. Limitation of Liability', content: 'CareerCode Academy provides educational content "as is" without warranties of any kind. We are not liable for any damages arising from your use of the Platform, including but not limited to loss of data or missed employment opportunities.' },
   { title: '8. Termination', content: 'We may suspend or terminate accounts for violations of these terms. You may delete your account at any time through settings. Upon termination, your access to paid content will cease.' },
-  { title: '9. Governing Law', content: 'These terms are governed by the laws of the State of California. Any disputes shall be resolved through binding arbitration in San Francisco County.' },
+  { title: '9. Governing Law', content: 'These terms are governed by the laws of the Federal Republic of Nigeria. Any disputes shall be resolved in the courts of Ogun State, Nigeria.' },
   { title: '10. Contact', content: 'For questions about these terms, please contact us at legal@careercode.com.ng or through our Contact page.' },
 ];
 
