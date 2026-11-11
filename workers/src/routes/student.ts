@@ -752,6 +752,37 @@ student.post('/mentoring-slots/:id/book', async (c) => {
   } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to book slot'); }
 });
 
+// POST /student/mentoring-slots/:id/cancel — release a booked slot
+student.post('/mentoring-slots/:id/cancel', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const slot = (await db.query<any>('SELECT * FROM mentoring_slots WHERE id = $1', [c.req.param('id')])).rows[0];
+    if (!slot) return err(c, 404, 'Slot not found');
+    if (slot.student_id !== s.userId) return err(c, 403, 'This booking is not yours');
+    if (new Date(slot.start_time).getTime() < Date.now()) return err(c, 400, 'This session has already started');
+
+    const { rows } = await db.query<any>(
+      `UPDATE mentoring_slots
+       SET student_id = NULL, status = 'available', updated_at = NOW()
+       WHERE id = $1 AND student_id = $2 RETURNING *`,
+      [slot.id, s.userId]
+    );
+    if (!rows.length) return err(c, 409, 'Booking could not be cancelled');
+
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type, link)
+       VALUES ($1, 'Mentoring booking cancelled', $2, 'info', $3)`,
+      [slot.instructor_id, 'A student cancelled their mentoring booking. The slot is available again.', '/instructor/mentoring']
+    );
+    const instructor = (await db.query<any>('SELECT name, email FROM users WHERE id = $1', [slot.instructor_id])).rows[0];
+    if (instructor?.email) {
+      c.executionCtx.waitUntil(mail.mentoringBooked(c.env, instructor.email, instructor.name, `${new Date(slot.start_time).toUTCString()} (cancelled)`, 'a student').catch(() => {}));
+    }
+    return c.json({ success: true, message: 'Booking cancelled' });
+  } catch (e: any) { return err(c, e?.statusCode || 500, e?.message || 'Failed to cancel booking'); }
+});
+
 student.get('/my-mentoring-slots', async (c) => {
   try {
     const s = await authenticate(c);

@@ -50,6 +50,17 @@ export default function StudentMentorship() {
     fetchData();
   }, []);
 
+  async function cancelBooking(slotId: string) {
+    if (!confirm('Cancel this mentoring booking?')) return;
+    try {
+      await api.post(`/student/mentoring-slots/${slotId}/cancel`);
+      toast.success('Booking cancelled');
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to cancel booking');
+    }
+  }
+
   async function fetchData() {
     setLoading(true);
     try {
@@ -233,6 +244,11 @@ export default function StudentMentorship() {
                             )}
                           </div>
                         </div>
+                        {!expired && (
+                          <Button variant="ghost" size="sm" className="text-red-400" onClick={() => cancelBooking(slot.id)}>
+                            Cancel
+                          </Button>
+                        )}
                         {!expired && slot.meeting_url && (
                           <a
                             href={slot.meeting_url}
