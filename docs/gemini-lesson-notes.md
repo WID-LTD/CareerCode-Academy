@@ -37,3 +37,10 @@ It does **not** produce a verbatim transcript. Gemini blocks full verbatim recit
 4. Apply the generated SQL with `wrangler d1 execute ... --file=...`.
 
 Process one lesson at a time; the script sleeps between requests and falls back across models.
+
+## Backend pass status
+- 35 of 37 backend lessons generated successfully and stored in `lesson_ai_notes`.
+- 2 skipped:
+  - `Double Booking, Race Conditions & Row Locks` — Gemini returned `403 Forbidden`.
+  - `WebSockets & Server-Authoritative State` — repeated `503 Service Unavailable` (very long video).
+- The lesson UI shows Gemini notes when available; otherwise it falls back to the existing written notes.
