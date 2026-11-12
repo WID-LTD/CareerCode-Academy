@@ -44,3 +44,22 @@ Process one lesson at a time; the script sleeps between requests and falls back 
   - `Double Booking, Race Conditions & Row Locks` — Gemini returned `403 Forbidden`.
   - `WebSockets & Server-Authoritative State` — repeated `503 Service Unavailable` (very long video).
 - The lesson UI shows Gemini notes when available; otherwise it falls back to the existing written notes.
+
+## Detailed lesson format
+Each generated lesson is written as an original lesson, not a transcript:
+- learning objectives
+- prerequisites
+- timestamped outline
+- detailed explanation with examples
+- commands/code shown
+- common mistakes and troubleshooting
+- step-by-step practice task
+- checkpoint
+- 5-question quiz with answers
+- glossary
+- GiGo knowledge summary
+
+## Where it is used
+- Course lesson **Resources** tab: full generated lesson.
+- Course packs: written lesson notes and project briefs.
+- GiGo: `buildContext` loads up to 12 generated course lessons and the current lesson's full notes, so answers use the same material the student is studying.
