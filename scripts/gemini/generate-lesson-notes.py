@@ -89,6 +89,7 @@ def main():
         # Keep prior successes when resuming into the same output file.
         sql = [line for line in open(OUTPUT).read().splitlines() if line.strip()]
     processed = 0
+    consecutive_failures = 0
     for index, lesson in enumerate(lessons[start:end], start):
         if lesson['id'] in skip:
             print(f"[{index + 1}/{len(lessons)}] SKIP already ready: {lesson['title']}", flush=True)
@@ -139,8 +140,10 @@ def main():
                 f"ON CONFLICT(lesson_id) DO UPDATE SET status='error',error=excluded.error;"
             )
             open(OUTPUT, 'w').write('\n'.join(sql))
-            print(f"  FAILED: {last_error}", flush=True)
-            time.sleep(3)
+            consecutive_failures += 1
+            print(f"  FAILED: {last_error} (consecutive={consecutive_failures})", flush=True)
+            # Provider outage / rate limit: cool down instead of burning quota.
+            time.sleep(300 if consecutive_failures < 3 else 900)
             continue
 
         sql.append(
@@ -150,6 +153,7 @@ def main():
         )
         open(OUTPUT, 'w').write('\n'.join(sql))
         processed += 1
+        consecutive_failures = 0
         print(f"  ok {used_model} chars={len(result)} tokens={tokens}", flush=True)
         time.sleep(4)
 
