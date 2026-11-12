@@ -236,11 +236,39 @@ export async function redeemXpForDiscount(env: Env, userId: string, xpAmount: nu
   return rows[0];
 }
 
-export async function validateDiscountCode(env: Env, code: string, userId: string, coursePrice?: number) {
+export async function validateDiscountCode(env: Env, code: string, userId: string, coursePrice?: number, courseId?: string, pathId?: string) {
   const normalized = code.trim().toUpperCase();
   const db = getDb(env);
   const { rows } = await db.query<any>('SELECT * FROM discount_codes WHERE code = $1', [normalized]);
-  if (!rows.length) return { valid: false, discount: 0, reason: 'Invalid code' };
+  if (!rows.length) {
+    const couponRes = await db.query<any>('SELECT * FROM coupons WHERE code = $1', [normalized]);
+    if (!couponRes.rows.length) return { valid: false, discount: 0, reason: 'Invalid code' };
+    const coupon = couponRes.rows[0];
+    if (coupon.status !== 'active') return { valid: false, discount: 0, reason: `Code ${coupon.status}` };
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+      await db.query(`UPDATE coupons SET status='expired' WHERE id=$1`, [coupon.id]);
+      return { valid: false, discount: 0, reason: 'Code expired' };
+    }
+    if (coupon.max_uses != null && Number(coupon.uses) >= Number(coupon.max_uses)) {
+      return { valid: false, discount: 0, reason: 'Code has reached its usage limit' };
+    }
+    if (coupon.course_id && courseId && coupon.course_id !== courseId) {
+      return { valid: false, discount: 0, reason: 'This code is for a different course' };
+    }
+    if (coupon.path_id && pathId && coupon.path_id !== pathId) {
+      return { valid: false, discount: 0, reason: 'This code is for a different pathway' };
+    }
+    const base = Number(coursePrice) || 0;
+    const discount = coupon.discount_type === 'amount'
+      ? Math.min(base || Number(coupon.value), Number(coupon.value))
+      : Math.round(base * (Number(coupon.value) / 100));
+    return {
+      valid: true,
+      discount: Math.max(0, discount),
+      row: { ...coupon, xp_redeemed: 0, is_coupon: true },
+      is_coupon: true,
+    };
+  }
   const row = rows[0];
   if (row.user_id !== userId) return { valid: false, discount: 0, reason: 'Code does not belong to you' };
   if (row.status !== 'active') {
@@ -273,5 +301,15 @@ export async function markDiscountCodeUsed(env: Env, codeId: string, paymentId?:
   await getDb(env).query(
     `UPDATE discount_codes SET status='used', used_at=NOW(), used_payment_id=$2 WHERE id=$1`,
     [codeId, paymentId || null]
+  );
+}
+
+export async function markCouponUsed(env: Env, couponId: string): Promise<void> {
+  const db = getDb(env);
+  await db.query(`UPDATE coupons SET uses = COALESCE(uses,0) + 1, updated_at=NOW() WHERE id=$1`, [couponId]);
+  await db.query(
+    `UPDATE coupons SET status='expired', updated_at=NOW()
+     WHERE id=$1 AND max_uses IS NOT NULL AND COALESCE(uses,0) >= max_uses`,
+    [couponId]
   );
 }

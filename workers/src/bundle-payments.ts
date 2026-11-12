@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import { getDb } from './db';
-import { validateDiscountCode, markDiscountCodeUsed } from './gamification';
+import { validateDiscountCode, markDiscountCodeUsed, markCouponUsed } from './gamification';
 import * as LP from './learning-paths';
 
 // Learning-path bundle checkout: one gateway payment, many course enrolments.
@@ -100,7 +100,7 @@ export async function initializeBundlePayment(env: Env, userId: string, path: an
   let xpDiscount = 0;
   let discountRow: any = null;
   if (input.discountCode) {
-    const validation = await validateDiscountCode(env, String(input.discountCode), userId, amount);
+    const validation = await validateDiscountCode(env, String(input.discountCode), userId, amount, undefined, path.id);
     if (!validation.valid) throw Object.assign(new Error(validation.reason || 'Invalid discount code'), { statusCode: 400 });
     xpDiscount = validation.discount;
     discountRow = validation.row;
@@ -110,7 +110,7 @@ export async function initializeBundlePayment(env: Env, userId: string, path: an
 
   if (amount <= 0) {
     const result = await LP.enrollInPath(env, userId, path, 'force');
-    if (discountRow) await markDiscountCodeUsed(env, discountRow.id, undefined);
+    if (discountRow) { if (discountRow.is_coupon) await markCouponUsed(env, discountRow.id); else await markDiscountCodeUsed(env, discountRow.id, undefined); }
     return {
       amount: 0,
       alreadyEnrolled: true,
@@ -131,9 +131,9 @@ export async function initializeBundlePayment(env: Env, userId: string, path: an
   });
 
   const { rows: payRows } = await db.query<any>(
-    `INSERT INTO payments (user_id, course_id, amount, currency, provider, reference, status, metadata, discount_code_id, xp_discount, amount_before_discount)
-     VALUES ($1, NULL, $2, $3, $4, $5, 'pending', $6, $7, $8, $9) RETURNING *`,
-    [userId, amount, currency, provider, reference, metadata, discountRow?.id || null, xpDiscount, pricing.bundle_price]
+    `INSERT INTO payments (user_id, course_id, amount, currency, provider, reference, status, metadata, discount_code_id, coupon_id, xp_discount, amount_before_discount)
+     VALUES ($1, NULL, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10) RETURNING *`,
+    [userId, amount, currency, provider, reference, metadata, discountRow?.is_coupon ? null : (discountRow?.id || null), discountRow?.is_coupon ? discountRow.id : null, xpDiscount, pricing.bundle_price]
   );
   const payment = payRows[0];
 

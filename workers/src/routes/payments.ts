@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, statusOf } from '../route-utils';
-import { validateDiscountCode, markDiscountCodeUsed } from '../gamification';
+import { validateDiscountCode, markDiscountCodeUsed, markCouponUsed } from '../gamification';
 import { receiptPdf } from '../receipt';
 import { mail } from '../email';
 import { initializeBundlePayment, enrollBundleCourses } from '../bundle-payments';
@@ -179,6 +179,7 @@ async function verifyPaymentByReference(env: Env, reference: string) {
       if (payment.discount_code_id) {
         await markDiscountCodeUsed(env, payment.discount_code_id, payment.id);
       }
+      if (payment.coupon_id) await markCouponUsed(env, payment.coupon_id);
       if (payment.course_id) await enrollIfMissing(env, payment.user_id, payment.course_id);
       else await enrollBundleCourses(env, payment);
     }
@@ -227,6 +228,31 @@ payments.get('/gateways', async (c) => {
   }
 });
 
+// GET /api/v1/payments/gateways/health — safe provider reachability check
+payments.get('/gateways/health', async (c) => {
+  const out: any = {
+    paystack: { configured: gatewayConfigured(c.env.PAYSTACK_SECRET_KEY), reachable: false, status: 'not checked' },
+    flutterwave: { configured: gatewayConfigured(c.env.FLUTTERWAVE_SECRET_KEY), reachable: false, status: 'not checked' },
+  };
+  if (out.paystack.configured) {
+    try {
+      const res = await fetchWithTimeout('https://api.paystack.co/balance', { headers: { Authorization: `Bearer ${c.env.PAYSTACK_SECRET_KEY}` } });
+      const json: any = await res.json().catch(() => ({}));
+      out.paystack.reachable = res.ok && !!json.status;
+      out.paystack.status = out.paystack.reachable ? 'ready' : (json.message || `HTTP ${res.status}`);
+    } catch (e: any) { out.paystack.status = e?.message || 'unreachable'; }
+  }
+  if (out.flutterwave.configured) {
+    try {
+      const res = await fetchWithTimeout('https://api.flutterwave.com/v3/balances', { headers: { Authorization: `Bearer ${c.env.FLUTTERWAVE_SECRET_KEY}` } });
+      const json: any = await res.json().catch(() => ({}));
+      out.flutterwave.reachable = res.ok && json.status === 'success';
+      out.flutterwave.status = out.flutterwave.reachable ? 'ready' : (json.message || `HTTP ${res.status}`);
+    } catch (e: any) { out.flutterwave.status = e?.message || 'unreachable'; }
+  }
+  return c.json({ success: true, data: out });
+});
+
 payments.post('/initialize', async (c) => {
   try {
     const s = await requireAuth(c);
@@ -268,7 +294,7 @@ payments.post('/initialize', async (c) => {
     let xpDiscount = 0;
     let discountRow: any = null;
     if (discountCode) {
-      const validation = await validateDiscountCode(c.env, discountCode, s.userId, priceAfterPromotion);
+      const validation = await validateDiscountCode(c.env, discountCode, s.userId, priceAfterPromotion, courseId);
       if (!validation.valid) return fail(c, 400, validation.reason || 'Invalid discount code');
       xpDiscount = validation.discount;
       discountRow = validation.row;
@@ -277,7 +303,7 @@ payments.post('/initialize', async (c) => {
 
     if (effectivePrice <= 0) {
       await enrollIfMissing(c.env, s.userId, courseId);
-      if (discountRow) await markDiscountCodeUsed(c.env, discountRow.id, undefined);
+      if (discountRow) { if (discountRow.is_coupon) await markCouponUsed(c.env, discountRow.id); else await markDiscountCodeUsed(c.env, discountRow.id, undefined); }
       return c.json({
         success: true,
         data: {
@@ -307,11 +333,13 @@ payments.post('/initialize', async (c) => {
 
     const reference = `${provider}_${s.userId}_${courseId}_${Date.now()}`;
     const { rows: payRows } = await db.query<any>(
-      `INSERT INTO payments (user_id, course_id, amount, currency, provider, reference, discount_code_id, xp_discount, amount_before_discount, promotion_id, promotion_title, promo_discount_percent, promo_discount_amount)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      `INSERT INTO payments (user_id, course_id, amount, currency, provider, reference, discount_code_id, coupon_id, xp_discount, amount_before_discount, promotion_id, promotion_title, promo_discount_percent, promo_discount_amount)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [
         s.userId, courseId, effectivePrice, currency, provider, reference,
-        discountRow?.id || null, xpDiscount, priceAfterPromotion,
+        discountRow?.is_coupon ? null : (discountRow?.id || null),
+        discountRow?.is_coupon ? discountRow.id : null,
+        xpDiscount, priceAfterPromotion,
         promotion?.id || null, promotion?.title || null,
         promoPercent || null, promoAmount || null,
       ]
@@ -470,6 +498,7 @@ payments.post('/webhook', async (c) => {
 
     if (finalStatus === 'completed') {
       if (payment.discount_code_id) await markDiscountCodeUsed(c.env, payment.discount_code_id, payment.id);
+      if (payment.coupon_id) await markCouponUsed(c.env, payment.coupon_id);
       if (payment.course_id) await enrollIfMissing(c.env, payment.user_id, payment.course_id);
       else await enrollBundleCourses(c.env, payment);
       if (payment.status !== 'completed') {
@@ -512,13 +541,14 @@ payments.post('/validate-discount', async (c) => {
         price = Number(rows[0].price) * (1 - pct / 100);
       }
     }
-    const validation = await validateDiscountCode(c.env, body.code, s.userId, price);
+    const validation = await validateDiscountCode(c.env, body.code, s.userId, price, body.courseId, body.pathId);
     if (!validation.valid) return fail(c, 400, validation.reason || 'Invalid code');
     return c.json({
       success: true,
       data: {
         discount: validation.discount,
-        xpRedeemed: validation.row.xp_redeemed,
+        xpRedeemed: validation.row.xp_redeemed || 0,
+        discountType: validation.row.is_coupon ? validation.row.discount_type : 'xp',
         expires_at: validation.row.expires_at,
       },
     });

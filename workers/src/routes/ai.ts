@@ -451,7 +451,14 @@ ai.post('/vision', async (c) => {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const image = Array.from(bytes);
     const visionPrompt = `You are GiGo's visual analysis engine for CareerCode Academy. Analyse the screenshot carefully.${contextHint}
-Read every visible error message exactly. Identify the file, line, terminal command, browser panel or UI element involved. Do not invent details that are not visible. Return a concise but specific analysis with: (1) what is on screen, (2) the likely problem, (3) the exact next steps the learner should try. Learner question: ${question}`;
+Read every visible error message exactly. Identify the file, line, terminal command, browser panel or UI element involved.
+Rules:
+- Never invent an API key, secret, package or error that is not visible.
+- If the screen says "Cannot GET /path", treat it as an Express route mismatch: the request path does not match the registered route. Check the router mount prefix and the app.get path.
+- If the screen says "Cannot find module 'x'", the next command is usually npm install x (or check the import path).
+- If the screen shows ECONNREFUSED or MongooseServerSelectionError, check the connection string, database host, network access/IP allowlist and whether MongoDB is running.
+- If the screen says "'node' is not recognized", explain that Node is not on PATH and point to the Node.js LTS installer.
+Return a concise but specific analysis with: (1) what is on screen, (2) the likely problem, (3) the exact next steps. Learner question: ${question}`;
 
     let vision: any = null;
     let usedModel = VISION_MODEL;

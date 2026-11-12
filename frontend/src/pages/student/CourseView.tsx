@@ -481,7 +481,15 @@ export default function CourseView() {
     } catch {
       if (editor) { editor.commands.setContent('', { emitUpdate: false }); }
     }
-    try { const { data } = await api.get(`/resources/lesson/${lesson.id}`); setResources(data.data || []); } catch { setResources([]); }
+    try {
+      const [lessonRes, courseRes] = await Promise.all([
+        api.get(`/resources/lesson/${lesson.id}`).catch(() => ({ data: { data: [] } })),
+        course?.id ? api.get(`/resources/course/${course.id}`).catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+      ]);
+      const merged = [...(lessonRes.data.data || []), ...(courseRes.data.data || [])];
+      const unique = merged.filter((r: any, i: number) => merged.findIndex((x: any) => x.id === r.id) === i);
+      setResources(unique);
+    } catch { setResources([]); }
     try { const q = await api.get(`/quizzes/lesson/${lesson.id}`); setLessonQuiz(q.data.data || null); } catch { setLessonQuiz(null); }
     try { const c = await api.get(`/challenges/lesson/${lesson.id}`); setChallenges(c.data.data || []); } catch { setChallenges([]); }
   };

@@ -444,7 +444,7 @@ student.get('/calendar', async (c) => {
         ce.meeting_url, ce.location
         FROM calendar_events ce LEFT JOIN courses c ON c.id = ce.course_id
         WHERE ce.start_datetime >= NOW() AND ce.status = 'scheduled'
-          AND (ce.visibility = 'public' OR (ce.visibility = 'course' AND ce.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1)))
+          AND (ce.visibility = 'public' OR (ce.visibility = 'course' AND ce.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1) AND EXISTS (SELECT 1 FROM courses c2 WHERE c2.id = ce.course_id AND c2.price > 0)))
         ORDER BY ce.start_datetime ASC LIMIT 30`, [s.userId]),
     ]);
     const events = [

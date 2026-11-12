@@ -530,6 +530,77 @@ instructor.get('/submissions', async (c) => {
   }
 });
 
+
+// ── Verifiable project submissions ────────────────────────────────────────
+instructor.get('/project-submissions', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const admin = ['admin', 'super_admin'].includes(s.role);
+    const vals: any[] = admin ? [] : [s.userId];
+    const where = admin ? '' : 'WHERE c.instructor_id = $1';
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT p.id, p.title, p.description, p.source_url, p.demo_url, p.status,
+              p.repo_verified, p.verification, p.verified_at, p.last_commit_at,
+              p.score, p.review_feedback, p.reviewed_at, p.created_at,
+              cp.title AS project_title, cp.required_languages, cp.requires_demo,
+              c.title AS course_title, c.slug AS course_slug, c.instructor_id,
+              u.name AS student_name, u.email AS student_email, u.avatar AS student_avatar
+       FROM projects p
+       JOIN course_projects cp ON cp.id = p.project_id
+       JOIN courses c ON c.id = p.course_id
+       JOIN users u ON u.id = p.user_id
+       ${where}
+       ORDER BY CASE WHEN p.score IS NULL THEN 0 ELSE 1 END, p.created_at DESC
+       LIMIT 500`,
+      vals
+    );
+    return c.json({ success: true, data: rows.map((r) => ({
+      ...r,
+      verification: (() => { try { return typeof r.verification === 'string' ? JSON.parse(r.verification) : (r.verification || {}); } catch { return {}; } })(),
+      required_languages: (() => { try { return typeof r.required_languages === 'string' ? JSON.parse(r.required_languages) : (r.required_languages || []); } catch { return []; } })(),
+    })) });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load project submissions');
+  }
+});
+
+instructor.put('/project-submissions/:id/review', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const db = getDb(c.env);
+    const body: any = (await c.req.json().catch(() => ({}))) || {};
+    const score = Number(body.score);
+    if (!Number.isFinite(score) || score < 0 || score > 100) return fail(c, 400, 'Score must be between 0 and 100');
+    const feedback = String(body.feedback || '').slice(0, 4000);
+    const status = body.status === 'rejected' ? 'rejected' : 'reviewed';
+    const admin = ['admin', 'super_admin'].includes(s.role);
+    const vals: any[] = [c.req.param('id')];
+    const owner = admin ? '' : ' AND c.instructor_id = $2';
+    if (!admin) vals.push(s.userId);
+    const existing = (await db.query<any>(
+      `SELECT p.id, p.user_id, p.title, c.title AS course_title
+       FROM projects p JOIN courses c ON c.id = p.course_id
+       WHERE p.id = $1${owner}`,
+      vals
+    )).rows[0];
+    if (!existing) return fail(c, 404, 'Project submission not found');
+    await db.query(
+      `UPDATE projects SET score=$1, review_feedback=$2, reviewer_id=$3, reviewed_at=NOW(), status=$4, updated_at=NOW()
+       WHERE id=$5`,
+      [score, feedback, s.userId, status, existing.id]
+    );
+    const title = status === 'rejected' ? 'Project needs another attempt' : 'Project reviewed';
+    const message = `${existing.title} — ${score}/100. ${feedback || 'Open the project to see the review.'}`;
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1,$2,$3,'success','/student/lab')`,
+      [existing.user_id, title, message]
+    );
+    return c.json({ success: true, data: { id: existing.id, score, feedback, status } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to review project');
+  }
+});
+
 instructor.put('/submissions/:id/grade', async (c) => {
   try {
     const s = await requireRole(c, STAFF_ROLES);

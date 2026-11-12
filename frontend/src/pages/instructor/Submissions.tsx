@@ -3,13 +3,13 @@ import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { FileText, CheckCircle, Clock, Code, ChevronDown, ChevronUp, Palette, Image, Briefcase, PenLine, ExternalLink, BookOpen } from 'lucide-react';
+import { FileText, CheckCircle, Clock, Code, ChevronDown, ChevronUp, Palette, Image, Briefcase, PenLine, ExternalLink, BookOpen, Github, ShieldCheck, XCircle } from 'lucide-react';
 import CodeEditor from '@/components/student/CodeEditor';
 import { api } from '@/lib/axios';
 import toast from 'react-hot-toast';
 import { PageSkeleton } from '@/components/student/SkeletonLoader';
 
-type Tab = 'assignments' | 'challenges';
+type Tab = 'assignments' | 'challenges' | 'projects';
 type Filter = 'all' | 'pending' | 'graded';
 
 const typeConfig: Record<string, { icon: any; label: string; color: string }> = {
@@ -26,6 +26,7 @@ export default function InstructorSubmissions() {
   const [filter, setFilter] = useState<Filter>('all');
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [challengeSubs, setChallengeSubs] = useState<any[]>([]);
+  const [projectSubs, setProjectSubs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [gradingId, setGradingId] = useState<string | null>(null);
   const [score, setScore] = useState<number | ''>('');
@@ -39,12 +40,14 @@ export default function InstructorSubmissions() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [assignRes, challengeRes] = await Promise.all([
+      const [assignRes, challengeRes, projectRes] = await Promise.all([
         api.get('/instructor/submissions'),
         api.get('/instructor/challenge-submissions'),
+        api.get('/instructor/project-submissions').catch(() => ({ data: { data: [] } })),
       ]);
       setSubmissions(assignRes.data.data || []);
       setChallengeSubs(challengeRes.data.data || []);
+      setProjectSubs(projectRes.data.data || []);
     } catch {
       toast.error('Failed to load submissions');
     } finally {
@@ -58,7 +61,9 @@ export default function InstructorSubmissions() {
     try {
       const endpoint = type === 'assignments'
         ? `/instructor/submissions/${id}/grade`
-        : `/instructor/challenge-submissions/${id}/grade`;
+        : type === 'challenges'
+          ? `/instructor/challenge-submissions/${id}/grade`
+          : `/instructor/project-submissions/${id}/review`;
       await api.put(endpoint, { score: Number(score), feedback });
       toast.success('Submission graded successfully');
       setGradingId(null);
@@ -94,6 +99,7 @@ export default function InstructorSubmissions() {
         {([
           { key: 'assignments' as Tab, label: 'Assignments', count: submissions.length },
           { key: 'challenges' as Tab, label: 'Challenges', count: challengeSubs.length, pending: pendingCount },
+          { key: 'projects' as Tab, label: 'Projects', count: projectSubs.length, pending: projectSubs.filter((p) => p.score === null || p.score === undefined).length },
         ]).map(t => (
           <button
             key={t.key}
@@ -321,6 +327,76 @@ export default function InstructorSubmissions() {
                   </div>
                 </div>
               )}
+            </GlassCard>
+          );
+        })}
+
+        {tab === 'projects' && projectSubs.map((sub) => {
+          const v = sub.verification || {};
+          const checks = Array.isArray(v.checks) ? v.checks : [];
+          return (
+            <GlassCard key={sub.id} className="p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <Github className="w-4 h-4 text-gray-400" />
+                    <h3 className="font-semibold text-lg">{sub.project_title || sub.title}</h3>
+                    {sub.score !== null && sub.score !== undefined ? (
+                      <Badge variant="success"><CheckCircle className="w-3 h-3 mr-1" /> Reviewed</Badge>
+                    ) : (
+                      <Badge variant="warning"><Clock className="w-3 h-3 mr-1" /> Pending review</Badge>
+                    )}
+                    {sub.repo_verified ? <Badge variant="success"><ShieldCheck className="w-3 h-3 mr-1" /> GitHub verified</Badge> : <Badge variant="warning">Needs GitHub fixes</Badge>}
+                  </div>
+                  <p className="text-sm text-gray-500">Submitted by <span className="font-medium text-gray-900 dark:text-gray-100">{sub.student_name}</span> ({sub.student_email}) · {sub.course_title}</p>
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                    {sub.source_url && <a href={sub.source_url} target="_blank" rel="noreferrer" className="text-primary-500 inline-flex items-center gap-1"><Github className="w-3.5 h-3.5" /> Repository</a>}
+                    {sub.demo_url && <a href={sub.demo_url} target="_blank" rel="noreferrer" className="text-primary-500 inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Live demo</a>}
+                    {v.score != null && <span className="text-gray-500">Verifier score: {v.score}/100</span>}
+                  </div>
+                </div>
+              </div>
+              {checks.length > 0 && (
+                <div className="mt-3 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                  <p className="text-xs font-medium mb-2">GitHub checks</p>
+                  <div className="grid sm:grid-cols-2 gap-1">
+                    {checks.map((c: any) => (
+                      <div key={c.key || c.label} className="flex items-start gap-1.5 text-[11px]">
+                        {c.passed ? <CheckCircle className="w-3 h-3 text-emerald-500 mt-0.5" /> : <XCircle className="w-3 h-3 text-amber-500 mt-0.5" />}
+                        <span className={c.passed ? 'text-gray-500' : 'text-amber-500'}>{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sub.review_feedback && sub.score !== null && gradingId !== sub.id && (
+                <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800 p-3 text-sm">
+                  <p className="font-medium">Score: {sub.score}/100</p>
+                  <p className="text-gray-500 mt-1">{sub.review_feedback}</p>
+                </div>
+              )}
+              <div className="mt-4">
+                {gradingId === sub.id ? (
+                  <form onSubmit={(e) => handleGradeSubmit(e, sub.id, 'projects')} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 rounded-xl">
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium mb-1">Score (0-100)</label>
+                      <input type="number" min={0} max={100} required value={score} onChange={(e) => setScore(e.target.value === '' ? '' : Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent" />
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium mb-1">Feedback</label>
+                      <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent resize-none" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" className="flex-1" onClick={() => setGradingId(null)}>Cancel</Button>
+                      <Button type="submit" variant="primary" className="flex-1">Save Review</Button>
+                    </div>
+                  </form>
+                ) : (
+                  <Button variant="outline" onClick={() => { setGradingId(sub.id); setScore(sub.score ?? ''); setFeedback(sub.review_feedback ?? ''); }}>
+                    {sub.score !== null && sub.score !== undefined ? 'Edit Review' : 'Review Project'}
+                  </Button>
+                )}
+              </div>
             </GlassCard>
           );
         })}

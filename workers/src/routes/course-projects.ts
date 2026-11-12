@@ -21,7 +21,12 @@ async function githubJson(env: Env, path: string): Promise<{ ok: boolean; status
   };
   if (env.GITHUB_TOKEN) headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
   try {
-    const res = await fetch(`https://api.github.com${path}`, { headers });
+    let res = await fetch(`https://api.github.com${path}`, { headers });
+    // A stale/invalid token should not break public repository verification.
+    if (res.status === 401 && headers.Authorization) {
+      delete headers.Authorization;
+      res = await fetch(`https://api.github.com${path}`, { headers });
+    }
     const data: any = await res.json().catch(() => null);
     return { ok: res.ok, status: res.status, data };
   } catch (e: any) {

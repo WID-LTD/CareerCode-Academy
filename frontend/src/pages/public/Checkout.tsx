@@ -55,9 +55,13 @@ export default function Checkout() {
   const [redeemAmount, setRedeemAmount] = useState(1000);
 
   useEffect(() => {
-    api.get('/payments/gateways').then(({ data }) => {
-      const live = (data?.data?.gateways || []).filter((g: any) => g.configured).map((g: any) => g.id);
+    api.get('/payments/gateways/health').then(({ data }) => {
+      const health = data?.data || {};
+      const live = Object.entries(health)
+        .filter(([, g]: any) => g?.configured && g?.reachable)
+        .map(([id]) => id);
       if (live.length) setEnabledGateways(live);
+      else setEnabledGateways(['paystack']);
     }).catch(() => { /* keep the default pair */ });
   }, []);
 

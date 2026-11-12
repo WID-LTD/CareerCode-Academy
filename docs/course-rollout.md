@@ -64,3 +64,11 @@ Market anchors:
 - Tech Faculty NG data analytics: ₦100k.
 - Cybersecurity training in Nigeria: commonly ₦100k–₦700k.
 - UI/UX training in Nigeria: commonly ₦150k–₦800k.
+
+## Course packs
+Every published course now has a downloadable ZIP in R2 containing:
+- a course README
+- written notes for every lesson
+- every project brief with requirements, tools and procedure
+
+The file is attached as a course-level resource and appears in the lesson Resources tab. Transcripts are not included yet; that remains a content task.
