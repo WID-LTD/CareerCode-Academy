@@ -268,6 +268,16 @@ async function buildContext(env: Env, ctx: any): Promise<string> {
           [ctx.courseId || ctx.courseSlug]
         );
         if (lessons.rows.length) lines.push(`Lessons: ${lessons.rows.map((l: any) => l.title).join('; ')}.`);
+        const notes = await db.query<any>(
+          `SELECT l.title, n.notes FROM lesson_ai_notes n JOIN lessons l ON l.id = n.lesson_id
+           WHERE l.course_id = (SELECT id FROM courses WHERE ${ctx.courseId ? 'id = $1' : 'slug = $1'} LIMIT 1)
+             AND n.status = 'ready' ORDER BY l.order_index ASC LIMIT 12`,
+          [ctx.courseId || ctx.courseSlug]
+        ).catch(() => ({ rows: [] } as any));
+        if (notes.rows.length) {
+          lines.push('Course knowledge base (use these generated lesson notes when answering):');
+          for (const n of notes.rows) lines.push(`- ${n.title}: ${String(n.notes || '').replace(/\s+/g, ' ').slice(0, 700)}`);
+        }
       }
     }
     if (ctx.lessonId) {
@@ -276,6 +286,8 @@ async function buildContext(env: Env, ctx: any): Promise<string> {
         lines.push(`Current lesson: "${rows[0].title}".`);
         const body = rows[0].script || rows[0].description;
         if (body) lines.push(`Lesson content: ${String(body).slice(0, 1200)}`);
+        const ai = await db.query<any>('SELECT notes FROM lesson_ai_notes WHERE lesson_id = $1 AND status = $2 LIMIT 1', [ctx.lessonId, 'ready']).catch(() => ({ rows: [] } as any));
+        if (ai.rows[0]?.notes) lines.push(`Detailed generated lesson notes: ${String(ai.rows[0].notes).slice(0, 5000)}`);
       }
     }
     if (ctx.page) lines.push(`The learner is on: ${String(ctx.page).slice(0, 120)}.`);

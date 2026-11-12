@@ -5,15 +5,23 @@ OUTPUT=os.environ.get('NOTES_SQL','/tmp/gemini-notes.sql')
 start=int(sys.argv[1]) if len(sys.argv)>1 else 0
 end=int(sys.argv[2]) if len(sys.argv)>2 else len(lessons)
 MODELS=['gemini-3.1-flash-lite','gemini-3.5-flash-lite','gemini-flash-lite-latest']
-PROMPT="""Watch this video and create original detailed study notes for a CareerCode Academy learner. Do not reproduce the transcript verbatim.
-Include:
-1. A timestamped outline using [MM:SS].
-2. Key concepts explained in your own words.
-3. Commands, code or configuration shown in the video.
-4. Common mistakes and how to avoid them.
-5. A 5-question quiz with answers.
-6. A short practice task.
-If the video is inaccessible, output exactly VIDEO_NOT_ACCESSIBLE."""
+PROMPT="""Watch this video and write a complete, original lesson for a CareerCode Academy learner. Do not reproduce the transcript verbatim.
+
+Use this exact markdown structure:
+# Lesson title
+## Learning objectives (3-5 measurable outcomes)
+## Prerequisites
+## Timestamped outline ([MM:SS] + topic)
+## Detailed explanation (the concepts in your own words, with examples)
+## Commands, code or configuration shown
+## Common mistakes and troubleshooting
+## Practice task (step by step)
+## Checkpoint (how the learner proves they understood it)
+## Quiz (5 questions with answers and short explanations)
+## Key terms / glossary
+## GiGo knowledge summary (8-12 concise facts a study assistant can use)
+
+Be specific, beginner-friendly and technically accurate. If the video is inaccessible, output exactly VIDEO_NOT_ACCESSIBLE."""
 def q(v): return "'"+str(v).replace("'","''")+"'"
 sql=[]
 for i,l in enumerate(lessons[start:end], start):
