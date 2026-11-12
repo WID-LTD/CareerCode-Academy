@@ -15,7 +15,7 @@
 ## Payments
 - `paid_enrollment_enabled` was disabled in production. It is now enabled.
 - Paystack health: ready.
-- Flutterwave health: **invalid authorization key**. Checkout now hides unreachable gateways, so students are not sent to a broken provider. Replace `FLUTTERWAVE_SECRET_KEY`/`FLUTTERWAVE_PUBLIC_KEY` to re-enable it.
+- Flutterwave health: ready. Live keys were replaced and both provider initializations returned a hosted payment link.
 - Health endpoint: `GET /api/v1/payments/gateways/health`.
 
 ## Coupons

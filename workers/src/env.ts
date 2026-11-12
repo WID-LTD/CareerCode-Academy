@@ -30,6 +30,7 @@ export interface Env {
   PAYSTACK_PUBLIC_KEY?: string;
   FLUTTERWAVE_SECRET_KEY?: string;
   FLUTTERWAVE_PUBLIC_KEY?: string;
+  FLUTTERWAVE_ENCRYPTION_KEY?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_CALLBACK_URL?: string;
