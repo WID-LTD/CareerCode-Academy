@@ -72,3 +72,9 @@ Every published course now has a downloadable ZIP in R2 containing:
 - every project brief with requirements, tools and procedure
 
 The file is attached as a course-level resource and appears in the lesson Resources tab. Transcripts are not included yet; that remains a content task.
+
+## Content upgrade pass
+- 420 non-backend lessons now include structured notes: what the lesson covers, why it matters, practice task, checkpoint and tools.
+- Added 840 additional quiz questions (2 per non-backend lesson).
+- Regenerated all 35 downloadable course packs with the improved notes.
+- Live labs extended from 4 to 12 weeks for every published course.

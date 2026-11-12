@@ -3,7 +3,7 @@
 ## Live labs
 - Meeting link: `https://meet.google.com/dwn-crnc-exi`
 - All live-session events use Google Meet.
-- Events are visible only to enrolled students in paid courses (`courses.price > 0`).
+- Events run for 12 weeks and are visible only to enrolled students in paid courses (`courses.price > 0`).
 - Reminders run from the 15-minute cron at:
   - 2 days before
   - 1 day before
@@ -32,6 +32,6 @@
 - Analytics include submissions, GitHub verified, needs-work, reviewed, average score, by course and common failed checks.
 
 ## GitHub
-- The supplied token `3312ab...` was rejected by GitHub (`Bad credentials`), so it was removed.
-- Verification now falls back to the public GitHub API if a token is rejected.
-- Set a valid `GITHUB_TOKEN` secret later to raise rate limits.
+- The supplied token was rejected by GitHub (`Bad credentials`) and removed.
+- A valid `GITHUB_TOKEN` from the authenticated `gh` CLI is now set, raising API limits.
+- Verification still falls back to the public GitHub API if a token is rejected.
