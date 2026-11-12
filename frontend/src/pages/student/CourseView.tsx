@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import HighlightExt from '@tiptap/extension-highlight';
@@ -244,6 +246,7 @@ export default function CourseView() {
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [resources, setResources] = useState<any[]>([]);
+  const [aiNotes, setAiNotes] = useState<any>(null);
   const [resourceView, setResourceView] = useState<'formatted' | 'plain'>('formatted');
   const [lessonQuiz, setLessonQuiz] = useState<any>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
@@ -491,6 +494,7 @@ export default function CourseView() {
       setResources(unique);
     } catch { setResources([]); }
     try { const q = await api.get(`/quizzes/lesson/${lesson.id}`); setLessonQuiz(q.data.data || null); } catch { setLessonQuiz(null); }
+    try { const n = await api.get(`/lessons/${lesson.id}/ai-notes`); setAiNotes(n.data.data || null); } catch { setAiNotes(null); }
     try { const c = await api.get(`/challenges/lesson/${lesson.id}`); setChallenges(c.data.data || []); } catch { setChallenges([]); }
   };
 
@@ -900,6 +904,21 @@ export default function CourseView() {
 
               {activeTab === 'resources' && (
                 <div className="space-y-4">
+                  {aiNotes?.notes && (
+                    <div className="rounded-xl bg-indigo-500/5 border border-indigo-500/20 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-500/20">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-indigo-400" />
+                          <span className="text-sm font-medium text-white">Gemini study notes</span>
+                        </div>
+                        <span className="text-[10px] text-gray-500">{aiNotes.model || 'Gemini'} · {aiNotes.tokens ? `${aiNotes.tokens.toLocaleString()} tokens` : 'AI-generated'}</span>
+                      </div>
+                      <div className="p-4 prose prose-invert prose-sm max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiNotes.notes}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+
                   {currentLesson?.description && (
                     <div className="rounded-xl bg-gray-800/50 border border-gray-700/50 overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50">

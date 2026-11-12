@@ -115,6 +115,17 @@ lessons.get('/:id/notes', async (c) => {
   }
 });
 
+// GET /api/v1/lessons/:id/ai-notes — Gemini-generated study notes
+lessons.get('/:id/ai-notes', async (c) => {
+  try {
+    await requireAuth(c);
+    const { rows } = await getDb(c.env).query<any>('SELECT * FROM lesson_ai_notes WHERE lesson_id = $1', [c.req.param('id')]);
+    return c.json({ success: true, data: rows[0] || null });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load AI notes');
+  }
+});
+
 // POST /api/v1/lessons/:id/notes
 lessons.post('/:id/notes', async (c) => {
   try {
