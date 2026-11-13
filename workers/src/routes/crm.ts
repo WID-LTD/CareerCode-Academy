@@ -83,6 +83,28 @@ crm.put('/users/:id/courses/:courseId/trial', async (c) => {
   } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update trial'); }
 });
 
+crm.post('/users/:id/trial-all', async (c) => {
+  try {
+    await requireRole(c, ADMIN);
+    const body: any = await c.req.json().catch(() => ({}));
+    const db = getDb(c.env);
+    const days = Math.max(1, Number(body.days) || 7);
+    const startsAt = body.starts_at || new Date().toISOString();
+    const endsAt = body.ends_at || new Date(new Date(startsAt).getTime() + days * 86400000).toISOString();
+    const courses = await db.query<any>('SELECT id FROM courses WHERE published=1');
+    for (const course of courses.rows) {
+      const existing = (await db.query<any>('SELECT id, access_type FROM enrollments WHERE user_id=$1 AND course_id=$2', [c.req.param('id'), course.id])).rows[0];
+      if (existing && ['paid', 'admin_grant'].includes(existing.access_type)) continue;
+      if (existing) {
+        await db.query(`UPDATE enrollments SET access_type='trial', status='active', trial_started_at=$1, trial_ends_at=$2, enrolled_at=NOW() WHERE id=$3`, [startsAt, endsAt, existing.id]);
+      } else {
+        await db.query(`INSERT INTO enrollments (user_id,course_id,status,access_type,trial_started_at,trial_ends_at,progress,completed_lessons,completed) VALUES ($1,$2,'active','trial',$3,$4,0,'[]',false)`, [c.req.param('id'), course.id, startsAt, endsAt]);
+      }
+    }
+    return c.json({ success: true, data: { courses: courses.rows.length, days, starts_at: startsAt, ends_at: endsAt } });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to start all-course trial'); }
+});
+
 crm.post('/users/:id/courses/:courseId/enroll', async (c) => {
   try {
     await requireRole(c, ADMIN);

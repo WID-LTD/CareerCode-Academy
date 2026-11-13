@@ -3,7 +3,7 @@
 ## Trial
 - Default 7 days.
 - Campaign: 13 November 2026 to 20 November 2026.
-- One trial per learner by default.
+- One trial per learner unlocks every published course for the trial period.
 - Admin can edit global settings and per-user/per-course trials.
 - Trial progress is preserved after expiry.
 - Expired trials are hidden from My Courses and course access checks.

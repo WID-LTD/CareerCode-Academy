@@ -72,7 +72,7 @@ enrollments.get('/course/:courseId', async (c) => {
   }
 });
 
-// POST /api/v1/enrollments/:courseId/trial — start a free trial
+// POST /api/v1/enrollments/:courseId/trial — start an all-course free trial
 enrollments.post('/:courseId/trial', async (c) => {
   try {
     const s = await requireAuth(c);
@@ -81,15 +81,26 @@ enrollments.post('/:courseId/trial', async (c) => {
     const course = (await db.query<any>('SELECT * FROM courses WHERE id = $1', [courseId])).rows[0];
     if (!course) return fail(c, 404, 'Course not found');
     if (Number(course.price) <= 0) return fail(c, 400, 'This course is not eligible for a trial');
-    const existing = (await db.query<any>('SELECT * FROM enrollments WHERE user_id=$1 AND course_id=$2', [s.userId, courseId])).rows[0];
-    if (existing && (existing.access_type !== 'trial' || new Date(existing.trial_ends_at || 0) > new Date())) {
-      return c.json({ success: true, data: { ...existing, alreadyActive: true } });
-    }
+
     const settings = (await db.query<any>("SELECT * FROM trial_settings WHERE id='default'")).rows[0] || { enabled: 1, default_days: 7, campaign_start: '2026-11-13T00:00:00.000Z', campaign_end: '2026-11-20T23:59:59.000Z', max_trials: 1 };
     if (!settings.enabled) return fail(c, 403, 'Free trials are currently disabled');
     const now = new Date();
     if (settings.campaign_start && now < new Date(settings.campaign_start)) return fail(c, 403, 'The free trial has not started yet');
     if (settings.campaign_end && now > new Date(settings.campaign_end)) return fail(c, 403, 'The free trial has ended');
+
+    const existingTrials = await db.query<any>(
+      `SELECT * FROM enrollments WHERE user_id=$1 AND access_type='trial' ORDER BY trial_ends_at DESC`,
+      [s.userId]
+    );
+    const activeTrial = existingTrials.rows.find((r: any) => r.trial_ends_at && new Date(r.trial_ends_at) > now);
+    if (activeTrial) {
+      const current = existingTrials.rows.find((r: any) => r.course_id === courseId) || activeTrial;
+      return c.json({ success: true, data: { ...current, alreadyActive: true, trial_days_remaining: Math.max(0, Math.ceil((new Date(current.trial_ends_at).getTime() - Date.now()) / 86400000)) } });
+    }
+    if (existingTrials.rows.length > 0 && !Number(settings.reset_allowed)) {
+      return fail(c, 403, 'Your free trial has already been used. Purchase a course to continue.');
+    }
+
     const override = (await db.query<any>(
       `SELECT * FROM trial_overrides WHERE enabled=1 AND (user_id=$1 OR user_id IS NULL) AND (course_id=$2 OR course_id IS NULL)
        ORDER BY CASE WHEN user_id=$1 THEN 0 ELSE 1 END, CASE WHEN course_id=$2 THEN 0 ELSE 1 END LIMIT 1`,
@@ -98,28 +109,31 @@ enrollments.post('/:courseId/trial', async (c) => {
     const days = Math.max(1, Number(override?.days) || Number(settings.default_days) || 7);
     const startsAt = override?.starts_at || now.toISOString();
     const endsAt = override?.ends_at || new Date(new Date(startsAt).getTime() + days * 86400000).toISOString();
-    const trialCount = (await db.query<any>(
-      `SELECT COUNT(*)::int AS n FROM enrollments WHERE user_id=$1 AND access_type='trial'`,
-      [s.userId]
-    )).rows[0]?.n || 0;
-    if (trialCount >= (Number(settings.max_trials) || 1) && !existing) return fail(c, 403, 'You have already used your free trial');
-    if (existing) {
-      const updated = await db.query<any>(
-        `UPDATE enrollments SET access_type='trial', status='active', trial_started_at=$1, trial_ends_at=$2, enrolled_at=NOW() WHERE id=$3 RETURNING *`,
-        [startsAt, endsAt, existing.id]
-      );
-      return c.json({ success: true, data: { ...updated.rows[0], trial_days_remaining: days } });
+
+    const allCourses = await db.query<any>('SELECT id, title, slug, price FROM courses WHERE published=1');
+    for (const cRow of allCourses.rows) {
+      const existing = (await db.query<any>('SELECT id, access_type FROM enrollments WHERE user_id=$1 AND course_id=$2', [s.userId, cRow.id])).rows[0];
+      if (existing && ['paid', 'admin_grant'].includes(existing.access_type)) continue;
+      if (existing) {
+        await db.query(
+          `UPDATE enrollments SET access_type='trial', status='active', trial_started_at=$1, trial_ends_at=$2, enrolled_at=NOW() WHERE id=$3`,
+          [startsAt, endsAt, existing.id]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO enrollments (user_id, course_id, status, access_type, trial_started_at, trial_ends_at, progress, completed_lessons, completed)
+           VALUES ($1,$2,'active','trial',$3,$4,0,'[]',false)`,
+          [s.userId, cRow.id, startsAt, endsAt]
+        );
+      }
     }
-    const created = await db.query<any>(
-      `INSERT INTO enrollments (user_id, course_id, status, access_type, trial_started_at, trial_ends_at, progress, completed_lessons, completed)
-       VALUES ($1,$2,'active','trial',$3,$4,0,'[]',false) RETURNING *`,
-      [s.userId, courseId, startsAt, endsAt]
-    );
+
     await db.query(
       `INSERT INTO notifications (user_id,title,message,type,link) VALUES ($1,$2,$3,'success',$4)`,
-      [s.userId, 'Free trial started', `Your ${days}-day trial for ${course.title} is active until ${new Date(endsAt).toLocaleDateString()}.`, `/student/courses/${course.slug}`]
+      [s.userId, 'All-course free trial started', `Your ${days}-day trial gives you access to every published course until ${new Date(endsAt).toLocaleDateString()}.`, '/student/courses']
     );
-    return c.json({ success: true, data: { ...created.rows[0], trial_days_remaining: days } }, 201);
+    const current = (await db.query<any>('SELECT * FROM enrollments WHERE user_id=$1 AND course_id=$2', [s.userId, courseId])).rows[0];
+    return c.json({ success: true, data: { ...current, trial_days_remaining: days, allCourses: allCourses.rows.length } }, 201);
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to start trial');
   }

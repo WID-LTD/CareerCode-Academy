@@ -105,6 +105,14 @@ export default function AdminUsers() {
     } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to update trial'); }
   };
 
+  const startAllTrial = async () => {
+    try {
+      await api.post(`/admin/crm/users/${(userDetail as any)._id}/trial-all`, { days: 7 });
+      toast.success('All-course trial started');
+      await refreshCrm();
+    } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to start trial'); }
+  };
+
   const grantAccess = async (course: any) => {
     try {
       await api.post(`/admin/crm/users/${(userDetail as any)._id}/courses/${course.course_id}/enroll`);
@@ -571,7 +579,10 @@ export default function AdminUsers() {
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Courses and access</p>
-                    {crmLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                    <div className="flex items-center gap-2">
+                      <button onClick={startAllTrial} className="text-[10px] px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600">Start all-course trial</button>
+                      {crmLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     {(crmUser?.courses || []).map((course: any) => (
