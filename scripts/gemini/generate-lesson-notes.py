@@ -184,6 +184,11 @@ def main():
                 f"ON CONFLICT(lesson_id) DO UPDATE SET status='error',error=excluded.error;"
             )
             open(OUTPUT, 'w').write('\n'.join(sql))
+            permanent = any(token in str(last_error).lower() for token in ('400', '403', '404', 'inaccessible', 'recitation'))
+            if permanent:
+                print(f"  SKIP inaccessible: {last_error}", flush=True)
+                time.sleep(2)
+                continue
             consecutive_failures += 1
             print(f"  FAILED: {last_error} (consecutive={consecutive_failures})", flush=True)
             # Provider outage / rate limit: cool down instead of burning quota.
