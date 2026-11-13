@@ -494,6 +494,8 @@ async function main() {
       const text = await res.text();
       return { status: res.status, json: { success: text.startsWith('%PDF'), skipped: false } };
     }, (r) => (r.json?.skipped || r.json?.success ? null : `status ${r.status}`)],
+    ['GET /api/v1/admin/crm/overview (no auth)', () => call('/api/v1/admin/crm/overview'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/enrollments/:id/trial (no auth)', () => call('/api/v1/enrollments/00000000-0000-4000-8000-000000000000/trial', { method: 'POST', body: {} }), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/hub/badges (no auth)', () => call('/api/v1/hub/badges'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/hub/client-projects (no auth)', () => call('/api/v1/hub/client-projects'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/hub/spaced-reviews (no auth)', () => call('/api/v1/hub/spaced-reviews'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],

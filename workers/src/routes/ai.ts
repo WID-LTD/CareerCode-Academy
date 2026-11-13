@@ -23,7 +23,8 @@ export type AiBlock =
   | { type: 'quiz'; question: string; options: string[]; answer: number; explanation?: string }
   | { type: 'flashcards'; cards: Array<{ front: string; back: string }> }
   | { type: 'plan'; title: string; items: string[] }
-  | { type: 'courses'; items: Array<{ title: string; slug?: string; reason?: string }> };
+  | { type: 'courses'; items: Array<{ title: string; slug?: string; reason?: string }> }
+  | { type: 'paywall'; reason: string; courses: Array<{ id: string; title: string; slug: string; price: number }> };
 
 interface ParsedReply {
   blocks: AiBlock[];
@@ -321,6 +322,41 @@ async function saveMessage(env: Env, conversationId: string, role: string, conte
 }
 
 // ── Chat core ────────────────────────────────────────────────────────────
+async function hasCourseAccess(env: Env, userId: string, role: string, courseId: string): Promise<boolean> {
+  if (['admin', 'super_admin', 'instructor'].includes(role)) return true;
+  const { rows } = await getDb(env).query<any>(
+    `SELECT 1 FROM enrollments WHERE user_id=$1 AND course_id=$2
+     AND (access_type <> 'trial' OR trial_ends_at > NOW()) LIMIT 1`,
+    [userId, courseId]
+  );
+  return rows.length > 0;
+}
+
+const CUSTOMER_CARE = ['refund', 'payment', 'paystack', 'flutterwave', 'login', 'password', 'account', 'certificate', 'support', 'consultation', 'human', 'billing', 'receipt', 'email verification', 'verify email', 'suspended', 'reset password', 'customer care'];
+const COURSE_INTENT = ['lesson', 'quiz', 'assignment', 'project', 'code', 'debug', 'explain', 'database', 'node', 'react', 'python', 'backend', 'frontend', 'api', 'challenge', 'syntax', 'error', 'why does', 'how do i', 'what is', 'teach me', 'help me build', 'course'];
+
+function isCustomerCare(text: string): boolean {
+  const t = text.toLowerCase();
+  return CUSTOMER_CARE.some((k) => t.includes(k));
+}
+function isCourseIntent(text: string): boolean {
+  const t = text.toLowerCase();
+  return COURSE_INTENT.some((k) => t.includes(k));
+}
+
+async function paywallReply(env: Env, session: { userId: string; role: string }, body: any, reason: string, courses: any[]) {
+  const conversationId = await ensureConversation(env, session.userId, body.conversationId || null, 'Course access');
+  const blocks: AiBlock[] = [{
+    type: 'paywall',
+    reason,
+    courses: courses.map((c: any) => ({ id: c.id, title: c.title, slug: c.slug, price: Number(c.price) || 0 })),
+  }];
+  const reply = 'This is course-specific help. Start your free trial or purchase the course to continue. Customer care and consultation are still available.';
+  await saveMessage(env, conversationId, 'user', String(body?.messages?.slice(-1)?.[0]?.content || 'Course question').slice(0, 4000));
+  await saveMessage(env, conversationId, 'assistant', reply, blocks, 'paywall', 0);
+  return { reply, blocks, followups: ['Customer care', 'Book a consultation'], quiz: null, conversationId, model: 'paywall', usage: null };
+}
+
 async function runChat(
   env: Env,
   session: { userId: string; role: string },
@@ -335,6 +371,25 @@ async function runChat(
   if (!userMessages.length) throw Object.assign(new Error('messages is required'), { statusCode: 400 });
 
   const lastUser = [...userMessages].reverse().find((m) => m.role === 'user');
+  const question = String(lastUser?.content || '');
+  const customerCare = isCustomerCare(question);
+  if (!customerCare && isCourseIntent(question)) {
+    let course: any = null;
+    if (body.context?.courseId || body.context?.courseSlug) {
+      const { rows } = await getDb(env).query<any>(
+        `SELECT id,title,slug,price FROM courses WHERE ${body.context.courseId ? 'id = $1' : 'slug = $1'} LIMIT 1`,
+        [body.context.courseId || body.context.courseSlug]
+      );
+      course = rows[0] || null;
+    }
+    if (course && !(await hasCourseAccess(env, session.userId, session.role, course.id))) {
+      return paywallReply(env, session, body, 'You need an active trial or purchase to get course help.', [course]);
+    }
+    if (!course && /recommend|which course|what should i learn|career path/i.test(question)) {
+      const { rows } = await getDb(env).query<any>('SELECT id,title,slug,price FROM courses WHERE published=1 ORDER BY featured DESC, created_at DESC LIMIT 3');
+      if (rows.length) return paywallReply(env, session, body, 'Choose a course to unlock course-specific guidance.', rows);
+    }
+  }
   const conversationId = await ensureConversation(env, session.userId, body.conversationId || null, lastUser?.content || 'GiGo chat');
 
   const context = await buildContext(env, body.context);

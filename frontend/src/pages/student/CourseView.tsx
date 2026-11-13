@@ -59,12 +59,16 @@ interface CourseData {
   instructor_name?: string;
   duration?: number;
   thumbnail?: string;
+  price?: number;
 }
 
 interface EnrollmentData {
   status?: string;
   completed?: boolean;
   progress?: number;
+  access_type?: string;
+  trial_ends_at?: string;
+  trial_days_remaining?: number;
 }
 
 interface AnalyticsData {
@@ -249,6 +253,7 @@ export default function CourseView() {
   const [resources, setResources] = useState<any[]>([]);
   const [aiNotes, setAiNotes] = useState<any>(null);
   const [sandbox, setSandbox] = useState<any>(null);
+  const [startingTrial, setStartingTrial] = useState(false);
   const [resourceView, setResourceView] = useState<'formatted' | 'plain'>('formatted');
   const [lessonQuiz, setLessonQuiz] = useState<any>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
@@ -579,8 +584,22 @@ export default function CourseView() {
         <GlassCard className="max-w-md text-center p-8">
           <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Access Required</h2>
-          <p className="text-gray-400 mb-6">You need to enroll in this course to access the content.</p>
-          <Link to={`/courses/${slug}`}><Button>View Course Details</Button></Link>
+          <p className="text-gray-400 mb-2">Start a one-week free trial or purchase this course to continue.</p>
+          {course?.price ? <p className="text-lg font-bold text-white mb-5">₦{Number(course.price).toLocaleString()}</p> : null}
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button disabled={startingTrial} onClick={async () => {
+              setStartingTrial(true);
+              try {
+                await api.post(`/enrollments/${course.id}/trial`);
+                toast.success('Your free trial has started');
+                window.location.reload();
+              } catch (e: any) {
+                toast.error(e?.response?.data?.message || 'Could not start trial');
+              } finally { setStartingTrial(false); }
+            }}>{startingTrial ? 'Starting trial...' : 'Start one-week free trial'}</Button>
+            <Link to={`/checkout?courseId=${course.id}`}><Button variant="outline">Buy course</Button></Link>
+          </div>
+          <Link to={`/courses/${slug}`} className="text-xs text-gray-500 mt-4 inline-block">View course details</Link>
         </GlassCard>
       </div>
     );
@@ -604,6 +623,11 @@ export default function CourseView() {
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300 border border-primary-500/20">
                 <Sparkles className="w-3 h-3" /> Practical
               </span>
+              {enrollment?.access_type === 'trial' && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/20">
+                  Trial: {enrollment.trial_days_remaining ?? 0} day{enrollment.trial_days_remaining === 1 ? '' : 's'} left
+                </span>
+              )}
             </h1>
             <p className="text-gray-400 text-xs truncate flex items-center gap-1.5">
               <span>{currentLesson?.title || 'Select a lesson'}</span>

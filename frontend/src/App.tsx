@@ -166,6 +166,7 @@ const StudentSetup = lazy(() => import('@/pages/student/Setup'));
 const StudentProjectWorkspace = lazy(() => import('@/pages/student/ProjectWorkspace'));
 const StudentLearningHub = lazy(() => import('@/pages/student/LearningHub'));
 const BadgeVerify = lazy(() => import('@/pages/public/BadgeVerify'));
+const TrialCampaign = lazy(() => import('@/pages/public/TrialCampaign'));
 const StudentLiveRoom = lazy(() => import('@/pages/student/LiveRoom'));
 const StudentPathwayFinder = lazy(() => import('@/pages/student/PathwayFinder'));
 
@@ -228,6 +229,7 @@ const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
 const AdminCoupons = lazy(() => import('@/pages/admin/Coupons'));
 const AdminProjectAnalytics = lazy(() => import('@/pages/admin/ProjectAnalytics'));
 const InstructorHubReview = lazy(() => import('@/pages/instructor/HubReview'));
+const AdminTrialSettings = lazy(() => import('@/pages/admin/TrialSettings'));
 const AdminBoardOversight = lazy(() => import('@/pages/admin/BoardOversight'));
 const AdminPrograms = lazy(() => import('@/pages/admin/Programs'));
 
@@ -326,6 +328,7 @@ function App() {
           <Route path="/blog/:slug" element={<SuspenseWrapper><BlogPost /></SuspenseWrapper>} />
           <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
           <Route path="/pricing" element={<SuspenseWrapper><Pricing /></SuspenseWrapper>} />
+          <Route path="/trial" element={<SuspenseWrapper><TrialCampaign /></SuspenseWrapper>} />
           <Route path="/community" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
           <Route path="/c/:slug" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
           <Route path="/community/join/:code" element={<SuspenseWrapper><CommunityInvite /></SuspenseWrapper>} />
@@ -465,6 +468,7 @@ function App() {
           <Route path="career" element={<SuspenseWrapper><AdminCareer /></SuspenseWrapper>} />
           <Route path="promotions" element={<SuspenseWrapper><AdminPromotions /></SuspenseWrapper>} />
           <Route path="coupons" element={<SuspenseWrapper><AdminCoupons /></SuspenseWrapper>} />
+          <Route path="trial-settings" element={<SuspenseWrapper><AdminTrialSettings /></SuspenseWrapper>} />
           <Route path="project-analytics" element={<SuspenseWrapper><AdminProjectAnalytics /></SuspenseWrapper>} />
           <Route path="board-oversight" element={<SuspenseWrapper><AdminBoardOversight /></SuspenseWrapper>} />
           <Route path="settings" element={<SuspenseWrapper><AdminSettings /></SuspenseWrapper>} />

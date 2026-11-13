@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import {
   Send, X, Minimize2, GripVertical, CheckCircle2, XCircle, Mic, MicOff,
   Volume2, VolumeX, Plus, History, Loader2, Sparkles, ListChecks,
-  BookOpen, Briefcase, MessageSquare, RotateCcw, Square, ImagePlus, Monitor,
+  BookOpen, Briefcase, MessageSquare, RotateCcw, Square, ImagePlus, Monitor, Lock,
 } from 'lucide-react';
 import api from '@/lib/axios';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,8 @@ type Block =
   | { type: 'quiz'; question: string; options: string[]; answer: number; explanation?: string }
   | { type: 'flashcards'; cards: Array<{ front: string; back: string }> }
   | { type: 'plan'; title: string; items: string[] }
-  | { type: 'courses'; items: Array<{ title: string; slug?: string; reason?: string }> };
+  | { type: 'courses'; items: Array<{ title: string; slug?: string; reason?: string }> }
+  | { type: 'paywall'; reason: string; courses: Array<{ id: string; title: string; slug: string; price: number }> };
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -225,6 +226,35 @@ function CoursesCard({ block }: { block: Extract<Block, { type: 'courses' }> }) 
   );
 }
 
+function PaywallCard({ block }: { block: Extract<Block, { type: 'paywall' }> }) {
+  return (
+    <div className="rounded-2xl border border-amber-300 dark:border-amber-900/60 p-3 bg-amber-50 dark:bg-amber-950/20">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-amber-600 font-semibold mb-1">
+        <Lock className="w-3 h-3" /> Course access required
+      </div>
+      <p className="text-sm text-gray-700 dark:text-gray-300">{block.reason}</p>
+      <div className="space-y-2 mt-2">
+        {block.courses.map((course) => (
+          <div key={course.id} className="rounded-xl bg-white/70 dark:bg-gray-900/60 border border-amber-200 dark:border-amber-900/40 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">{course.title}</p>
+              <span className="text-xs font-bold">₦{Number(course.price).toLocaleString()}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              <Link to={`/courses/${course.slug}`} className="text-[11px] px-2 py-1 rounded-lg bg-indigo-500 text-white font-medium">Start one-week trial</Link>
+              <Link to={`/checkout?courseId=${course.id}`} className="text-[11px] px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-700">Buy course</Link>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+        <Link to="/student/tickets" className="text-[11px] text-indigo-500">Customer care</Link>
+        <Link to="/student/mentoring" className="text-[11px] text-indigo-500">Book a consultation</Link>
+      </div>
+    </div>
+  );
+}
+
 function Blocks({ msg, onFollowup, onAddPlan }: { msg: Msg; onFollowup: (text: string) => void; onAddPlan: (items: string[]) => void }) {
   return (
     <div className="space-y-2">
@@ -234,6 +264,7 @@ function Blocks({ msg, onFollowup, onAddPlan }: { msg: Msg; onFollowup: (text: s
         if (b.type === 'flashcards') return <Flashcards key={i} cards={b.cards} />;
         if (b.type === 'plan') return <PlanCard key={i} block={b} onAdd={onAddPlan} />;
         if (b.type === 'courses') return <CoursesCard key={i} block={b} />;
+        if (b.type === 'paywall') return <PaywallCard key={i} block={b} />;
         return null;
       })}
       {!!msg.followups?.length && (

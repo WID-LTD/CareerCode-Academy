@@ -37,6 +37,32 @@ async function reminders(env: Env) {
   let liveDetail = '';
   try { liveDetail = await liveReminders(env); } catch { liveDetail = 'live reminders failed'; }
 
+  let trialDetail = '';
+  try {
+    for (const [days, label] of [[7, '7 days'], [3, '3 days'], [1, '1 day'], [0, 'today']] as const) {
+      const { rows } = await db.query<any>(
+        `SELECT e.user_id, e.course_id, e.trial_ends_at, c.title, c.slug
+         FROM enrollments e JOIN courses c ON c.id=e.course_id
+         WHERE e.access_type='trial' AND date(e.trial_ends_at)=date('now', $1)
+           AND NOT EXISTS (
+             SELECT 1 FROM notifications n WHERE n.user_id=e.user_id AND n.type='trial'
+               AND n.link='/student/courses/' || c.slug AND date(n.created_at)=date('now')
+           ) LIMIT 500`,
+        [`+${days} days`]
+      );
+      for (const row of rows) {
+        const title = days === 0 ? 'Your trial ends today' : `Your trial ends in ${label}`;
+        const message = `${row.title}: your free trial ${days === 0 ? 'ends today' : `ends in ${label}`}. Buy the course to keep your progress.`;
+        await db.query(
+          `INSERT INTO notifications (user_id,title,message,type,link) VALUES ($1,$2,$3,'trial',$4)`,
+          [row.user_id, title, message, `/student/courses/${row.slug}`]
+        );
+        await sendPushToUser(env, row.user_id, { title, body: message, url: `/student/courses/${row.slug}` }).catch(() => {});
+      }
+      trialDetail += ` ${label}=${rows.length}`;
+    }
+  } catch { trialDetail = 'trial reminders failed'; }
+
   // To-do reminders: notify once per task when it is due today or overdue.
   const due = await db.query<any>(
     `SELECT t.id, t.user_id, t.title, t.due_at
@@ -61,7 +87,7 @@ async function reminders(env: Env) {
     );
     await sendPushToUser(env, todo.user_id, { title, body: message, url: '/student/todos' }).catch(() => {});
   }
-  return `mentoring users=${rows.length}, todo reminders=${due.rows.length}, ${liveDetail}`;
+  return `mentoring users=${rows.length}, todo reminders=${due.rows.length}, ${liveDetail}, trials${trialDetail}`;
 }
 
 const LIVE_WINDOWS = [

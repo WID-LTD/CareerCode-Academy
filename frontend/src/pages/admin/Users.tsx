@@ -72,10 +72,55 @@ export default function AdminUsers() {
   const [createForm, setCreateForm] = useState({ name: '', email: '', role: 'student', sendInvite: true });
   const [createError, setCreateError] = useState('');
   const [bulkRoleTarget, setBulkRoleTarget] = useState('');
+  const [crmUser, setCrmUser] = useState<any>(null);
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [trialDates, setTrialDates] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchUsers(1, 1000);
   }, [fetchUsers]);
+
+  useEffect(() => {
+    const id = (userDetail as any)?._id;
+    if (!id) { setCrmUser(null); return; }
+    setCrmLoading(true);
+    api.get(`/admin/crm/users/${id}`).then(({ data }) => setCrmUser(data.data)).catch(() => setCrmUser(null)).finally(() => setCrmLoading(false));
+  }, [(userDetail as any)?._id]);
+
+  const refreshCrm = async () => {
+    const id = (userDetail as any)?._id;
+    if (!id) return;
+    const { data } = await api.get(`/admin/crm/users/${id}`);
+    setCrmUser(data.data);
+  };
+
+  const updateTrial = async (course: any, days?: number) => {
+    try {
+      const payload: any = {};
+      if (days) payload.days = days;
+      if (trialDates[course.course_id]) payload.ends_at = new Date(trialDates[course.course_id]).toISOString();
+      await api.put(`/admin/crm/users/${(userDetail as any)._id}/courses/${course.course_id}/trial`, payload);
+      toast.success('Trial updated');
+      await refreshCrm();
+    } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to update trial'); }
+  };
+
+  const grantAccess = async (course: any) => {
+    try {
+      await api.post(`/admin/crm/users/${(userDetail as any)._id}/courses/${course.course_id}/enroll`);
+      toast.success('Access granted');
+      await refreshCrm();
+    } catch { toast.error('Failed to grant access'); }
+  };
+
+  const revokeAccess = async (course: any) => {
+    if (!confirm(`Revoke access to ${course.title}?`)) return;
+    try {
+      await api.delete(`/admin/crm/users/${(userDetail as any)._id}/courses/${course.course_id}/access`);
+      toast.success('Access revoked');
+      await refreshCrm();
+    } catch { toast.error('Failed to revoke access'); }
+  };
 
   const stats = useMemo(() => {
     const s = { student: 0, instructor: 0, admin: 0, super_admin: 0, suspended: 0, verified: 0 };
@@ -519,6 +564,38 @@ export default function AdminUsers() {
                     <Clock className="w-4 h-4 text-purple-500 mx-auto mb-1" />
                     <p className="text-lg font-bold text-purple-600">{formatRelative(userDetail.lastLogin)}</p>
                     <p className="text-[10px] text-gray-500">Last Login</p>
+                  </div>
+                </div>
+
+                {/* Courses and access */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Courses and access</p>
+                    {crmLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                  </div>
+                  <div className="space-y-2">
+                    {(crmUser?.courses || []).map((course: any) => (
+                      <div key={course.course_id} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{course.title}</p>
+                            <p className="text-[11px] text-gray-500 capitalize">{course.access_type?.replace('_', ' ')} · {course.progress || 0}% complete</p>
+                          </div>
+                          <Badge variant={course.access_type === 'trial' ? 'warning' : course.access_type === 'paid' ? 'success' : 'default'} size="sm">
+                            {course.access_type === 'trial' ? `${course.trial_days_remaining ?? 0} days left` : course.access_type?.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <button onClick={() => updateTrial(course, 7)} className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700">+7 days</button>
+                          <button onClick={() => updateTrial(course, 14)} className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700">+14 days</button>
+                          <input type="date" value={trialDates[course.course_id] || ''} onChange={(e) => setTrialDates({ ...trialDates, [course.course_id]: e.target.value })} className="text-[10px] px-1.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent" />
+                          <button onClick={() => updateTrial(course)} className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700">Set end</button>
+                          <button onClick={() => grantAccess(course)} className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600">Grant paid</button>
+                          <button onClick={() => revokeAccess(course)} className="text-[10px] px-2 py-1 rounded-lg bg-red-500/10 text-red-500">Revoke</button>
+                        </div>
+                      </div>
+                    ))}
+                    {!crmLoading && (crmUser?.courses || []).length === 0 && <p className="text-xs text-gray-500">No courses enrolled. Courses not enrolled are hidden.</p>}
                   </div>
                 </div>
 
