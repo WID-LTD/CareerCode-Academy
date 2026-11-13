@@ -494,6 +494,9 @@ async function main() {
       const text = await res.text();
       return { status: res.status, json: { success: text.startsWith('%PDF'), skipped: false } };
     }, (r) => (r.json?.skipped || r.json?.success ? null : `status ${r.status}`)],
+    ['GET /api/v1/hub/badges (no auth)', () => call('/api/v1/hub/badges'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/hub/client-projects (no auth)', () => call('/api/v1/hub/client-projects'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/hub/spaced-reviews (no auth)', () => call('/api/v1/hub/spaced-reviews'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/course-projects (no auth)', () => call('/api/v1/course-projects'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/course-projects/github/status (no auth)', () => call('/api/v1/course-projects/github/status'), (r) => (r.status === 401 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/payments/gateways/health', () => call('/api/v1/payments/gateways/health'), (r) => (r.json?.data?.paystack ? null : JSON.stringify(r.json).slice(0, 160))],

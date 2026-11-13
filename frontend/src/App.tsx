@@ -163,6 +163,9 @@ const StudentPortfolioBuilder = lazy(() => import('@/pages/student/PortfolioBuil
 const StudentGuidedMode = lazy(() => import('@/pages/student/GuidedMode'));
 const StudentLab = lazy(() => import('@/pages/student/Lab'));
 const StudentSetup = lazy(() => import('@/pages/student/Setup'));
+const StudentProjectWorkspace = lazy(() => import('@/pages/student/ProjectWorkspace'));
+const StudentLearningHub = lazy(() => import('@/pages/student/LearningHub'));
+const BadgeVerify = lazy(() => import('@/pages/public/BadgeVerify'));
 const StudentLiveRoom = lazy(() => import('@/pages/student/LiveRoom'));
 const StudentPathwayFinder = lazy(() => import('@/pages/student/PathwayFinder'));
 
@@ -224,6 +227,7 @@ const AdminCareer = lazy(() => import('@/pages/admin/CareerManagement'));
 const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
 const AdminCoupons = lazy(() => import('@/pages/admin/Coupons'));
 const AdminProjectAnalytics = lazy(() => import('@/pages/admin/ProjectAnalytics'));
+const InstructorHubReview = lazy(() => import('@/pages/instructor/HubReview'));
 const AdminBoardOversight = lazy(() => import('@/pages/admin/BoardOversight'));
 const AdminPrograms = lazy(() => import('@/pages/admin/Programs'));
 
@@ -306,6 +310,7 @@ function App() {
         </ErrorBoundary>
       ) : (
       <Routes>
+        <Route path="/badges/:code" element={<SuspenseWrapper><BadgeVerify /></SuspenseWrapper>} />
         <Route path="/u/:username" element={<ErrorBoundary><SuspenseWrapper><PublicProfile /></SuspenseWrapper></ErrorBoundary>} />
         <Route path="/u/:username/:projectSlug" element={<ErrorBoundary><SuspenseWrapper><PublicProfile /></SuspenseWrapper></ErrorBoundary>} />
         <Route element={<ErrorBoundary><MainLayout /></ErrorBoundary>}>
@@ -389,6 +394,8 @@ function App() {
           <Route path="guided" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
           <Route path="lab" element={<SuspenseWrapper><StudentLab /></SuspenseWrapper>} />
           <Route path="setup" element={<SuspenseWrapper><StudentSetup /></SuspenseWrapper>} />
+          <Route path="hub" element={<SuspenseWrapper><StudentLearningHub /></SuspenseWrapper>} />
+          <Route path="projects/:projectId/workspace" element={<SuspenseWrapper><StudentProjectWorkspace /></SuspenseWrapper>} />
           <Route path="guided/:slug" element={<SuspenseWrapper><StudentGuidedMode /></SuspenseWrapper>} />
           <Route path="live/:sessionId" element={<SuspenseWrapper><StudentLiveRoom /></SuspenseWrapper>} />
           <Route path="pathway-finder" element={<SuspenseWrapper><StudentPathwayFinder /></SuspenseWrapper>} />
@@ -405,6 +412,7 @@ function App() {
           <Route path="students" element={<SuspenseWrapper><InstructorStudents /></SuspenseWrapper>} />
           <Route path="assignments" element={<SuspenseWrapper><InstructorAssignments /></SuspenseWrapper>} />
           <Route path="submissions" element={<SuspenseWrapper><InstructorSubmissions /></SuspenseWrapper>} />
+          <Route path="hub-review" element={<SuspenseWrapper><InstructorHubReview /></SuspenseWrapper>} />
           <Route path="announcements" element={<SuspenseWrapper><InstructorAnnouncements /></SuspenseWrapper>} />
           <Route path="live-classes" element={<SuspenseWrapper><InstructorLiveClasses /></SuspenseWrapper>} />
           <Route path="messages" element={<SuspenseWrapper><InstructorMessages /></SuspenseWrapper>} />

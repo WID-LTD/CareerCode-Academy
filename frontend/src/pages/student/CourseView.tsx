@@ -242,11 +242,13 @@ export default function CourseView() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('notes');
   useEffect(() => { if (window.location.hash === '#projects') setActiveTab('projects'); }, []);
+  useEffect(() => { if (!course?.id) return; api.get(`/hub/sandbox/${course.id}`).then(({ data }) => setSandbox(data.data)).catch(() => setSandbox(null)); }, [course?.id]);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | ''>('');
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [resources, setResources] = useState<any[]>([]);
   const [aiNotes, setAiNotes] = useState<any>(null);
+  const [sandbox, setSandbox] = useState<any>(null);
   const [resourceView, setResourceView] = useState<'formatted' | 'plain'>('formatted');
   const [lessonQuiz, setLessonQuiz] = useState<any>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
@@ -990,6 +992,7 @@ export default function CourseView() {
                   <div className="flex items-center gap-2">
                     <Target className="w-4 h-4 text-orange-400" />
                     <h3 className="text-white text-sm font-medium">Course Projects</h3>
+                    {sandbox && <a href={sandbox.url} target="_blank" rel="noreferrer" className="ml-2 text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Start in {sandbox.provider}</a>}
                     <Badge variant="warning" size="sm" className="ml-auto">{projects.length} project{projects.length !== 1 ? 's' : ''}</Badge>
                   </div>
                   {projects.length === 0 ? (
@@ -1043,6 +1046,11 @@ export default function CourseView() {
                               </ol>
                             </details>
 
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Link to={`/student/projects/${proj.id}/workspace`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold">
+                                Open workspace <ExternalLink className="w-3.5 h-3.5" />
+                              </Link>
+                            </div>
                             <ProjectSubmitForm project={proj} submission={sub} onSubmitted={() => {
                               api.get(`/course-projects?courseId=${course?.id}`).then(r => setProjects(r.data.data || [])).catch(() => {});
                               api.get(`/progress/detailed?courseId=${course?.id}`).then(r => { if (r.data.data) setDetailed(r.data.data); }).catch(() => {});
