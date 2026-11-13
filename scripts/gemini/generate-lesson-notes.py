@@ -75,6 +75,31 @@ def request(model, video_url, timeout=240):
         return json.load(response)
 
 
+def request_generate(model, video_url, timeout=240):
+    payload = {
+        'contents': [{'parts': [
+            {'file_data': {'mime_type': 'video/*', 'file_uri': video_url}},
+            {'text': PROMPT},
+        ]}],
+        'generationConfig': {'maxOutputTokens': 5000, 'temperature': 0.2},
+    }
+    req = urllib.request.Request(
+        f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={KEY}',
+        data=json.dumps(payload).encode(),
+        headers={'Content-Type': 'application/json'},
+        method='POST',
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return json.load(response)
+
+
+def extract_generate_text(data):
+    candidates = data.get('candidates') or []
+    if not candidates:
+        return ''
+    return ''.join(part.get('text', '') for part in candidates[0].get('content', {}).get('parts', [])).strip()
+
+
 def extract_text(data):
     text = ''
     for step in data.get('steps', []):
@@ -102,34 +127,53 @@ def main():
 
         for model in MODELS:
             for attempt in range(2):
+                # Endpoint 1: Interactions API.
                 try:
                     data = request(model, lesson['video_url'])
-                    if data.get('error'):
-                        message = data['error'].get('message', '')
-                        code = data['error'].get('code', '')
-                        last_error = f"{code}: {message}"
-                        print(f"  {model} error {last_error[:120]}", flush=True)
-                        if code in (400, 403, 404, 'recitation'):
+                    error = data.get('error')
+                    if error:
+                        last_error = f"{error.get('code')}: {error.get('message', '')}"
+                        print(f"  {model} interactions {last_error[:110]}", flush=True)
+                    else:
+                        text = extract_text(data)
+                        if text and 'VIDEO_NOT_ACCESSIBLE' not in text:
+                            result = text
+                            used_model = model
+                            tokens = int(data.get('usage', {}).get('total_tokens', 0) or 0)
                             break
-                        time.sleep(15 if attempt == 0 else 45)
-                        continue
-                    text = extract_text(data)
-                    if text and 'VIDEO_NOT_ACCESSIBLE' not in text:
-                        result = text
-                        used_model = model
-                        tokens = int(data.get('usage', {}).get('total_tokens', 0) or 0)
-                        break
-                    last_error = 'empty or inaccessible'
+                        last_error = 'interactions empty/inaccessible'
                 except urllib.error.HTTPError as error:
-                    last_error = f'HTTP {error.code}'
+                    last_error = f'interactions HTTP {error.code}'
+                    print(f"  {model} {last_error}", flush=True)
+                except Exception as error:
+                    last_error = f'interactions {error}'
+                    print(f"  {model} {last_error[:110]}", flush=True)
+
+                # Endpoint 2: generateContent. It often succeeds when Interactions is 503.
+                try:
+                    data = request_generate(model, lesson['video_url'])
+                    error = data.get('error')
+                    if error:
+                        last_error = f"{error.get('code')}: {error.get('message', '')}"
+                        print(f"  {model} generateContent {last_error[:110]}", flush=True)
+                    else:
+                        text = extract_generate_text(data)
+                        if text and 'VIDEO_NOT_ACCESSIBLE' not in text:
+                            result = text
+                            used_model = model + ':generateContent'
+                            tokens = int((data.get('usageMetadata') or {}).get('totalTokenCount', 0) or 0)
+                            break
+                        last_error = 'generateContent empty/inaccessible'
+                except urllib.error.HTTPError as error:
+                    last_error = f'generateContent HTTP {error.code}'
                     print(f"  {model} {last_error}", flush=True)
                     if error.code in (400, 403, 404):
                         break
-                    time.sleep(20 if attempt == 0 else 60)
                 except Exception as error:
-                    last_error = str(error)
-                    print(f"  {model} {last_error[:120]}", flush=True)
-                    time.sleep(10 if attempt == 0 else 30)
+                    last_error = f'generateContent {error}'
+                    print(f"  {model} {last_error[:110]}", flush=True)
+
+                time.sleep(15 if attempt == 0 else 45)
             if result:
                 break
 
