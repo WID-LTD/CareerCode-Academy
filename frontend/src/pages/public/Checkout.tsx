@@ -8,6 +8,7 @@ import { Loader } from '../../components/ui/Loader';
 import toast from 'react-hot-toast';
 import { CreditCard, Wallet, Lock, ShieldCheck, CheckCircle, ChevronLeft, Zap, Gift, Ticket, Coins, BookOpen, Layers } from 'lucide-react';
 import { optimizeImageUrl } from '@/lib/cloudinary';
+import { formatCurrency } from '@/lib/utils';
 
 const providers = [
   { 
@@ -226,6 +227,102 @@ export default function Checkout() {
     </div>
   );
 
+
+  if (courseId && course && !pathId) {
+    const base = Number(course.price || 0);
+    const total = Math.max(0, base - (appliedDiscount || 0));
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-20 sm:pt-24 pb-12">
+        <div className="max-w-xl mx-auto px-4 sm:px-6">
+          <Link to={`/courses/${course.slug}`} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white mb-5">
+            <ChevronLeft className="w-4 h-4 mr-1" /> Back to course
+          </Link>
+
+          <GlassCard className="p-5 sm:p-7" hover={false}>
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-primary-500/10 grid place-items-center mx-auto mb-3">
+                <Lock className="w-6 h-6 text-primary-500" />
+              </div>
+              <h1 className="text-2xl font-bold">Secure checkout</h1>
+              <p className="text-sm text-gray-500 mt-1">Complete your payment to unlock the course.</p>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-5">
+              <div className="flex items-start gap-3">
+                {course.thumbnail ? (
+                  <img src={optimizeImageUrl(course.thumbnail, 120, 80)} alt="" className="w-16 h-12 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-16 h-12 rounded-lg bg-primary-500/10 grid place-items-center"><BookOpen className="w-5 h-5 text-primary-500" /></div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm line-clamp-2">{course.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Lifetime access · Certificate on completion</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <span className="text-sm text-gray-500">Total</span>
+                <span className="text-xl font-bold">{formatCurrency(total)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 mb-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment method</p>
+              {providers.filter((p) => enabledGateways.includes(p.id)).map((p) => {
+                const Icon = p.icon;
+                const selected = provider === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setProvider(p.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${selected ? 'border-primary-500 bg-primary-500/5 ring-1 ring-primary-500/30' : 'border-gray-200 dark:border-gray-800'}`}
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800 grid place-items-center"><Icon className="w-4 h-4" /></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{p.name}</p>
+                      <p className="text-[11px] text-gray-500">Secure payment</p>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 grid place-items-center ${selected ? 'border-primary-500' : 'border-gray-300 dark:border-gray-700'}`}>
+                      {selected && <div className="w-2.5 h-2.5 rounded-full bg-primary-500" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <details className="mb-5 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+              <summary className="text-xs font-medium text-gray-500 cursor-pointer">Have a discount code?</summary>
+              <div className="flex gap-2 mt-3">
+                <input
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value)}
+                  placeholder="Enter code"
+                  className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none"
+                />
+                <Button size="sm" variant="outline" onClick={handleApplyCode}>Apply</Button>
+              </div>
+              {codeMessage && <p className={`text-xs mt-2 ${codeStatus === 'valid' ? 'text-emerald-500' : 'text-red-500'}`}>{codeMessage}</p>}
+            </details>
+
+            <Button
+              className="w-full py-4 text-base font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+              onClick={handlePay}
+              disabled={processing}
+            >
+              {processing ? <Loader size="sm" className="mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+              {processing ? 'Opening secure payment…' : `Complete payment — ${formatCurrency(total)}`}
+            </Button>
+
+            <div className="flex items-center justify-center gap-3 mt-4 text-[11px] text-gray-500">
+              <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Secure checkout</span>
+              <span className="inline-flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> Instant access</span>
+            </div>
+            <p className="text-center text-[11px] text-gray-400 mt-3">If payment succeeds, you are redirected straight into your course. No extra screens.</p>
+          </GlassCard>
+        </div>
+      </div>
+    );
+  }
 
   if (pathId && !courseId && bundle) {
     const pricing = bundle.pricing || {};

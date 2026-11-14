@@ -113,7 +113,8 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
   return (
     <div
       className={cn(
-        'group relative px-4 hover:bg-gray-800/30 transition-colors',
+        'group relative px-4 hover:bg-gray-800/30 transition-colors flex',
+        isOwn ? 'justify-end' : 'justify-start',
         isGrouped ? 'py-0.5' : 'pt-3 pb-1'
       )}
       onMouseEnter={() => setShowActions(true)}
@@ -176,7 +177,7 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
 
       {/* Avatar (only for non-grouped messages) */}
       {!isGrouped && (
-        <div className="flex items-start gap-3">
+        <div className={cn('flex items-start gap-3 max-w-[85%]', isOwn && 'flex-row-reverse')}>
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm">
             {message.author_avatar ? (
               <img src={message.author_avatar} alt="" className="w-full h-full rounded-full object-cover" />
@@ -216,7 +217,7 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">{message.content}</p>
+              <p className={cn('text-sm whitespace-pre-wrap break-words inline-block rounded-xl px-3 py-2', isOwn ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-gray-200')}>{message.content}</p>
             )}
 
             {/* Attachment */}
@@ -280,7 +281,7 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
 
       {/* Grouped message (only content) */}
       {isGrouped && (
-        <div className="ml-[52px]">
+        <div className={cn(isOwn ? 'mr-[52px]' : 'ml-[52px]')}>
           {isEditing ? (
             <div>
               <textarea
@@ -301,7 +302,7 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
             </div>
           ) : (
             <>
-              <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">{message.content}</p>
+              <p className={cn('text-sm whitespace-pre-wrap break-words inline-block rounded-xl px-3 py-2', isOwn ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-gray-200')}>{message.content}</p>
               {message.attachment_url && (
                 <div className="mt-1">
                   {message.attachment_type?.startsWith('image/') ? (

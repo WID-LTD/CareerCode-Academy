@@ -83,7 +83,7 @@ export default function Exams() {
     setIsLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/instructor/exams');
+      const { data } = await api.get('/exams');
       setExams(data.data || []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load exams');
@@ -109,7 +109,7 @@ export default function Exams() {
   const loadExamDetail = async (examId: string) => {
     setLoadingDetail(true);
     try {
-      const { data } = await api.get(`/instructor/exams/${examId}`);
+      const { data } = await api.get(`/exams/${examId}`);
       setExpandedExam(data.data);
       if (data.data?.questions) {
         setExams(prev => prev.map(e => e.id === examId ? { ...e, questions: data.data.questions, questionCount: data.data.questions.length } : e));
@@ -146,11 +146,11 @@ export default function Exams() {
     try {
       const payload = { ...form, title: form.title.trim() };
       if (editingExam) {
-        const { data } = await api.put(`/instructor/exams/${editingExam.id}`, payload);
+        const { data } = await api.put(`/exams/${editingExam.id}`, payload);
         setExams(prev => prev.map(e => e.id === editingExam.id ? { ...e, ...data.data } : e));
         toast.success('Exam updated');
       } else {
-        const { data } = await api.post('/instructor/exams', payload);
+        const { data } = await api.post('/exams', payload);
         setExams(prev => [data.data, ...prev]);
         toast.success('Exam created');
       }
@@ -165,7 +165,7 @@ export default function Exams() {
   const handleDelete = async (exam: Exam) => {
     if (!window.confirm(`Delete "${exam.title}"? This action cannot be undone.`)) return;
     try {
-      await api.delete(`/instructor/exams/${exam.id}`);
+      await api.delete(`/exams/${exam.id}`);
       setExams(prev => prev.filter(e => e.id !== exam.id));
       toast.success('Exam deleted');
     } catch (err: any) {
@@ -176,7 +176,7 @@ export default function Exams() {
   const toggleStatus = async (exam: Exam) => {
     const newStatus = exam.status === 'published' ? 'draft' : 'published';
     try {
-      await api.put(`/instructor/exams/${exam.id}/status`, { status: newStatus });
+      await api.put(`/exams/${exam.id}`, { status: newStatus });
       setExams(prev => prev.map(e => e.id === exam.id ? { ...e, status: newStatus } : e));
       toast.success(`Exam ${newStatus === 'published' ? 'published' : 'unpublished'}`);
     } catch (err: any) {
@@ -205,7 +205,7 @@ export default function Exams() {
     if (!newQuestion || !expandedExamId) return;
     if (!newQuestion.question.trim()) { toast.error('Question text is required'); return; }
     try {
-      const { data } = await api.post(`/instructor/exams/${expandedExamId}/questions`, {
+      const { data } = await api.post(`/exams/${expandedExamId}/questions`, {
         question: newQuestion.question.trim(),
         type: newQuestion.type,
         options: newQuestion.type !== 'essay' ? newQuestion.options : [],
@@ -226,7 +226,7 @@ export default function Exams() {
   const handleDeleteQuestion = async (questionId: string) => {
     if (!window.confirm('Delete this question?')) return;
     try {
-      await api.delete(`/instructor/exams/${expandedExamId}/questions/${questionId}`);
+      await api.delete(`/exams/${expandedExamId}/questions/${questionId}`);
       setExpandedExam(prev => prev ? { ...prev, questions: prev.questions.filter(q => q.id !== questionId), questionCount: Math.max(0, (prev.questionCount || 0) - 1) } : prev);
       setExams(prev => prev.map(e => e.id === expandedExamId ? { ...e, questions: e.questions.filter(q => q.id !== questionId), questionCount: Math.max(0, (e.questionCount || 0) - 1) } : e));
       toast.success('Question deleted');

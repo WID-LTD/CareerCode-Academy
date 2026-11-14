@@ -102,9 +102,14 @@ api.interceptors.response.use(
         } else {
           throw new Error('Refresh failed');
         }
-      } catch (err) {
-        const { useAuthStore } = await import('@/store/authStore');
-        useAuthStore.getState().logout();
+      } catch (err: any) {
+        // Only a definitive authentication failure should end the session.
+        // Network errors, timeouts and provider outages must not log the
+        // learner out in the middle of their work.
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
+          const { useAuthStore } = await import('@/store/authStore');
+          await useAuthStore.getState().logout();
+        }
       }
     }
     return Promise.reject(error);
