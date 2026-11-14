@@ -38,6 +38,7 @@ export default function CourseDetails() {
   const { wishlistItems, addToWishlist, removeFromWishlist, fetchWishlist } = useWishlistStore();
   const [curriculumOpen, setCurriculumOpen] = useState(true);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = useState(false);
 
@@ -123,6 +124,29 @@ export default function CourseDetails() {
       toast.error(error?.response?.data?.error || 'Enrollment failed');
     } finally {
       setIsEnrolling(false);
+    }
+  };
+
+  const handleStartTrial = async () => {
+    if (!user) {
+      navigate(`/login?redirect=/courses/${slug}`);
+      return;
+    }
+    if (!course) return;
+    if (isEnrolled) {
+      navigate(`/student/courses/${course.slug}`);
+      return;
+    }
+    setIsStartingTrial(true);
+    try {
+      const { data } = await api.post(`/enrollments/${course.id}/trial`);
+      window.dispatchEvent(new Event('trial:updated'));
+      toast.success(data?.data?.alreadyActive ? 'Your free trial is already active' : 'Free trial started — every course is unlocked');
+      navigate(`/student/courses/${course.slug}`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.response?.data?.error || 'Could not start the free trial');
+    } finally {
+      setIsStartingTrial(false);
     }
   };
 
@@ -364,6 +388,12 @@ export default function CourseDetails() {
                     )}
                   </div>
 
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium">
+                    <span className="px-2 py-1 rounded-md bg-sky-500/10 text-sky-300 border border-sky-500/20">Paystack</span>
+                    <span className="px-2 py-1 rounded-md bg-orange-500/10 text-orange-300 border border-orange-500/20">Flutterwave</span>
+                    <span className="px-2 py-1 rounded-md bg-gray-500/10 text-gray-300 border border-gray-500/20">Secure checkout</span>
+                  </div>
+
                   <div className="space-y-2 text-sm text-gray-400">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
@@ -383,16 +413,34 @@ export default function CourseDetails() {
                     </div>
                   </div>
 
+                  {!isEnrolled && !isFree && (
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
+                      <p className="text-sm font-semibold text-emerald-300">Enroll now and enjoy 7 days free</p>
+                      <p className="text-xs text-emerald-200/70 mt-0.5">One trial unlocks every published course.</p>
+                    </div>
+                  )}
+
                   <Button
-                    className="w-full py-4 sm:py-6 text-base sm:text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                    onClick={handleEnroll}
-                    disabled={isEnrolling || checkingEnrollment}
+                    className="w-full py-4 sm:py-6 text-base sm:text-lg font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                    onClick={!isEnrolled && !isFree ? handleStartTrial : handleEnroll}
+                    disabled={isEnrolling || isStartingTrial || checkingEnrollment}
                   >
-                    {isEnrolling || checkingEnrollment ? (
+                    {isEnrolling || isStartingTrial || checkingEnrollment ? (
                       <Loader size="sm" className="mr-2" />
                     ) : null}
-                    {isEnrolled ? 'Go to Course' : isFree ? 'Enroll Free' : 'Enroll Now'}
+                    {isEnrolled ? 'Go to Course' : isFree ? 'Enroll Free' : 'Start 7-day free trial'}
                   </Button>
+
+                  {!isEnrolled && !isFree && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleEnroll}
+                      disabled={isEnrolling || isStartingTrial || checkingEnrollment}
+                    >
+                      Buy this course only — {priceDisplay}
+                    </Button>
+                  )}
 
                   <div className="flex gap-2">
                     <Button
@@ -611,16 +659,23 @@ export default function CourseDetails() {
               <span>{enrollmentCount} enrolled</span>
             </div>
           </div>
-          <Button
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shrink-0"
-            onClick={handleEnroll}
-            disabled={isEnrolling || checkingEnrollment}
-          >
-            {isEnrolling || checkingEnrollment ? (
-              <Loader size="sm" className="mr-1" />
-            ) : null}
-            {isEnrolled ? 'Go to Course' : isFree ? 'Enroll Free' : 'Enroll Now'}
-          </Button>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <Button
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+              onClick={!isEnrolled && !isFree ? handleStartTrial : handleEnroll}
+              disabled={isEnrolling || isStartingTrial || checkingEnrollment}
+            >
+              {isEnrolling || isStartingTrial || checkingEnrollment ? (
+                <Loader size="sm" className="mr-1" />
+              ) : null}
+              {isEnrolled ? 'Go to Course' : isFree ? 'Enroll Free' : 'Start free trial'}
+            </Button>
+            {!isEnrolled && !isFree && (
+              <Button variant="outline" onClick={handleEnroll} disabled={isEnrolling || isStartingTrial || checkingEnrollment}>
+                Buy — {priceDisplay}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

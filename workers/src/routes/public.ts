@@ -23,6 +23,36 @@ pub.get('/stats', async (c) => {
   return c.json({ success: true, data: { students, courses, certificates, alumni } });
 });
 
+// GET /api/v1/public/course-categories — live category counts for navigation
+pub.get('/course-categories', async (c) => {
+  try {
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT category, COUNT(*)::int AS n FROM courses WHERE published = 1 GROUP BY category`
+    );
+    const groups: Record<string, { name: string; slug: string; categories: string[]; count: number }> = {
+      'Web Development': { name: 'Web Development', slug: 'web-development', categories: ['Web Development', 'Backend Development'], count: 0 },
+      'Data Science': { name: 'Data Science', slug: 'data-science', categories: ['Data Science'], count: 0 },
+      'Mobile Development': { name: 'Mobile Development', slug: 'mobile-development', categories: ['Mobile'], count: 0 },
+      'DevOps': { name: 'DevOps', slug: 'devops', categories: ['DevOps'], count: 0 },
+      'Security': { name: 'Security', slug: 'security', categories: ['Security'], count: 0 },
+      'AI & Machine Learning': { name: 'AI & Machine Learning', slug: 'ai-machine-learning', categories: ['AI'], count: 0 },
+      'Design': { name: 'Design', slug: 'design', categories: ['Design'], count: 0 },
+      'Cloud Computing': { name: 'Cloud Computing', slug: 'cloud-computing', categories: ['Cloud Computing'], count: 0 },
+      'Software Engineering': { name: 'Software Engineering', slug: 'software-engineering', categories: ['Software Engineering', 'Computer Science', 'Programming'], count: 0 },
+      'Databases': { name: 'Databases', slug: 'databases', categories: ['Databases'], count: 0 },
+      'Networking': { name: 'Networking', slug: 'networking', categories: ['Networking'], count: 0 },
+    };
+    for (const row of rows) {
+      const group = Object.values(groups).find((g) => g.categories.includes(row.category));
+      if (group) group.count += Number(row.n) || 0;
+    }
+    const data = Object.values(groups).filter((g) => g.count > 0).map((g) => ({ ...g, href: `/courses?categories=${encodeURIComponent(g.categories.join(','))}` }));
+    return c.json({ success: true, data });
+  } catch (e: any) {
+    return c.json({ success: false, message: 'Failed to load categories' }, 500);
+  }
+});
+
 // GET /api/v1/public/currency — platform currency for checkout/pricing
 pub.get('/currency', async (c) => {
   try {

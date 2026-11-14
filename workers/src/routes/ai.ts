@@ -13,8 +13,11 @@ const ai = new Hono<{ Bindings: Env }>();
 
 const TEXT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const WHISPER_MODEL = '@cf/openai/whisper-large-v3-turbo';
-const TTS_MODEL = '@cf/myshell-ai/melotts';
-const TTS_FALLBACK = '@cf/deepgram/aura-1';
+// Aura-2 is context-aware and follows punctuation for pacing/expression. MeloTTS
+// and Aura-1 remain as fallbacks so voice never hard-fails.
+const TTS_MODEL = '@cf/deepgram/aura-2-en';
+const TTS_FALLBACK = '@cf/myshell-ai/melotts';
+const TTS_FALLBACK_2 = '@cf/deepgram/aura-1';
 const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 const VISION_FALLBACK = '@cf/llava-hf/llava-1.5-7b-hf';
 
@@ -48,6 +51,7 @@ Block types:
 
 Rules:
 - Be concise and practical. Prefer short paragraphs and bullet points.
+- Write speech-ready sentences with correct punctuation (full stops, commas, question marks and exclamation marks). GiGo reads replies aloud, so punctuation controls pacing and tone.
 - Never invent course names, prices or certificates. If unsure, say so and suggest browsing Courses.
 - For a quiz request, return a quiz block (not plain text).
 - For code, use fenced blocks with a language tag inside the text block.
@@ -109,6 +113,84 @@ async function checkQuota(env: Env, userId: string, role: string, kind: 'text' |
     throw Object.assign(new Error(`Daily GiGo ${kind} limit reached (${limit}). Try again tomorrow.`), { statusCode: 429 });
   }
   return { used, limit };
+}
+
+// ── Speech preparation ────────────────────────────────────────────────────
+// Aura-2 uses punctuation as a pacing/expression signal. Strip markdown that
+// would otherwise be read aloud, expand symbols that TTS mangles, and make sure
+// every sentence and list line ends with terminal punctuation.
+function normalizeSpeechText(input: string): string {
+  let text = String(input || '')
+    .replace(/```[\s\S]*?```/g, ' Code example. ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^\s*(?:[-*+>]|\d+[.)])\s+/gm, '')
+    .replace(/[*_~]/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\r\n?/g, '\n');
+
+  const expansions: Array<[RegExp, string]> = [
+    [/\be\.g\.\s*/gi, 'for example, '],
+    [/\bi\.e\.\s*/gi, 'that is, '],
+    [/\betc\./gi, 'et cetera.'],
+    [/\bvs\.?\s*/gi, 'versus '],
+    [/\bw\/\s*/gi, 'with '],
+    [/\bAPI\b/g, 'A P I'],
+    [/\bURL\b/g, 'U R L'],
+    [/\bHTML\b/g, 'H T M L'],
+    [/\bCSS\b/g, 'C S S'],
+    [/\bSQL\b/g, 'S Q L'],
+    [/\bJSON\b/g, 'J son'],
+    [/\bJS\b/g, 'JavaScript'],
+    [/\bAI\b/g, 'A I'],
+    [/\bML\b/g, 'machine learning'],
+    [/&/g, ' and '],
+    [/%/g, ' percent '],
+    [/₦\s?/g, ' naira '],
+    [/\+/g, ' plus '],
+  ];
+  for (const [pattern, replacement] of expansions) text = text.replace(pattern, replacement);
+
+  // Newlines and bullets become sentence breaks, so Aura pauses naturally.
+  const sentences = text
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .map((line) => {
+      const cleaned = line.replace(/\s*;\s*/g, ', ').replace(/\s*:\s*/g, ', ');
+      return /[.!?…]$/.test(cleaned) ? cleaned : `${cleaned}.`;
+    });
+
+  return sentences.join(' ').replace(/\s+/g, ' ').trim().slice(0, 3500);
+}
+
+async function audioToBase64(out: any): Promise<string> {
+  if (!out) return '';
+  if (typeof out === 'string') return out;
+  if (out instanceof ReadableStream) {
+    const buf = await new Response(out).arrayBuffer();
+    return bytesToBase64(new Uint8Array(buf));
+  }
+  if (out instanceof ArrayBuffer) return bytesToBase64(new Uint8Array(out));
+  if (ArrayBuffer.isView(out)) return bytesToBase64(new Uint8Array(out.buffer));
+  const direct = out.audio || out.audio_base64 || out.result?.audio || out.result?.audio_base64;
+  if (typeof direct === 'string') return direct;
+  if (direct instanceof ReadableStream) {
+    const buf = await new Response(direct).arrayBuffer();
+    return bytesToBase64(new Uint8Array(buf));
+  }
+  return '';
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 // ── JSON extraction ───────────────────────────────────────────────────────
@@ -560,20 +642,25 @@ ai.post('/tts', async (c) => {
     await checkQuota(c.env, s.userId, s.role, 'tts');
     const body: any = await c.req.json().catch(() => ({}));
     if (!c.env.AI) return fail(c, 503, 'AI is not configured on this deployment');
-    const text = String(body.text || '').replace(/```[\s\S]*?```/g, ' ').replace(/[#*_>`]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000);
+    const text = normalizeSpeechText(String(body.text || ''));
     if (!text) return fail(c, 400, 'text is required');
 
+    const speaker = typeof body.speaker === 'string' && body.speaker.trim() ? body.speaker.trim() : 'luna';
     let out: any = null;
     let used = TTS_MODEL;
     try {
-      out = await c.env.AI.run(TTS_MODEL, { prompt: text, lang: body.lang || 'en' });
+      out = await c.env.AI.run(TTS_MODEL, { text, speaker, encoding: 'mp3' });
     } catch {
-      used = TTS_FALLBACK;
-      out = await c.env.AI.run(TTS_FALLBACK, { text });
+      try {
+        used = TTS_FALLBACK;
+        out = await c.env.AI.run(TTS_FALLBACK, { prompt: text, lang: body.lang || 'en' });
+      } catch {
+        used = TTS_FALLBACK_2;
+        out = await c.env.AI.run(TTS_FALLBACK_2, { text });
+      }
     }
-    const audio = out?.audio || out?.result?.audio || out?.audio_base64;
-    if (!audio) return fail(c, 502, 'Speech synthesis returned no audio');
-    const b64 = String(audio);
+    const b64 = await audioToBase64(out);
+    if (!b64) return fail(c, 502, 'Speech synthesis returned no audio');
     const mime = b64.startsWith('UklGR') ? 'audio/wav' : 'audio/mpeg';
     await bumpUsage(c.env, s.userId, 'tts', 0);
     return c.json({

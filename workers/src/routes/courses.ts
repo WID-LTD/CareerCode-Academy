@@ -42,10 +42,20 @@ courses.get('/', async (c) => {
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50') || 50));
     const offset = (page - 1) * limit;
     const category = c.req.query('category');
+    const categories = String(c.req.query('categories') || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
     const level = c.req.query('level');
     const conds = [`c.published = true`];
     const vals: any[] = [];
-    if (category) {
+    if (categories.length) {
+      const placeholders = categories.map((value) => {
+        vals.push(value);
+        return `$${vals.length}`;
+      });
+      conds.push(`c.category IN (${placeholders.join(', ')})`);
+    } else if (category) {
       conds.push(`c.category = $${vals.length + 1}`);
       vals.push(category);
     }
@@ -68,7 +78,7 @@ courses.get('/', async (c) => {
     );
     const decorated = await Promise.all(rows.map((r) => decorate(c.env, r)));
     const total = await db.query<{ count: string }>(
-      `SELECT COUNT(*) FROM courses c WHERE ${conds.join(' AND ')}`,
+      `SELECT COUNT(*)::int AS count FROM courses c WHERE ${conds.join(' AND ')}`,
       vals
     );
     const totalN = parseInt(total.rows[0]?.count || '0', 10);

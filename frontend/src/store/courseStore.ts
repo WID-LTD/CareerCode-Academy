@@ -90,7 +90,7 @@ interface CourseState {
   error: string | null;
   pagination: PaginationInfo;
   
-  fetchCourses: (filters?: { category?: string; level?: string; page?: number; limit?: number; sort?: string }) => Promise<void>;
+  fetchCourses: (filters?: { category?: string; categories?: string[]; level?: string; page?: number; limit?: number; sort?: string }) => Promise<void>;
   fetchCourseBySlug: (slug: string) => Promise<void>;
   enrollCourse: (courseId: string) => Promise<void>;
   unenrollCourse: (courseId: string) => Promise<void>;
@@ -108,7 +108,9 @@ export const useCourseStore = create<CourseState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const params = new URLSearchParams();
-      if (filters.category && filters.category !== 'All') {
+      if (filters.categories?.length) {
+        params.append('categories', filters.categories.join(','));
+      } else if (filters.category && filters.category !== 'All') {
         params.append('category', filters.category);
       }
       if (filters.level && filters.level !== 'All Levels') {

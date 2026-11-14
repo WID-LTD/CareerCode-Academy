@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { optimizeImageUrl } from '@/lib/cloudinary';
 import {
@@ -65,9 +65,13 @@ const formatDuration = (minutes: number) => {
 };
 
 export default function Courses() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [category, setCategory] = useState('All');
+  const [category, setCategory] = useState(searchParams.get('category') || 'All');
+  const [groupCategories, setGroupCategories] = useState<string[]>(
+    (searchParams.get('categories') || '').split(',').map((value) => value.trim()).filter(Boolean)
+  );
   const [level, setLevel] = useState('All Levels');
   const [sort, setSort] = useState('');
   const [page, setPage] = useState(1);
@@ -82,12 +86,13 @@ export default function Courses() {
   useEffect(() => {
     fetchCourses({
       category,
+      categories: groupCategories,
       level,
       page,
       limit: 12,
       sort: sort || undefined,
     });
-  }, [category, level, page, sort]);
+  }, [category, groupCategories, level, page, sort]);
 
   useEffect(() => {
     if (search !== debouncedSearch) {
@@ -112,6 +117,7 @@ export default function Courses() {
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setCategory(e.target.value);
+    setGroupCategories([]);
     setPage(1);
   };
 
@@ -190,7 +196,7 @@ export default function Courses() {
               icon={<BookOpen className="w-8 h-8" />}
               title="No courses found"
               description={debouncedSearch ? `No courses matching "${debouncedSearch}"` : 'No courses available in this category yet.'}
-              action={{ label: 'Clear filters', onClick: () => { setSearch(''); setDebouncedSearch(''); setCategory('All'); setLevel('All Levels'); setSort(''); } }}
+              action={{ label: 'Clear filters', onClick: () => { setSearch(''); setDebouncedSearch(''); setCategory('All'); setGroupCategories([]); setLevel('All Levels'); setSort(''); } }}
             />
           ) : (
             <>
@@ -213,6 +219,9 @@ export default function Courses() {
                   const style = getCategoryStyles(course.category);
                   const Icon = style.icon;
                   const isFree = Number(course.price) === 0;
+                  const discountPercent = Number(course.promotion?.discount_percent || 0);
+                  const hasDiscount = discountPercent > 0;
+                  const discountedPrice = Number(course.effective_price ?? (Number(course.price) * (1 - discountPercent / 100)));
                   const rating = course.averageRating || course.avg_rating || 0;
                   const studentCount = course.enrollmentCount || course.student_count || 0;
                   const diffLevel = course.level || 'Beginner';
@@ -235,14 +244,19 @@ export default function Courses() {
                                   Quick View
                                 </NeonButton>
                               </div>
+                              <div className="absolute top-2 left-2 flex flex-col gap-1.5">
+                                {hasDiscount ? (
+                                  <Badge variant="danger" size="sm" className="shadow-lg">-{discountPercent}% off</Badge>
+                                ) : (
+                                  <Badge variant="success" size="sm" className="shadow-lg">Free trial</Badge>
+                                )}
+                                {!isFree && (
+                                  <Badge variant="warning" size="sm" className="shadow-lg">7-day trial</Badge>
+                                )}
+                              </div>
                               {isFree && (
                                 <div className="absolute top-2 right-2">
                                   <Badge variant="success" size="sm">Free</Badge>
-                                </div>
-                              )}
-                              {course.promotion && (
-                                <div className="absolute top-2 left-2">
-                                  <Badge variant="danger" size="sm">-{course.promotion.discount_percent}%</Badge>
                                 </div>
                               )}
                             </div>
@@ -293,17 +307,31 @@ export default function Courses() {
                             <div className="mb-3 pt-3 border-t border-gray-100 dark:border-gray-800">
                               {isFree ? (
                                 <span className="text-success-500 font-bold text-lg">Free</span>
-                              ) : course.promotion ? (
+                              ) : hasDiscount ? (
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-lg font-bold text-white">
-                                    {formatCurrency(Number(course.effective_price ?? Number(course.price) * (1 - Number(course.promotion.discount_percent) / 100)))}
-                                  </span>
+                                  <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(discountedPrice)}</span>
                                   <span className="text-sm text-gray-500 line-through">{formatCurrency(Number(course.price))}</span>
-                                  <span className="text-xs text-success-500 font-medium">Save {formatCurrency(Number(course.price) - Number(course.effective_price ?? Number(course.price) * (1 - Number(course.promotion.discount_percent) / 100)))}</span>
+                                  <span className="text-xs text-success-500 font-medium">Save {formatCurrency(Number(course.price) - discountedPrice)}</span>
                                 </div>
                               ) : (
-                                <span className="text-lg font-bold text-white">{formatCurrency(Number(course.price))}</span>
+                                <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(Number(course.price))}</span>
                               )}
+                            </div>
+
+                            {!isFree && (
+                              <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-2.5 mb-2.5">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  Enroll now and enjoy 7 days free
+                                </div>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Trial unlocks every course. Or purchase this course only.</p>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium mb-2">
+                              <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">Paystack</span>
+                              <span className="px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">Flutterwave</span>
+                              <span className="px-1.5 py-0.5 rounded-md bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20">Secure checkout</span>
                             </div>
 
                             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-auto">

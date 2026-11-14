@@ -591,6 +591,7 @@ export default function CourseView() {
               setStartingTrial(true);
               try {
                 await api.post(`/enrollments/${course.id}/trial`);
+                window.dispatchEvent(new Event('trial:updated'));
                 toast.success('Your free trial has started');
                 window.location.reload();
               } catch (e: any) {

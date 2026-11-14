@@ -83,7 +83,7 @@ export default function MyCourses() {
   const [exploreLevel, setExploreLevel] = useState('All Levels');
   const [exploreSearch, setExploreSearch] = useState('');
   const [explorePage, setExplorePage] = useState(1);
-  const [enrollingIds, setEnrollingIds] = useState<string[]>([]);
+
   const { courses, isLoading: coursesLoading, pagination: coursesPagination, fetchCourses } = useCourseStore();
 
   const handleUnenroll = async (e: React.MouseEvent, courseId: string) => {
@@ -100,25 +100,6 @@ export default function MyCourses() {
       toast.error(err?.response?.data?.error || err?.response?.data?.message || 'Failed to un-enroll from course');
     } finally {
       setUnenrollingIds((prev) => prev.filter((id) => id !== courseId));
-    }
-  };
-
-  const handleEnroll = async (courseId: string) => {
-    setEnrollingIds((prev) => [...prev, courseId]);
-    try {
-      await api.post(`/courses/${courseId}/enroll`);
-      toast.success('Successfully enrolled!');
-      fetchEnrollments();
-      setActiveTab('my');
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.response?.data?.error;
-      if (err?.response?.status === 402) {
-        toast.error('Payment required for this course. Please visit course page.');
-      } else {
-        toast.error(msg || 'Failed to enroll');
-      }
-    } finally {
-      setEnrollingIds((prev) => prev.filter((id) => id !== courseId));
     }
   };
 
@@ -387,6 +368,8 @@ export default function MyCourses() {
                     const nextLesson = item.next_lesson_title || item._continueWatching?.lesson_title;
                     const level = (item.level || 'beginner').toLowerCase();
                     const diff = difficultyConfig[level] || difficultyConfig.beginner;
+                    const isTrial = item.access_type === 'trial';
+                    const trialDays = Number(item.trial_days_remaining || 0);
 
                     return (
                       <motion.div
@@ -413,6 +396,11 @@ export default function MyCourses() {
                                 {progress >= 100 && (
                                   <Badge variant="success" size="sm" className="backdrop-blur-md bg-emerald-500 text-white border-0">
                                     Completed
+                                  </Badge>
+                                )}
+                                {isTrial && (
+                                  <Badge variant="warning" size="sm" className="backdrop-blur-md border-0">
+                                    Trial · {trialDays}d left
                                   </Badge>
                                 )}
                               </div>
@@ -577,6 +565,8 @@ export default function MyCourses() {
                   {filteredExplore.map((course: any, i: number) => {
                     const enrolled = enrollments.some((e: any) => e.course_id === course.id);
                     const isFree = Number(course.price) === 0;
+                    const discountPercent = Number(course.promotion?.discount_percent || 0);
+                    const discountedPrice = Number(course.effective_price ?? (Number(course.price) * (1 - discountPercent / 100)));
                     const diff = difficultyConfig[(course.level || 'beginner').toLowerCase()] || difficultyConfig.beginner;
                     const grad = categoryGradients[course.category] || 'from-gray-500 to-slate-500';
                     return (
@@ -593,7 +583,16 @@ export default function MyCourses() {
                               <div className="absolute top-2 left-2">
                                 <Badge variant={diff.variant} size="sm" className="backdrop-blur bg-white/90 dark:bg-gray-900/80 border-0">{diff.label}</Badge>
                               </div>
-                              {isFree && <div className="absolute top-2 right-2"><Badge variant="success" size="sm" className="bg-emerald-500 text-white border-0">Free</Badge></div>}
+                              <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
+                                {isFree ? (
+                                  <Badge variant="success" size="sm" className="bg-emerald-500 text-white border-0">Free</Badge>
+                                ) : discountPercent > 0 ? (
+                                  <Badge variant="danger" size="sm" className="shadow-lg">-{discountPercent}% off</Badge>
+                                ) : (
+                                  <Badge variant="success" size="sm" className="bg-emerald-500 text-white border-0 shadow-lg">Free trial</Badge>
+                                )}
+                                {!isFree && <Badge variant="warning" size="sm" className="shadow-lg">7-day trial</Badge>}
+                              </div>
                               <div className="absolute bottom-2 left-2 right-2">
                                 <h3 className="font-semibold text-white line-clamp-1 text-sm drop-shadow">{course.title}</h3>
                                 <p className="text-white/80 text-xs truncate">{course.instructor_name || course.category}</p>
@@ -602,18 +601,40 @@ export default function MyCourses() {
                           </Link>
                           <div className="p-4 flex flex-col flex-1">
                             <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3 flex-1">{course.description}</p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
                               <Badge variant="default" size="sm">{course.category}</Badge>
-                              <span className="ml-auto font-semibold">{isFree ? <span className="text-emerald-600">Free</span> : formatCurrency(course.price)}</span>
+                              <span className="ml-auto font-semibold">
+                                {isFree ? (
+                                  <span className="text-emerald-600">Free</span>
+                                ) : discountPercent > 0 ? (
+                                  <span className="flex items-center gap-1.5"><span className="text-gray-400 line-through">{formatCurrency(course.price)}</span><span className="text-emerald-600">{formatCurrency(discountedPrice)}</span></span>
+                                ) : (
+                                  formatCurrency(course.price)
+                                )}
+                              </span>
                             </div>
+                            {!isFree && !enrolled && (
+                              <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 mb-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> Enroll now and enjoy 7 days free
+                              </div>
+                            )}
                             {enrolled ? (
                               <Link to={`/student/courses/${course.slug}`}>
                                 <Button size="sm" variant="outline" className="w-full">Go to course</Button>
                               </Link>
                             ) : (
-                              <Button size="sm" className="w-full" loading={enrollingIds.includes(course.id)} onClick={() => handleEnroll(course.id)}>
-                                {enrollingIds.includes(course.id) ? 'Enrolling...' : 'Enroll Now'}
-                              </Button>
+                              <div className="space-y-1.5">
+                                {!isFree && (
+                                  <Link to={`/courses/${course.slug}?trial=1`} className="block">
+                                    <Button size="sm" className="w-full bg-gradient-to-r from-emerald-600 to-teal-600">Start 7-day free trial</Button>
+                                  </Link>
+                                )}
+                                <Link to={`/courses/${course.slug}`} className="block">
+                                  <Button size="sm" variant="outline" className="w-full">
+                                    {isFree ? 'Enroll free' : `Buy this course — ${formatCurrency(discountedPrice)}`}
+                                  </Button>
+                                </Link>
+                              </div>
                             )}
                           </div>
                         </GlassCard>

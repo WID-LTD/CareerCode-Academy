@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { NotificationsBell } from './NotificationsBell';
 import { PageGuideButton } from '@/guides/PageGuideButton';
 import { SearchModal } from './SearchModal';
+import api from '@/lib/axios';
 
 const navLinks = [
   { label: 'Home', path: '/' },
@@ -31,18 +32,18 @@ const megaMenuSchools = [
 ];
 
 const megaMenuCourses = [
-  { name: 'Web Development', count: '24 courses', slug: 'web-development' },
-  { name: 'Data Science', count: '18 courses', slug: 'data-science' },
-  { name: 'Mobile Development', count: '12 courses', slug: 'mobile' },
-  { name: 'DevOps', count: '15 courses', slug: 'devops' },
-  { name: 'Security', count: '10 courses', slug: 'security' },
-  { name: 'AI & Machine Learning', count: '20 courses', slug: 'ai' },
-  { name: 'Design', count: '8 courses', slug: 'design' },
-  { name: 'Cloud Computing', count: '14 courses', slug: 'cloud-computing' },
+  { name: 'Web Development', count: 0, slug: 'web-development', category: 'Web Development' },
+  { name: 'Data Science', count: 0, slug: 'data-science', category: 'Data Science' },
+  { name: 'Mobile Development', count: 0, slug: 'mobile-development', category: 'Mobile' },
+  { name: 'DevOps', count: 0, slug: 'devops', category: 'DevOps' },
+  { name: 'Security', count: 0, slug: 'security', category: 'Security' },
+  { name: 'AI & Machine Learning', count: 0, slug: 'ai-machine-learning', category: 'AI' },
+  { name: 'Design', count: 0, slug: 'design', category: 'Design' },
+  { name: 'Cloud Computing', count: 0, slug: 'cloud-computing', category: 'Cloud Computing' },
 ];
 
 interface MegaMenuProps {
-  items: typeof megaMenuSchools | typeof megaMenuCourses;
+  items: any[];
   basePath: string;
   renderItem: (item: any) => React.ReactNode;
 }
@@ -54,7 +55,7 @@ function MegaMenu({ items, basePath, renderItem }: MegaMenuProps) {
         {items.map((item) => (
           <Link
             key={item.name}
-            to={`${basePath}/${item.slug}`}
+            to={item.href || `${basePath}/${item.slug}`}
             className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors group"
           >
             {renderItem(item)}
@@ -66,6 +67,12 @@ function MegaMenu({ items, basePath, renderItem }: MegaMenuProps) {
 }
 
 export function Navbar() {
+  const [courseCategories, setCourseCategories] = useState<any[]>(megaMenuCourses);
+  useEffect(() => {
+    api.get('/public/course-categories').then(({ data }) => {
+      if (Array.isArray(data.data) && data.data.length) setCourseCategories(data.data);
+    }).catch(() => {});
+  }, []);
   const [isOpen, setIsOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeMega, setActiveMega] = useState<string | null>(null);
@@ -207,14 +214,14 @@ export function Navbar() {
                         )}
                         {link.label === 'Courses' && (
                           <MegaMenu
-                            items={megaMenuCourses}
+                            items={courseCategories}
                             basePath="/courses"
                             renderItem={(item: any) => (
                               <div className="flex items-center gap-2 w-full">
                                 <BookOpen className="w-4 h-4 text-primary-500 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium group-hover:text-primary-500 transition-colors truncate">{item.name}</p>
-                                  <p className="text-xs text-gray-500">{item.count}</p>
+                                  <p className="text-xs text-gray-500">{item.count} {item.count === 1 ? 'course' : 'courses'}</p>
                                 </div>
                                 <GraduationCap className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>

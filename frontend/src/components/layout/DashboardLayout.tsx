@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
+import { TrialStatusBanner } from './TrialStatusBanner';
 import { useStudentStore } from '@/store/studentStore';
 import {
   Menu, Search, MessageSquare, X, Loader2,
@@ -190,6 +191,7 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
           </div>
         </div>
 
+        <TrialStatusBanner />
         <main className="container-page py-4 sm:py-6 lg:py-8" id="main-content">
           <Outlet />
         </main>
