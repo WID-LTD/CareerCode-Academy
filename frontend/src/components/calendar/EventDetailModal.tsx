@@ -133,19 +133,36 @@ export function EventDetailModal({ event, onClose }: Props) {
               </div>
             )}
 
-            {/* Meeting URL */}
-            {event.meeting_url && (
-              <a
-                href={event.meeting_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium text-sm transition-colors"
-              >
-                <Video size={16} />
-                Join {event.meeting_platform || 'Meeting'}
-                <ExternalLink size={14} />
-              </a>
-            )}
+            {/* Meeting URL: only joinable while the meeting is live */}
+            {event.meeting_url && (() => {
+              const now = Date.now();
+              const start = startDate.getTime();
+              const end = endDate.getTime();
+              const isLive = now >= start && now <= end;
+              if (isLive) {
+                return (
+                  <a
+                    href={event.meeting_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium text-sm transition-colors"
+                  >
+                    <Video size={16} />
+                    Join {event.meeting_platform || 'Meeting'}
+                    <ExternalLink size={14} />
+                  </a>
+                );
+              }
+              const when = now < start
+                ? `Opens ${formatDate(startDate)} at ${formatTime(startDate)}`
+                : 'This meeting has ended';
+              return (
+                <div className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-white/5 border border-white/10 text-gray-400 rounded-xl font-medium text-sm">
+                  <Video size={16} />
+                  {when}
+                </div>
+              );
+            })()}
 
             {/* RSVP */}
             <div className="flex gap-2">
@@ -169,16 +186,18 @@ export function EventDetailModal({ event, onClose }: Props) {
               })}
             </div>
 
-            {/* Add to calendar */}
-            <EventActions
-              event={{
-                title: event.title,
-                description: event.description || event.course_title || '',
-                date: event.start_datetime,
-                time: formatTime(startDate),
-                meeting_url: event.meeting_url || undefined,
-              }}
-            />
+            {/* Add to calendar only after the learner selects Going */}
+            {rsvpStatus === 'going' && (
+              <EventActions
+                event={{
+                  title: event.title,
+                  description: event.description || event.course_title || '',
+                  date: event.start_datetime,
+                  time: formatTime(startDate),
+                  meeting_url: event.meeting_url || undefined,
+                }}
+              />
+            )}
           </div>
 
           <div className="p-6 pt-2" />

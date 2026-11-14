@@ -63,6 +63,75 @@ careerGoals.get('/my/goals', async (c) => {
   }
 });
 
+// POST /api/v1/career-goals/:slug/enroll — start a goal/pathway
+careerGoals.post('/:slug/enroll', async (c) => {
+  try {
+    const s = await authenticate(c);
+    const db = getDb(c.env);
+    const goal = (await db.query<any>(
+      `SELECT g.*, lp.id as path_id, lp.slug as path_slug, lp.title as path_title
+       FROM career_goals g
+       LEFT JOIN learning_paths lp ON lp.career_goal_id = g.id
+       WHERE g.slug = $1 LIMIT 1`,
+      [c.req.param('slug')]
+    )).rows[0];
+    if (!goal) return err(c, 404, 'Career goal not found');
+
+    const { rows: courses } = await db.query<any>(
+      `SELECT c.id, c.title, c.slug, c.price
+       FROM career_goal_courses gc JOIN courses c ON gc.course_id = c.id
+       WHERE gc.goal_id = $1 AND c.published = true ORDER BY gc.order_index ASC`,
+      [goal.id]
+    );
+
+    const enrolledCourseIds: string[] = [];
+    const paidCourses: any[] = [];
+
+    for (const course of courses) {
+      const existing = (await db.query<any>(
+        'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 LIMIT 1',
+        [s.userId, course.id]
+      )).rows[0];
+      if (existing) {
+        enrolledCourseIds.push(course.id);
+        continue;
+      }
+      if (Number(course.price) <= 0) {
+        await db.query(
+          `INSERT INTO enrollments (user_id, course_id, status, access_type)
+           VALUES ($1, $2, 'active', 'paid')`,
+          [s.userId, course.id]
+        );
+        enrolledCourseIds.push(course.id);
+      } else {
+        paidCourses.push(course);
+      }
+    }
+
+    if (goal.path_id) {
+      await db.query(
+        `INSERT INTO learning_path_enrollments (user_id, path_id, status)
+         VALUES ($1, $2, 'active')
+         ON CONFLICT (user_id, path_id) DO UPDATE SET status = 'active'`,
+        [s.userId, goal.path_id]
+      );
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        goal_slug: goal.slug,
+        path_slug: goal.path_slug || null,
+        enrolledCourseIds,
+        paidCourses,
+        checkoutUrl: paidCourses.length && goal.path_id ? `/checkout?pathId=${goal.path_id}` : null,
+      },
+    });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to start career goal');
+  }
+});
+
 // GET /api/v1/career-goals/:slug
 careerGoals.get('/:slug', async (c) => {
   try {

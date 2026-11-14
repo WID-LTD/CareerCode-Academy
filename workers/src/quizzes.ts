@@ -35,6 +35,7 @@ export interface QuizAttempt {
   answers: any[];
   score: number;
   passed: boolean;
+  attempt_count?: number;
   attempted_at: string;
 }
 

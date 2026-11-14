@@ -14,6 +14,11 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const EVENT_TYPES = Object.keys(EVENT_TYPE_CONFIG) as CalendarEventType[];
 
+function isMeetingLive(event: CalendarEvent): boolean {
+  const now = Date.now();
+  return new Date(event.start_datetime).getTime() <= now && new Date(event.end_datetime).getTime() >= now;
+}
+
 export default function CalendarPage() {
   const {
     events, selectedEvent, isLoading, view, currentDate, filters,
@@ -419,7 +424,7 @@ function DayView({
                         <p className="text-sm font-medium text-white truncate">{event.title}</p>
                         <p className="text-xs text-gray-500">{timeStr}</p>
                       </div>
-                      {event.meeting_url && (
+                      {event.meeting_url && isMeetingLive(event) && (
                         <a
                           href={event.meeting_url}
                           target="_blank"
@@ -513,7 +518,7 @@ function AgendaView({
                       {event.course_title && <span>• {event.course_title}</span>}
                     </p>
                   </div>
-                  {event.meeting_url && (
+                  {event.meeting_url && isMeetingLive(event) && (
                     <a
                       href={event.meeting_url}
                       target="_blank"

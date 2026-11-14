@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PageSkeleton } from '@/components/student/SkeletonLoader';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useAdminStore } from '@/store/adminStore';
 import api from '@/lib/axios';
 import toast from 'react-hot-toast';
@@ -50,6 +51,7 @@ function exportCSV(users: any[]) {
 }
 
 export default function AdminUsers() {
+  const confirm = useConfirm();
   const {
     users, isLoading, error, fetchUsers,
     suspendUser, reactivateUser, deleteUser, resetUserPassword,
@@ -122,7 +124,13 @@ export default function AdminUsers() {
   };
 
   const revokeAccess = async (course: any) => {
-    if (!confirm(`Revoke access to ${course.title}?`)) return;
+    const ok = await confirm({
+      title: 'Revoke course access?',
+      message: `Remove this learner's access to ${course.title}? Their progress is preserved.`,
+      confirmLabel: 'Revoke access',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await api.delete(`/admin/crm/users/${(userDetail as any)._id}/courses/${course.course_id}/access`);
       toast.success('Access revoked');

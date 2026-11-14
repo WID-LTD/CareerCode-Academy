@@ -46,6 +46,26 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // PROGRAMS
 // ----------------------------------------------------------------------
 // GET /instructor/programs — programs that contain courses owned by the instructor
+// GET /api/v1/instructor/courses — alias for the instructor course list.
+instructor.get('/courses', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const admin = ['admin', 'super_admin'].includes(s.role);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT c.*, u.name as instructor_name,
+              (SELECT COUNT(*)::int FROM lessons l WHERE l.course_id = c.id) as lessons_count,
+              (SELECT COUNT(*)::int FROM enrollments e WHERE e.course_id = c.id) as students_count
+       FROM courses c JOIN users u ON u.id = c.instructor_id
+       ${admin ? '' : 'WHERE c.instructor_id = $1'}
+       ORDER BY c.created_at DESC`,
+      admin ? [] : [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load instructor courses');
+  }
+});
+
 instructor.get('/programs', async (c) => {
   try {
     const s = await requireRole(c, STAFF_ROLES);
@@ -926,6 +946,15 @@ instructor.post('/live-classes', async (c) => {
     const s = await requireRole(c, STAFF_ROLES);
     const body: any = (await c.req.json().catch(() => ({}))) || {};
     const { course_id, title, description, meeting_url, start_time, duration } = body;
+    if (!course_id || !title || !start_time) return fail(c, 400, 'course_id, title and start_time are required');
+
+    const owned = await getDb(c.env).query<any>(
+      'SELECT id FROM courses WHERE id = $1 AND instructor_id = $2 LIMIT 1',
+      [course_id, s.userId]
+    );
+    if (!owned.rows.length && !['admin', 'super_admin'].includes(s.role)) {
+      return fail(c, 403, 'You can only create live classes for your own courses');
+    }
 
     const { rows } = await getDb(c.env).query<any>(
       `INSERT INTO live_classes (course_id, instructor_id, title, description, meeting_url, start_time, duration)

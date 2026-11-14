@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useCommunityStore } from '@/store/communityStore';
 import api from '@/lib/axios';
+import { uploadFile } from '@/lib/upload';
 import type { Community, CommunityMember, CommunityRule } from '@/store/communityStore';
 
 const CATEGORIES = ['General', 'Tech', 'Design', 'Business', 'Other'];
@@ -332,10 +333,14 @@ export default function CommunityManagement() {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       setUploadingImage(true);
-                      try { const fd = new FormData(); fd.append('file', file); const { data } = await api.post('/upload', fd); setForm((f: any) => ({ ...f, image_url: data.data.url })); }
+                      try { const uploaded = await uploadFile(file); setForm((f: any) => ({ ...f, image_url: uploaded.url })); }
+                      catch { /* keep the form usable */ }
                       finally { setUploadingImage(false); }
                     }} />
                   </label>
+                  {form.image_url && (
+                    <img src={form.image_url} alt="Community preview" className="mt-2 h-20 w-20 rounded-xl object-cover border border-white/10" />
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-400 mb-1 block">Category</label>

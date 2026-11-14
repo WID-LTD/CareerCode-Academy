@@ -115,8 +115,23 @@ auth.post('/login', async (c) => {
   if (!user || !(user as any).password) {
     return err(c, 401, 'Invalid email or password');
   }
+  if ((user as any).locked_until && new Date((user as any).locked_until).getTime() > Date.now()) {
+    return err(c, 429, 'Too many failed sign-in attempts. Try again in a few minutes.');
+  }
   const ok = await verifyPassword(c.env, password, (user as any).password);
-  if (!ok) return err(c, 401, 'Invalid email or password');
+  if (!ok) {
+    const attempts = Number((user as any).failed_login_attempts || 0) + 1;
+    const lockedUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null;
+    await getDb(c.env).query(
+      'UPDATE users SET failed_login_attempts = $1, locked_until = $2 WHERE id = $3',
+      [attempts, lockedUntil, (user as any).id]
+    ).catch(() => {});
+    return err(c, 401, 'Invalid email or password');
+  }
+  await getDb(c.env).query(
+    'UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1',
+    [(user as any).id]
+  ).catch(() => {});
   if (!(user as any).is_verified) return err(c, 401, 'Please verify your email address.');
   if ((user as any).is_suspended) return err(c, 403, 'Your account has been suspended. Please contact support.');
 

@@ -6,6 +6,7 @@ import { Loader, PageLoader } from '@/components/ui/Loader';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/axios';
 import { OnboardingProvider } from '@/guides/OnboardingContext';
+import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
@@ -135,6 +136,7 @@ const Board = lazy(() => import('@/pages/public/Board'));
 const StudentDashboard = lazy(() => import('@/pages/student/Dashboard'));
 const Todos = lazy(() => import('@/pages/Todos'));
 const StudentMyCourses = lazy(() => import('@/pages/student/MyCourses'));
+const StudentWishlist = lazy(() => import('@/pages/student/Wishlist'));
 const StudentCourseView = lazy(() => import('@/pages/student/CourseView'));
 const StudentAssignments = lazy(() => import('@/pages/student/Assignments'));
 const StudentCertificate = lazy(() => import('@/pages/student/Certificate'));
@@ -296,6 +298,7 @@ function App() {
 
   return (
     <OnboardingProvider>
+      <ConfirmProvider>
       <AnalyticsTracker />
       <PlatformConfig />
       <NotificationBridge />
@@ -369,6 +372,7 @@ function App() {
           <Route path="dashboard" element={<SuspenseWrapper><StudentDashboard /></SuspenseWrapper>} />
           <Route path="todos" element={<SuspenseWrapper><Todos /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><StudentMyCourses /></SuspenseWrapper>} />
+          <Route path="wishlist" element={<SuspenseWrapper><StudentWishlist /></SuspenseWrapper>} />
           <Route path="courses/:slug" element={<SuspenseWrapper><StudentCourseView /></SuspenseWrapper>} />
           <Route path="learning-paths" element={<SuspenseWrapper><StudentLearningPaths /></SuspenseWrapper>} />
           <Route path="learning-paths/:slug" element={<SuspenseWrapper><StudentLearningPathDetail /></SuspenseWrapper>} />
@@ -478,6 +482,7 @@ function App() {
       </Routes>
       )}
       {!isPortfolioRoute && <OnboardingModal />}
+      </ConfirmProvider>
     </OnboardingProvider>
   );
 }

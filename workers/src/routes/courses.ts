@@ -133,6 +133,28 @@ courses.get('/slug/:slug', async (c) => {
   }
 });
 
+// GET /api/v1/courses/instructor — courses owned by the signed-in instructor
+// Registered before /:id so the literal path is not treated as a course id.
+courses.get('/instructor', async (c) => {
+  try {
+    const s = await requireRole(c, ['instructor', 'admin', 'super_admin']);
+    const db = getDb(c.env);
+    const admin = ['admin', 'super_admin'].includes(s.role);
+    const { rows } = await db.query<any>(
+      `SELECT c.*, u.name as instructor_name,
+              (SELECT COUNT(*)::int FROM lessons l WHERE l.course_id = c.id) as lessons_count,
+              (SELECT COUNT(*)::int FROM enrollments e WHERE e.course_id = c.id) as students_count
+       FROM courses c JOIN users u ON u.id = c.instructor_id
+       ${admin ? '' : 'WHERE c.instructor_id = $1'}
+       ORDER BY c.created_at DESC`,
+      admin ? [] : [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return err(c, e?.statusCode || 500, e?.message || 'Failed to load instructor courses');
+  }
+});
+
 // GET /api/v1/courses/:id
 courses.get('/:id', async (c) => {
   try {

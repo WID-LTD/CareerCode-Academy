@@ -18,6 +18,14 @@ api.interceptors.request.use(
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      // FormData must own the Content-Type so the browser can add the
+      // multipart boundary. A forced application/json header breaks uploads.
+      if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+        if (config.headers && 'Content-Type' in config.headers) {
+          delete (config.headers as any)['Content-Type'];
+        }
+        delete (config.headers as any)['content-type'];
+      }
     } catch (e) {
       // Store might not be ready
     }

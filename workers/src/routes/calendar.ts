@@ -126,7 +126,15 @@ calendar.get('/upcoming', async (c) => {
     const limit = Math.min(50, Math.max(1, parseInt(c.req.query('limit') || '10', 10) || 10));
     const conds = [`ce.start_datetime >= NOW()`, `ce.status IN ('scheduled', 'live')`];
     if (!['admin', 'super_admin'].includes(s.role)) {
-      conds.push(`(ce.visibility = 'public' OR ce.created_by = $1 OR ce.instructor_id = $1)`);
+      // Match the main calendar visibility rules so enrolled learners and
+      // community members see their course/community events in the sidebar.
+      conds.push(`(
+        ce.visibility = 'public'
+        OR ce.created_by = $1
+        OR ce.instructor_id = $1
+        OR (ce.visibility = 'course' AND ce.course_id IN (SELECT course_id FROM enrollments WHERE user_id = $1))
+        OR (ce.visibility = 'community' AND ce.community_id IN (SELECT community_id FROM community_members WHERE user_id = $1))
+      )`);
     }
     const { rows } = await getDb(c.env).query<any>(
       `SELECT ${EVENT_COLS},

@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from './Button';
+import api from '@/lib/axios';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -20,6 +21,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    api.post('/telemetry/error', {
+      message: error.message,
+      stack: `${error.stack || ''}\n${info.componentStack || ''}`,
+      route: window.location.pathname + window.location.search,
+    }).catch(() => {});
   }
 
   render() {

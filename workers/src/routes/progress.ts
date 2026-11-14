@@ -5,6 +5,7 @@ import { fail, requireAuth, statusOf } from '../route-utils';
 import { awardXp, updateStreak } from '../gamification';
 import { celebrateCompletedLearningPaths } from '../learning-path-helpers';
 import { sendPushToUser } from '../push';
+import { issueCertificateIfEligible } from '../certificate-service';
 
 const progress = new Hono<{ Bindings: Env }>();
 
@@ -125,24 +126,10 @@ progress.post('/', async (c) => {
         [s.userId, courseId]
       );
 
-      const certExists = await db.query<any>(
-        'SELECT id FROM certificates WHERE user_id = $1 AND course_id = $2',
-        [s.userId, courseId]
-      );
-      if (certExists.rows.length === 0) {
-        const code = `CERT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        await db.query(
-          'INSERT INTO certificates (user_id, course_id, verification_code) VALUES ($1, $2, $3)',
-          [s.userId, courseId, code]
-        );
-        const courseInfo = await db.query<any>('SELECT title FROM courses WHERE id = $1', [courseId]);
-        const courseTitle = courseInfo.rows[0]?.title || 'Course';
-        await db.query(
-          `INSERT INTO notifications (user_id, title, message, type, link)
-           VALUES ($1, 'Certificate Earned!', $2, 'certificate', $3)`,
-          [s.userId, `Congratulations! You earned a certificate for "${courseTitle}"`, '/student/certificates']
-        );
-        await awardXp(c.env, s.userId, 50, 'course_complete', `Completed course: ${courseTitle}`);
+      const certificate = await issueCertificateIfEligible(c.env, s.userId, courseId);
+      if (certificate.issued) {
+        const courseTitle = certificate.certificate?.course_title || 'your course';
+        await awardXp(c.env, s.userId, 50, 'course_complete', 'Completed course');
         c.executionCtx.waitUntil(sendPushToUser(c.env, s.userId, {
           title: 'Certificate earned',
           body: `You earned a certificate for "${courseTitle}".`,

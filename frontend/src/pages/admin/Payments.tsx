@@ -11,6 +11,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAdminStore } from '@/store/adminStore';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { formatCurrency } from '@/lib/utils';
 
 const COLORS = ['#6366f1', '#7C3AED', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'];
@@ -32,6 +33,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function AdminPayments() {
+  const confirm = useConfirm();
   const { payments, isLoading, error, fetchPayments, refundPayment } = useAdminStore();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -70,7 +72,13 @@ export default function AdminPayments() {
   })();
 
   const handleRefund = async (id: string) => {
-    if (!confirm('Refund this payment? This action cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Refund this payment?',
+      message: 'The provider will be asked to refund the transaction and course access will be revoked. This cannot be undone.',
+      confirmLabel: 'Refund payment',
+      destructive: true,
+    });
+    if (!ok) return;
     await refundPayment(id);
   };
 

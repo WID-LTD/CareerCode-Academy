@@ -76,6 +76,22 @@ export default function Certificate() {
     navigator.clipboard.writeText(url).then(() => toast.success('Verification link copied!'));
   };
 
+  const downloadCertificate = async (cert: any) => {
+    try {
+      const { data } = await api.get(`/certificates/${cert.id}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `certificate-${cert.verification_code || cert.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Could not download the certificate');
+    }
+  };
+
   if (loading) return <PageSkeleton />;
 
   return (
@@ -114,7 +130,7 @@ export default function Certificate() {
               Valid Certificate
             </div>
             <p className="text-gray-500 text-sm mt-1">
-              {verifyResult.user?.name} completed &ldquo;{verifyResult.course?.title}&rdquo; on {formatDate(verifyResult.issued_at)}
+              {verifyResult.user?.name || verifyResult.user_name} completed &ldquo;{verifyResult.course?.title || verifyResult.course_title}&rdquo; on {formatDate(verifyResult.issued_at)}
             </p>
           </div>
         )}
@@ -134,7 +150,8 @@ export default function Certificate() {
         <div className="grid md:grid-cols-2 gap-6">
           {certificates.map((item: any, i: number) => {
             const cert = item.certificate || item;
-            const course = item.course || {};
+            const course = item.course || { title: item.course_title, category: item.category };
+            const learnerName = item.user?.name || item.user_name || 'Student';
             const isNewCert = isNew(cert.issued_at);
             return (
               <motion.div
@@ -160,7 +177,7 @@ export default function Certificate() {
                     <h3 className="text-lg sm:text-xl font-bold mb-1">Certificate of Completion</h3>
                     <p className="text-gray-500 text-sm mb-4">This certifies that</p>
                     <p className="text-xl sm:text-2xl font-bold gradient-text mb-2 break-words">
-                      {item.user?.name || 'Student'}
+                      {learnerName}
                     </p>
                     <p className="text-gray-500 text-sm mb-4">has successfully completed</p>
                     <p className="text-lg sm:text-xl font-semibold mb-6 break-words">{course.title || 'Course'}</p>
@@ -187,7 +204,7 @@ export default function Certificate() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(`/api/v1/certificates/${cert.id}/download`, '_blank')}
+                        onClick={() => downloadCertificate(cert)}
                       >
                         <Download className="w-4 h-4 mr-1" /> PDF
                       </Button>

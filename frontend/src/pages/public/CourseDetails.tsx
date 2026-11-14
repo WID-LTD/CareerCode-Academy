@@ -397,7 +397,7 @@ export default function CourseDetails() {
                   <div className="space-y-2 text-sm text-gray-400">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      <span>Duration: {course.duration || 'Self-paced'}</span>
+                      <span>Duration: {course.duration ? `${course.duration} hours` : 'Self-paced'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <BarChart className="w-4 h-4" />

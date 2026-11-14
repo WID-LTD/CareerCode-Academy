@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, Sun, Moon, User, LogOut, ChevronDown, BookOpen, Code2, Search,
-  Shield, Globe, Database, Palette, Briefcase, GraduationCap, Star, Zap,
+  Shield, Globe, Database, Palette, Briefcase, GraduationCap, Star, Zap, Heart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { NotificationsBell } from './NotificationsBell';
 import { PageGuideButton } from '@/guides/PageGuideButton';
 import { SearchModal } from './SearchModal';
+import { BugReportButton } from '@/components/support/BugReportButton';
 import api from '@/lib/axios';
 
 const navLinks = [
@@ -249,6 +250,7 @@ export function Navbar() {
               </button>
 
               <PageGuideButton className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors hidden lg:flex" />
+              <BugReportButton className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors hidden lg:flex" />
 
 
               {isAuthenticated && (
@@ -299,6 +301,17 @@ export function Navbar() {
                           <User className="w-4 h-4 flex-shrink-0" />
                           Profile
                         </Link>
+                        {(!user?.role || user.role === 'student') && (
+                          <Link
+                            to="/student/wishlist"
+                            role="menuitem"
+                            onClick={() => setShowDropdown(false)}
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <Heart className="w-4 h-4 flex-shrink-0" />
+                            Wishlist
+                          </Link>
+                        )}
                         <hr className="my-1 border-gray-200 dark:border-gray-700" />
                         <button
                           role="menuitem"

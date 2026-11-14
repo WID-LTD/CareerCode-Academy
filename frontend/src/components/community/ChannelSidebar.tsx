@@ -4,6 +4,7 @@ import { Hash, Volume2, Megaphone, ChevronDown, ChevronRight, Plus, Users, Setti
 import { useCommunityStore, CommunityChannel, CommunityCategory } from '@/store/communityStore';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/axios';
+import { uploadFile } from '@/lib/upload';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 
@@ -50,10 +51,8 @@ export function ChannelSidebar({ onToggleMembers, showMembers, onBack }: { onTog
   const uploadCommunityImage = async (file: File) => {
     setUploadingCommunityImage(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const { data } = await api.post('/upload', fd);
-      setCommunityForm((f) => ({ ...f, image_url: data.data.url }));
+      const uploaded = await uploadFile(file);
+      setCommunityForm((f) => ({ ...f, image_url: uploaded.url }));
       toast.success('Image uploaded — save to apply');
     } catch { toast.error('Upload failed'); }
     finally { setUploadingCommunityImage(false); }

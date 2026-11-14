@@ -59,6 +59,8 @@ import blogRoutes from './routes/blogs';
 import aiRoutes from './routes/ai';
 import pushRoutes from './routes/push';
 import todoRoutes from './routes/todos';
+import contactRoutes from './routes/contact';
+import telemetryRoutes from './routes/telemetry';
 import { runScheduled } from './cron';
 
 export { AuthDO };
@@ -160,6 +162,16 @@ app.use('*', async (c, next) => {
   })(c, next);
 });
 
+// ── Security headers ──────────────────────────────────────
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'SAMEORIGIN');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(self)');
+  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+});
+
 // ── Health ────────────────────────────────────────────────
 app.get('/health', (c) =>
   c.json({
@@ -247,6 +259,8 @@ app.route('/api/v1/blogs', blogRoutes);
 app.route('/api/v1/ai', aiRoutes);
 app.route('/api/v1/push', pushRoutes);
 app.route('/api/v1/todos', todoRoutes);
+app.route('/api/v1/contact', contactRoutes);
+app.route('/api/v1/telemetry', telemetryRoutes);
 
 // ── No legacy fallback ────────────────────────────────────────────────────
 // Every route group is now served natively from D1. An unmatched /api/v1 path

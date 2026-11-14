@@ -693,7 +693,7 @@ export default function CourseView() {
                   {course.category && <Badge variant="primary" size="sm">{course.category}</Badge>}
                   {course.level && <Badge variant="default" size="sm" className="capitalize">{course.level}</Badge>}
                   {course.instructor_name && <Badge variant="default" size="sm">{course.instructor_name}</Badge>}
-                  {course.duration && <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Clock className="w-3.5 h-3.5" /> {course.duration} mins</span>}
+                  {course.duration && <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Clock className="w-3.5 h-3.5" /> {course.duration} hours</span>}
                 </div>
               </div>
               <div className="space-y-3">

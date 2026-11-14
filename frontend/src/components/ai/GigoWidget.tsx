@@ -6,6 +6,7 @@ import {
   Send, X, Minimize2, GripVertical, CheckCircle2, XCircle, Mic, MicOff,
   Volume2, VolumeX, Plus, History, Loader2, Sparkles, ListChecks,
   BookOpen, Briefcase, MessageSquare, RotateCcw, Square, ImagePlus, Monitor, Lock,
+  FileText, Video, Paperclip,
 } from 'lucide-react';
 import api from '@/lib/axios';
 import { cn } from '@/lib/utils';
@@ -255,11 +256,25 @@ function PaywallCard({ block }: { block: Extract<Block, { type: 'paywall' }> }) 
   );
 }
 
-function Blocks({ msg, onFollowup, onAddPlan }: { msg: Msg; onFollowup: (text: string) => void; onAddPlan: (items: string[]) => void }) {
+function safeMarkdown(value: string): string {
+  const text = String(value || '').trim();
+  if (!text.startsWith('{') || !/"blocks"\s*:/.test(text)) return text;
+  try {
+    const parsed = JSON.parse(text);
+    const markdown = Array.isArray(parsed?.blocks)
+      ? parsed.blocks.filter((b: any) => b?.type === 'text').map((b: any) => String(b.markdown || '')).join('\n\n')
+      : '';
+    return markdown || 'GiGo returned a response in an unreadable format. Please ask again.';
+  } catch {
+    return 'GiGo returned a response in an unreadable format. Please ask again.';
+  }
+}
+
+function Blocks({ msg, onAddPlan }: { msg: Msg; onAddPlan: (items: string[]) => void }) {
   return (
     <div className="space-y-2">
       {(msg.blocks && msg.blocks.length ? msg.blocks : [{ type: 'text', markdown: msg.content } as Block]).map((b, i) => {
-        if (b.type === 'text') return <Markdown key={i} text={b.markdown} />;
+        if (b.type === 'text') return <Markdown key={i} text={safeMarkdown(b.markdown)} />;
         if (b.type === 'quiz') return <QuizCard key={i} block={b} />;
         if (b.type === 'flashcards') return <Flashcards key={i} cards={b.cards} />;
         if (b.type === 'plan') return <PlanCard key={i} block={b} onAdd={onAddPlan} />;
@@ -267,15 +282,23 @@ function Blocks({ msg, onFollowup, onAddPlan }: { msg: Msg; onFollowup: (text: s
         if (b.type === 'paywall') return <PaywallCard key={i} block={b} />;
         return null;
       })}
-      {!!msg.followups?.length && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {msg.followups.map((f) => (
-            <button key={f} onClick={() => onFollowup(f)} className="text-[11px] px-2 py-1 rounded-full border border-gray-200 dark:border-gray-800 hover:border-indigo-400 hover:text-indigo-500">
-              {f}
-            </button>
-          ))}
-        </div>
-      )}
+    </div>
+  );
+}
+
+function FollowupChips({ items, onPick }: { items: string[]; onPick: (text: string) => void }) {
+  if (!items.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {items.map((f) => (
+        <button
+          key={f}
+          onClick={() => onPick(f)}
+          className="text-[11px] px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-white/80 dark:bg-gray-950/60 text-indigo-600 dark:text-indigo-300 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
+        >
+          {f}
+        </button>
+      ))}
     </div>
   );
 }
@@ -298,6 +321,7 @@ export function GigoWidget() {
   const [recording, setRecording] = useState(false);
   const [screenRecording, setScreenRecording] = useState(false);
   const [attaching, setAttaching] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try { return localStorage.getItem(STORAGE_TTS) !== 'false'; } catch { return true; }
   });
@@ -410,31 +434,34 @@ export function GigoWidget() {
     return () => window.removeEventListener('gigo:open', openGigo as EventListener);
   }, [send]);
 
-  const sendVision = useCallback(async (file: Blob, label: string) => {
+  const sendAttachment = useCallback(async (file: Blob, label: string) => {
     setLoading(true);
     stopAudio();
     setAttaching(true);
     try {
+      const name = (file as File).name || `gigo-${Date.now()}.${file.type.startsWith('video/') ? 'webm' : file.type.startsWith('image/') ? 'jpg' : 'bin'}`;
       const fd = new FormData();
-      fd.append('image', file, `gigo-${Date.now()}.jpg`);
+      fd.append('file', file, name);
       fd.append('prompt', label);
       fd.append('messages', JSON.stringify(messages.map((m) => ({ role: m.role, content: messageText(m) }))));
       fd.append('context', JSON.stringify(context));
       if (conversationId) fd.append('conversationId', conversationId);
-      const { data } = await api.post('/ai/vision', fd);
+      const { data } = await api.post('/ai/analyze', fd);
       const d = data.data;
       setConversationId(d.conversationId || conversationId);
+      const icon = file.type.startsWith('video/') ? '🎥' : file.type.startsWith('image/') ? '📷' : '📎';
       setMessages((m) => [
         ...m,
-        { role: 'user', content: `📷 ${label}` },
+        { role: 'user', content: `${icon} ${label}` },
         { role: 'assistant', content: d.reply || '', blocks: d.blocks, followups: d.followups },
       ]);
       if (ttsEnabled && d.reply) void speak(d.reply);
     } catch (e: any) {
+      const message = e?.response?.data?.message || 'I could not analyse that file. Please try a smaller or clearer file.';
       setMessages((m) => [...m, {
         role: 'assistant',
-        content: e?.response?.data?.message || 'I could not analyse that image. Please try a clearer screenshot.',
-        blocks: [{ type: 'text', markdown: e?.response?.data?.message || 'I could not analyse that image. Please try a clearer screenshot.' }],
+        content: message,
+        blocks: [{ type: 'text', markdown: message }],
       }]);
     } finally {
       setLoading(false);
@@ -463,10 +490,8 @@ export function GigoWidget() {
         setScreenRecording(false);
         const blob = new Blob(screenChunksRef.current, { type: recorder.mimeType || 'video/webm' });
         if (!blob.size) return;
-        const frames = await extractFrames(blob, 2);
-        for (let i = 0; i < frames.length; i++) {
-          await sendVision(frames[i], `This is frame ${i + 1} of ${frames.length} from my screen recording. Tell me what is wrong and the exact next steps.`);
-        }
+        const file = new File([blob], `screen-recording-${Date.now()}.webm`, { type: 'video/webm' });
+        await sendAttachment(file, 'Analyse this screen recording. Tell me what is wrong, quote any errors, and give me the exact next steps.');
       };
       recorder.start(1000);
       screenRecRef.current = recorder;
@@ -474,7 +499,7 @@ export function GigoWidget() {
     } catch {
       setScreenRecording(false);
     }
-  }, [screenRecording, sendVision]);
+  }, [screenRecording, sendAttachment]);
 
   const sendVoice = useCallback(async (blob: Blob, mime: string) => {
     setLoading(true);
@@ -719,18 +744,23 @@ export function GigoWidget() {
                     {messages.map((m, i) => (
                       <div key={i} className={cn('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                         {m.role === 'assistant' && <GigoAvatar state={i === messages.length - 1 ? gigoState : 'idle'} size={28} className="mt-1 flex-shrink-0" />}
-                        <div className={cn(
-                          'max-w-[86%] rounded-2xl px-3 py-2 text-sm',
-                          m.role === 'user'
-                            ? 'bg-indigo-500 text-white rounded-tr-sm'
-                            : 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 rounded-tl-sm'
-                        )}>
-                          {m.role === 'user' ? <p className="whitespace-pre-wrap">{m.content}</p> : <Blocks msg={m} onFollowup={(t) => send(t)} onAddPlan={addPlanToTodo} />}
-                          {m.role === 'assistant' && messageText(m) && (
-                            <div className="flex items-center gap-1 mt-1.5 opacity-60">
-                              <button onClick={() => speak(messageText(m))} aria-label="Read aloud" title="Read aloud" className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10"><Volume2 className="w-3 h-3" /></button>
-                              <button onClick={() => send('Explain that in a simpler way')} aria-label="Simplify" title="Explain simpler" className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10"><RotateCcw className="w-3 h-3" /></button>
-                            </div>
+                        <div className="min-w-0 max-w-[86%]">
+                          <div className={cn(
+                            'rounded-2xl px-3 py-2 text-sm',
+                            m.role === 'user'
+                              ? 'bg-indigo-500 text-white rounded-tr-sm'
+                              : 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 rounded-tl-sm'
+                          )}>
+                            {m.role === 'user' ? <p className="whitespace-pre-wrap">{m.content}</p> : <Blocks msg={m} onAddPlan={addPlanToTodo} />}
+                            {m.role === 'assistant' && messageText(m) && (
+                              <div className="flex items-center gap-1 mt-1.5 opacity-60">
+                                <button onClick={() => speak(messageText(m))} aria-label="Read aloud" title="Read aloud" className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10"><Volume2 className="w-3 h-3" /></button>
+                                <button onClick={() => send('Explain that in a simpler way')} aria-label="Simplify" title="Explain simpler" className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10"><RotateCcw className="w-3 h-3" /></button>
+                              </div>
+                            )}
+                          </div>
+                          {m.role === 'assistant' && !!m.followups?.length && (
+                            <FollowupChips items={m.followups} onPick={(text) => send(text)} />
                           )}
                         </div>
                       </div>
@@ -768,10 +798,53 @@ export function GigoWidget() {
                   </div>
 
                   <form onSubmit={(e) => { e.preventDefault(); void send(); }} className="p-3 border-t border-gray-100 dark:border-gray-800 flex items-end gap-2">
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void sendVision(f, input.trim() || 'Review this screenshot and tell me what to fix.'); }} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={loading || attaching} aria-label="Attach screenshot" title="Attach a screenshot" className="h-10 w-10 rounded-xl grid place-items-center flex-shrink-0 bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-40">
-                      {attaching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,video/*,.pdf,.doc,.docx,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.py,.css,.html,.sql,.zip"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void sendAttachment(f, input.trim() || 'Review this file and tell me what I should fix or do next.');
+                      }}
+                    />
+                    <div className="relative flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowAttachMenu((v) => !v)}
+                        disabled={loading || attaching}
+                        aria-label="Attach a file"
+                        title="Attach a file"
+                        className="h-10 w-10 rounded-xl grid place-items-center bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-40"
+                      >
+                        {attaching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+                      </button>
+                      {showAttachMenu && (
+                        <div className="absolute bottom-12 left-0 z-30 w-48 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-xl p-1.5">
+                          {[
+                            { icon: ImagePlus, label: 'Image or screenshot', accept: 'image/*' },
+                            { icon: Video, label: 'Video', accept: 'video/*' },
+                            { icon: FileText, label: 'Document, code or ZIP', accept: '.pdf,.doc,.docx,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.py,.css,.html,.sql,.zip' },
+                          ].map((item) => (
+                            <button
+                              key={item.label}
+                              type="button"
+                              onClick={() => {
+                                setShowAttachMenu(false);
+                                if (fileInputRef.current) {
+                                  fileInputRef.current.accept = item.accept;
+                                  fileInputRef.current.click();
+                                }
+                              }}
+                              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <item.icon className="w-4 h-4 text-indigo-500" />
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button type="button" onClick={() => void startScreenRecording()} disabled={loading} aria-label={screenRecording ? 'Stop screen recording' : 'Record screen for GiGo'} title={screenRecording ? 'Stop screen recording' : 'Record screen for GiGo'} className={cn('h-10 w-10 rounded-xl grid place-items-center flex-shrink-0 transition-colors', screenRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-40')}>
                       {screenRecording ? <Square className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
                     </button>

@@ -164,6 +164,15 @@ export default function CareerGoalDetail() {
                 <PlayCircle className="w-4 h-4 mr-2" /> Start This Career Goal
               </Button>
             )}
+            {goal.path_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/checkout?pathId=${goal.path_id}`)}
+              >
+                <Lock className="w-4 h-4 mr-2" /> Buy all courses in this pathway
+              </Button>
+            )}
           </div>
         </div>
       </GlassCard>

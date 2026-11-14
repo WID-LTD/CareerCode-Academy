@@ -387,7 +387,9 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   },
 
   fetchMessages: async (channelId) => {
-    set({ isLoading: true });
+    // Only show the full-page spinner on the first load. Background polling
+    // must not flash a loading state every few seconds.
+    set((state) => ({ isLoading: state.messages.length === 0 }));
     try {
       const { data } = await api.get(`/community/channels/${channelId}/messages?limit=100`);
       set({ messages: data.data || [], isLoading: false });

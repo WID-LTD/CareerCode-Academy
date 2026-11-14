@@ -246,7 +246,7 @@ export default function PathwayFinder() {
                   >
                     {goal.isPursued ? 'Continue' : 'View Pathway'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => navigate(`/career-goals/${goal.slug}`)}>
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/student/career-goals/${goal.slug}`)}>
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </div>

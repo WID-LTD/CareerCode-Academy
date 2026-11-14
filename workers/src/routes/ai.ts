@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { fail, statusOf, requireAuth } from '../route-utils';
 import { getDb } from '../db';
 import { parseBody } from '../uploads';
+import { unzipSync, strFromU8 } from 'fflate';
 
 // GiGo — CareerCode's AI study assistant.
 // Text: Workers AI Llama 3.3. Speech-to-text: Whisper. Text-to-speech: MeloTTS
@@ -193,6 +194,117 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+// ── Multimodal analysis ───────────────────────────────────────────────────
+const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+const TEXT_EXTENSIONS = /\.(txt|md|markdown|csv|json|js|jsx|ts|tsx|py|rb|php|java|go|rs|c|cpp|h|hpp|css|scss|html|htm|sql|xml|yml|yaml|toml|sh|env|ini|conf|log)$/i;
+
+function decodeText(bytes: Uint8Array): string {
+  try { return new TextDecoder('utf-8').decode(bytes); } catch { return ''; }
+}
+
+function stripXml(value: string): string {
+  return value
+    .replace(/<w:p[^>]*>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function extractArchiveText(bytes: Uint8Array, file: File): string {
+  const zip = unzipSync(bytes);
+  const entries = Object.entries(zip);
+  if (/\.docx$/i.test(file.name)) {
+    const doc = zip['word/document.xml'];
+    if (!doc) throw new Error('This Word document has no readable body');
+    return stripXml(strFromU8(doc));
+  }
+  const parts: string[] = [];
+  for (const [name, data] of entries) {
+    if (parts.length >= 40) break;
+    if (data.length > 250_000) continue;
+    if (TEXT_EXTENSIONS.test(name) || /(^|\/)(README|LICENSE|Dockerfile|Makefile|package\.json|tsconfig\.json)$/i.test(name)) {
+      const text = decodeText(data);
+      if (text.trim()) parts.push(`--- ${name} ---\n${text.slice(0, 20_000)}`);
+    }
+  }
+  if (!parts.length) throw new Error('No readable text files were found in this archive');
+  return parts.join('\n\n');
+}
+
+async function uploadGeminiFile(env: Env, file: File, bytes: Uint8Array): Promise<any> {
+  const key = env.GEMINI_API_KEY;
+  if (!key) throw Object.assign(new Error('Video and document analysis is not configured'), { statusCode: 503 });
+  const mime = file.type || 'application/octet-stream';
+  const start = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': String(bytes.length),
+      'X-Goog-Upload-Header-Content-Type': mime,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ file: { display_name: file.name || 'gigo-upload' } }),
+  });
+  const uploadUrl = start.headers.get('x-goog-upload-url');
+  if (!start.ok || !uploadUrl) throw new Error('Could not start the file upload');
+  const upload = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Offset': '0',
+      'X-Goog-Upload-Command': 'upload, finalize',
+      'Content-Type': mime,
+    },
+    body: bytes,
+  });
+  const uploaded: any = await upload.json().catch(() => ({}));
+  if (!upload.ok || !uploaded?.file?.name) throw new Error(uploaded?.error?.message || 'Could not upload the file');
+  let info = uploaded.file;
+  for (let i = 0; i < 30 && info.state !== 'ACTIVE'; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const check = await fetch(`https://generativelanguage.googleapis.com/v1beta/${info.name}?key=${encodeURIComponent(key)}`);
+    const json: any = await check.json().catch(() => ({}));
+    info = json?.file || info;
+  }
+  if (info.state && info.state !== 'ACTIVE') throw new Error('The file is still processing. Try again in a moment.');
+  return info;
+}
+
+async function geminiAnalyze(env: Env, file: File, bytes: Uint8Array, prompt: string): Promise<string> {
+  const key = env.GEMINI_API_KEY;
+  if (!key) throw Object.assign(new Error('Video and document analysis is not configured'), { statusCode: 503 });
+  const info = await uploadGeminiFile(env, file, bytes);
+  let lastError = '';
+  for (const model of GEMINI_MODELS) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { file_data: { mime_type: file.type || info.mimeType || 'application/octet-stream', file_uri: info.uri } },
+              { text: prompt },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 2200, temperature: 0.2 },
+        }),
+      });
+      const json: any = await res.json().catch(() => ({}));
+      if (!res.ok) { lastError = json?.error?.message || `Gemini HTTP ${res.status}`; continue; }
+      const text = (json?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('').trim();
+      if (text) return text;
+      lastError = 'Gemini returned no analysis';
+    } catch (e: any) {
+      lastError = e?.message || 'Gemini request failed';
+    }
+  }
+  throw new Error(lastError || 'Could not analyse that file');
+}
+
 // ── JSON extraction ───────────────────────────────────────────────────────
 function stripFences(raw: string): string {
   return raw
@@ -301,6 +413,17 @@ function normalizeBlocks(obj: any): AiBlock[] {
   return out;
 }
 
+function repairJsonCandidate(value: string): string {
+  const first = value.indexOf('{');
+  const last = value.lastIndexOf('}');
+  let text = first >= 0 && last > first ? value.slice(first, last + 1) : value;
+  // Remove trailing commas before closing braces/brackets.
+  text = text.replace(/,\s*([}\]])/g, '$1');
+  // Normalise common smart quotes that models emit inside JSON.
+  text = text.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  return text.trim();
+}
+
 export function parseAssistantReply(raw: string): ParsedReply {
   const text = String(raw || '').trim();
   const candidates = [
@@ -308,8 +431,9 @@ export function parseAssistantReply(raw: string): ParsedReply {
     ...balancedObjects(text),
     stripFences(text),
   ];
+  const repaired = [...candidates, ...candidates.map(repairJsonCandidate)];
 
-  for (const candidate of candidates) {
+  for (const candidate of repaired) {
     try {
       const obj = JSON.parse(candidate);
       const blocks = normalizeBlocks(obj);
@@ -322,6 +446,29 @@ export function parseAssistantReply(raw: string): ParsedReply {
     } catch {
       /* try next candidate */
     }
+  }
+
+  // Last resort: never show raw JSON to the learner. Pull readable markdown
+  // fields out of a malformed blocks payload when possible.
+  if (/"blocks"\s*:/.test(text)) {
+    const markdown = Array.from(text.matchAll(/"markdown"\s*:\s*"((?:\\.|[^"\\])*)"/g))
+      .map((m) => {
+        try { return JSON.parse(`"${m[1]}"`); } catch { return m[1]; }
+      })
+      .filter(Boolean)
+      .join('\n\n');
+    if (markdown.trim()) {
+      return {
+        blocks: [{ type: 'text', markdown: markdown.trim() }],
+        followups: [],
+        plain: markdown.trim(),
+      };
+    }
+    return {
+      blocks: [{ type: 'text', markdown: 'GiGo returned a response in an unreadable format. Please ask again.' }],
+      followups: [],
+      plain: 'GiGo returned a response in an unreadable format. Please ask again.',
+    };
   }
 
   return {
@@ -631,6 +778,87 @@ My question: ${question}` },
     return c.json({ success: true, data: { ...data, vision: analysis, visionModel: usedModel } });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'GiGo could not analyse that image');
+  }
+});
+
+// POST /ai/analyze — images, video, PDF, Word, text/code, ZIP, screen recordings.
+ai.post('/analyze', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    if (!(await flag(c.env, 'ai_enabled'))) return fail(c, 503, 'GiGo is currently disabled');
+    await checkQuota(c.env, s.userId, s.role, 'text');
+
+    const { fields, file } = await parseBody(c as any);
+    if (!file) return fail(c, 400, 'Choose a file to upload');
+
+    const question = String(fields.prompt || fields.question || 'Review this file and tell me what I should do next.').slice(0, 1500);
+    let context: any = undefined;
+    if (fields.context) { try { context = JSON.parse(String(fields.context)); } catch { /* ignore */ } }
+    const contextHint = context?.courseSlug
+      ? ` The learner is working in course "${context.courseSlug}" on page ${context.page || 'unknown'}.`
+      : '';
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const mime = String(file.type || '').toLowerCase();
+    const name = String(file.name || '');
+    const isImage = mime.startsWith('image/');
+    const isVideo = mime.startsWith('video/');
+    const isPdf = mime === 'application/pdf' || /\.pdf$/i.test(name);
+    const isDocx = /\.docx$/i.test(name) || mime.includes('wordprocessingml');
+    const isZip = /\.zip$/i.test(name) || mime === 'application/zip' || mime === 'application/x-zip-compressed';
+    const isText = mime.startsWith('text/') || TEXT_EXTENSIONS.test(name) || ['application/json', 'application/javascript', 'application/xml'].includes(mime);
+
+    if (isImage && bytes.length > 8 * 1024 * 1024) return fail(c, 413, 'Image is too large (max 8MB)');
+    if (isVideo && bytes.length > 100 * 1024 * 1024) return fail(c, 413, 'Video is too large (max 100MB)');
+    if ((isPdf || isDocx || isZip) && bytes.length > 25 * 1024 * 1024) return fail(c, 413, 'Document is too large (max 25MB)');
+    if (isText && bytes.length > 5 * 1024 * 1024) return fail(c, 413, 'Text file is too large (max 5MB)');
+
+    let analysis = '';
+    let model = 'local-text';
+
+    if (isImage) {
+      const visionPrompt = `You are GiGo's visual analysis engine for CareerCode Academy. Analyse this image carefully.${contextHint}
+Read every visible error message exactly. Identify the file, line, terminal command, browser panel or UI element involved.
+Never invent a secret, package or error that is not visible. Return a concise but specific analysis with: (1) what is on screen, (2) the likely problem, (3) the exact next steps. Learner question: ${question}`;
+      const image = Array.from(bytes);
+      let vision: any = null;
+      model = VISION_MODEL;
+      try {
+        vision = await c.env.AI!.run(VISION_MODEL as any, { image, prompt: visionPrompt, max_tokens: 700 } as any);
+      } catch {
+        model = VISION_FALLBACK;
+        vision = await c.env.AI!.run(VISION_FALLBACK as any, { image, prompt: visionPrompt, max_tokens: 700 } as any);
+      }
+      analysis = String(vision?.response || vision?.description || vision?.result?.response || '').trim();
+      if (!analysis) return fail(c, 502, 'GiGo could not read that image. Try a clearer screenshot.');
+    } else if (isVideo || isPdf) {
+      const mediaPrompt = `You are GiGo, a patient technical tutor for CareerCode Academy.${contextHint}
+Analyse the attached ${isVideo ? 'video, including its audio and visuals' : 'document'} and answer the learner's question.
+If it is a video, include timestamps for important moments, quote errors exactly, and explain what to do next.
+If it is a document, summarise the key points and identify anything the learner must fix.
+Learner question: ${question}`;
+      analysis = await geminiAnalyze(c.env, file, bytes, mediaPrompt);
+      model = 'gemini';
+    } else if (isDocx || isZip) {
+      analysis = extractArchiveText(bytes, file);
+      model = 'archive';
+    } else if (isText) {
+      analysis = decodeText(bytes).slice(0, 30_000);
+      model = 'text';
+    } else {
+      return fail(c, 415, 'That file type is not supported. Use an image, video, PDF, Word document, text/code file, or ZIP archive.');
+    }
+
+    if (!analysis.trim()) return fail(c, 422, 'That file did not contain readable content');
+
+    const prior = Array.isArray(fields.messages) ? (() => { try { return JSON.parse(String(fields.messages)); } catch { return []; } })() : [];
+    const messages = [
+      ...(Array.isArray(prior) ? prior.slice(-8) : []),
+      { role: 'user', content: `I uploaded ${name || 'a file'}. Analysis of the file:\n${analysis}\n\nMy question: ${question}` },
+    ];
+    const data = await runChat(c.env, s, { messages, context, conversationId: fields.conversationId });
+    return c.json({ success: true, data: { ...data, analysis, analysisModel: model } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'GiGo could not analyse that file');
   }
 });
 

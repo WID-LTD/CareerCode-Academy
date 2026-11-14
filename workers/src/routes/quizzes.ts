@@ -208,10 +208,12 @@ quizzes.post('/:id/submit', async (c) => {
     const quiz = await getQuizById(db, quizId);
     if (!quiz) return fail(c, 404, 'Quiz not found');
 
-    // Already attempted and only one attempt allowed.
+    // Enforce the quiz attempt limit. Attempt history is stored as a counter on
+    // the attempt row so the existing unique(quiz_id,user_id) constraint stays
+    // intact while max_attempts is still respected.
     const existing = await getAttempt(db, quizId, s.userId);
-    if (existing && quiz.max_attempts <= 1) {
-      return fail(c, 400, 'Quiz already attempted');
+    if (existing && Number(existing.attempt_count || 1) >= Number(quiz.max_attempts || 1)) {
+      return fail(c, 400, `Quiz attempt limit reached (${quiz.max_attempts})`);
     }
 
     const questions = await getQuestionsByQuiz(db, quizId);
@@ -243,7 +245,9 @@ quizzes.post('/:id/submit', async (c) => {
     let attempt: any;
     if (existing) {
       const { rows } = await db.query<any>(
-        `UPDATE quiz_attempts SET answers = $1, score = $2, passed = $3, attempted_at = NOW()
+        `UPDATE quiz_attempts
+         SET answers = $1, score = $2, passed = $3, attempted_at = NOW(),
+             attempt_count = COALESCE(attempt_count, 1) + 1
          WHERE id = $4 RETURNING *`,
         [JSON.stringify(answers || []), finalScore, passed, existing.id]
       );

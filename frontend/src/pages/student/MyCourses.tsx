@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { BookOpen, Clock, PlayCircle, Search, Layers, Sparkles, GraduationCap, TrendingUp, Award, ArrowRight, Filter } from 'lucide-react';
 import { optimizeImageUrl } from '@/lib/cloudinary';
 import { formatCurrency } from '@/lib/utils';
@@ -64,6 +65,7 @@ const difficultyConfig: Record<string, { label: string; variant: 'success' | 'wa
 
 export default function MyCourses() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'my' | 'explore'>('my');
 
   // My Learning state
@@ -89,7 +91,13 @@ export default function MyCourses() {
   const handleUnenroll = async (e: React.MouseEvent, courseId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm('Are you sure you want to un-enroll from this course? This will delete all your progress.')) return;
+    const confirmed = await confirm({
+      title: 'Leave this course?',
+      message: 'This will remove your access to the course. Your progress is kept and will return if you re-enroll.',
+      confirmLabel: 'Leave course',
+      destructive: true,
+    });
+    if (!confirmed) return;
     setUnenrollingIds((prev) => [...prev, courseId]);
     try {
       await api.delete(`/courses/${courseId}/enroll`);

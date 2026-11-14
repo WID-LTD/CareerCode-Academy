@@ -14,6 +14,7 @@ import { useStudentStore } from '@/store/studentStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSocket } from '@/hooks/useSocket';
 import { HeroSection } from '@/components/student/HeroSection';
+import { GiGoCoachCard } from '@/components/student/GiGoCoachCard';
 import CareerGoalWidget from '@/components/student/CareerGoalWidget';
 import { StatsCards } from '@/components/student/StatsCards';
 import { TodoWidget } from '@/components/todos/TodoWidget';
@@ -183,6 +184,7 @@ export default function StudentDashboard() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       <SEO title="Dashboard" />
       <HeroSection />
+      <GiGoCoachCard />
 
       {/* Stats Cards */}
       <StatsCards stats={stats} />

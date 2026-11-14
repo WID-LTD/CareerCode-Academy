@@ -8,6 +8,7 @@ import { sendPushToUser } from '../push';
 import * as M from '../admin/models';
 import * as A from '../admin/analytics';
 import { syncLearningPathForCourse } from '../admin/learning-path-sync';
+import { refundPayment } from '../payment-refunds';
 import messageRoutes from '../admin/messages';
 import {
   logAudit,
@@ -1649,13 +1650,17 @@ admin.post('/payments/:id/refund', async (c) => {
   try {
     const session = c.get('session');
     const id = c.req.param('id');
-    const { rows } = await getDb(c.env).query<any>(
-      `UPDATE payments SET status = 'refunded' WHERE id = $1 RETURNING *`,
-      [id]
-    );
-    if (!rows[0]) return fail(c, 404, 'Payment not found');
-    await logAudit(c.env, { adminId: session.userId, action: 'refund', resourceType: 'payment', resourceId: id, ...AUDIT_META(c) });
-    return c.json({ success: true, data: rows[0] });
+    const body = await jsonBody(c).catch(() => ({} as any));
+    const result = await refundPayment(c.env, id, body.reason || body.note);
+    await logAudit(c.env, {
+      adminId: session.userId,
+      action: 'refund',
+      resourceType: 'payment',
+      resourceId: id,
+      details: `providerRefunded=${result.providerRefunded}; enrollmentRevoked=${result.enrollmentRevoked}; ${result.providerMessage}`,
+      ...AUDIT_META(c),
+    });
+    return c.json({ success: true, data: result });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to refund payment');
   }

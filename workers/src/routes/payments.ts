@@ -84,6 +84,19 @@ async function hmacHex(secret: string, body: string, hash: 'SHA-512' | 'SHA-256'
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function safeEqual(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
+
+function safeJson(value: any): any {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(String(value)); } catch { return {}; }
+}
+
 async function enrollIfMissing(env: Env, userId: string, courseId: string): Promise<void> {
   const db = getDb(env);
   const existing = await db.query<any>(
@@ -464,16 +477,24 @@ payments.post('/webhook', async (c) => {
     const paystackSig = c.req.header('x-paystack-signature');
     const flutterwaveSig = c.req.header('verif-hash');
 
+    // A webhook must be authenticated by exactly one provider signature.
+    // Never process an unsigned payload.
+    let provider: 'paystack' | 'flutterwave';
     if (paystackSig) {
       const secret = c.env.PAYSTACK_SECRET_KEY;
-      if (!secret) return fail(c, 401, 'Webhook not configured');
+      if (!secret) return fail(c, 401, 'Paystack webhook is not configured');
       const expected = await hmacHex(secret, raw, 'SHA-512');
-      if (expected !== paystackSig) return fail(c, 401, 'Invalid webhook signature');
+      if (!safeEqual(expected, paystackSig)) return fail(c, 401, 'Invalid Paystack webhook signature');
+      provider = 'paystack';
     } else if (flutterwaveSig) {
-      const secret = c.env.FLUTTERWAVE_SECRET_KEY;
-      if (!secret) return fail(c, 401, 'Webhook not configured');
-      const expected = await hmacHex(secret, raw, 'SHA-256');
-      if (expected !== flutterwaveSig) return fail(c, 401, 'Invalid webhook signature');
+      // Flutterwave sends the static secret hash from the dashboard, not an
+      // HMAC of the body. Compare it directly with the configured hash.
+      const expected = c.env.FLUTTERWAVE_WEBHOOK_HASH;
+      if (!expected) return fail(c, 401, 'Flutterwave webhook hash is not configured');
+      if (!safeEqual(expected, flutterwaveSig)) return fail(c, 401, 'Invalid Flutterwave webhook signature');
+      provider = 'flutterwave';
+    } else {
+      return fail(c, 401, 'Missing webhook signature');
     }
 
     const payload = JSON.parse(raw || '{}');
@@ -486,11 +507,42 @@ payments.post('/webhook', async (c) => {
     const { rows } = await db.query<any>('SELECT * FROM payments WHERE reference = $1', [reference]);
     const payment = rows[0];
     if (!payment) return fail(c, 404, 'Payment not found');
+    if (payment.provider !== provider) return fail(c, 409, 'Webhook provider does not match the payment');
+
+    // Idempotency: a repeated success webhook must not re-enroll or re-receipt.
+    if (payment.status === 'completed') return c.json({ success: true, idempotent: true });
 
     const finalStatus = ['success', 'completed', 'successful'].includes(String(status)) ? 'completed' : 'failed';
-    let priorMeta: any = {};
-    try { priorMeta = JSON.parse(payment.metadata || '{}'); } catch { /* ignore */ }
-    const mergedMeta = JSON.stringify({ ...priorMeta, webhook: raw });
+
+    if (finalStatus === 'completed') {
+      const paidAmount = Number(data.amount ?? data.amount_paid ?? data.charged_amount);
+      const paidCurrency = String(data.currency || payment.currency || '').toUpperCase();
+      const expectedAmount = Number(payment.amount);
+      const expectedCurrency = String(payment.currency || 'NGN').toUpperCase();
+
+      // Paystack sends the smallest currency unit (kobo for NGN).
+      const amountMatches = provider === 'paystack'
+        ? Math.abs(Math.round(paidAmount) - Math.round(expectedAmount * 100)) <= 1
+        : Math.abs(paidAmount - expectedAmount) <= 0.01;
+
+      if (!Number.isFinite(paidAmount) || !amountMatches) {
+        await db.query(
+          `UPDATE payments SET status = 'failed', metadata = $1 WHERE reference = $2`,
+          [JSON.stringify({ ...safeJson(payment.metadata), webhook: raw, reason: 'amount_mismatch', paidAmount, expectedAmount }), reference]
+        );
+        return fail(c, 409, 'Webhook amount does not match the payment');
+      }
+      if (paidCurrency && paidCurrency !== expectedCurrency) {
+        await db.query(
+          `UPDATE payments SET status = 'failed', metadata = $1 WHERE reference = $2`,
+          [JSON.stringify({ ...safeJson(payment.metadata), webhook: raw, reason: 'currency_mismatch', paidCurrency, expectedCurrency }), reference]
+        );
+        return fail(c, 409, 'Webhook currency does not match the payment');
+      }
+    }
+
+    const priorMeta = safeJson(payment.metadata);
+    const mergedMeta = JSON.stringify({ ...priorMeta, webhook: raw, webhookProvider: provider });
     await db.query(
       'UPDATE payments SET status = $1, metadata = $2 WHERE reference = $3',
       [finalStatus, mergedMeta, reference]
@@ -501,19 +553,19 @@ payments.post('/webhook', async (c) => {
       if (payment.coupon_id) await markCouponUsed(c.env, payment.coupon_id);
       if (payment.course_id) await enrollIfMissing(c.env, payment.user_id, payment.course_id);
       else await enrollBundleCourses(c.env, payment);
-      if (payment.status !== 'completed') {
-        let title = 'Course enrollment';
-        if (payment.course_id) {
-          const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [payment.course_id]);
-          title = course.rows[0]?.title || title;
-        } else if (priorMeta.pathTitle) {
-          title = `Learning path: ${priorMeta.pathTitle}`;
-        }
-        c.executionCtx.waitUntil(sendReceipt(c.env, payment, title));
+
+      let title = 'Course enrollment';
+      if (payment.course_id) {
+        const course = await db.query<any>('SELECT title FROM courses WHERE id = $1', [payment.course_id]);
+        title = course.rows[0]?.title || title;
+      } else if (priorMeta.pathTitle) {
+        title = `Learning path: ${priorMeta.pathTitle}`;
       }
+      c.executionCtx.waitUntil(sendReceipt(c.env, payment, title));
     }
     return c.json({ success: true });
-  } catch {
+  } catch (e: any) {
+    console.error(JSON.stringify({ src: 'payment-webhook', error: e?.message }));
     return fail(c, 500, 'Webhook processing failed');
   }
 });
