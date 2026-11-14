@@ -2335,6 +2335,63 @@ admin.get('/health', async (c) => {
   }
 });
 
+// POST /admin/platform-review — ask Claude to review a sanitized platform snapshot.
+admin.post('/platform-review', async (c) => {
+  try {
+    if (!c.env.AI) return fail(c, 503, 'AI is not configured on this deployment');
+    const db = getDb(c.env);
+    const one = async (sql: string, params: any[] = []) => {
+      try { return Number((await db.query<any>(sql, params)).rows[0]?.n) || 0; } catch { return 0; }
+    };
+    const [users, courses, enrollments, payments, pendingPayments, quizzes, notes, missingOutcomes, genericInstructors] = await Promise.all([
+      one(`SELECT COUNT(*)::int AS n FROM users`),
+      one(`SELECT COUNT(*)::int AS n FROM courses WHERE published = 1`),
+      one(`SELECT COUNT(*)::int AS n FROM enrollments`),
+      one(`SELECT COUNT(*)::int AS n FROM payments`),
+      one(`SELECT COUNT(*)::int AS n FROM payments WHERE status = 'pending'`),
+      one(`SELECT COUNT(*)::int AS n FROM quizzes`),
+      one(`SELECT COUNT(*)::int AS n FROM lesson_ai_notes WHERE status = 'ready'`),
+      one(`SELECT COUNT(*)::int AS n FROM courses WHERE published = 1 AND (learning_outcomes IS NULL OR learning_outcomes = '[]' OR learning_outcomes = '')`),
+      one(`SELECT COUNT(*)::int AS n FROM users WHERE name = 'Course Instructor'`),
+    ]);
+    const errors = await db.query<any>('SELECT route, message, created_at FROM client_errors ORDER BY created_at DESC LIMIT 15').catch(() => ({ rows: [] } as any));
+    const bugs = await db.query<any>('SELECT route, message, status, created_at FROM bug_reports ORDER BY created_at DESC LIMIT 15').catch(() => ({ rows: [] } as any));
+    const snapshot = {
+      counts: { users, courses, enrollments, payments, pendingPayments, quizzes, notes, missingOutcomes, genericInstructors },
+      recentClientErrors: errors.rows,
+      recentBugReports: bugs.rows,
+      services: { database: true, r2: !!c.env.R2, ai: !!c.env.AI, email: !!c.env.EMAIL, push: !!c.env.VAPID_PRIVATE_KEY },
+    };
+    const prompt = `You are a principal product engineer reviewing CareerCode Academy, a paid learning platform on Cloudflare. Review this sanitized operational snapshot. Identify the highest-risk product, data, payment, security, accessibility, and user-experience issues. Return a prioritized report with: severity, evidence from the snapshot, why it matters, and a concrete fix. Do not invent facts. Keep it under 900 words.\n\n${JSON.stringify(snapshot, null, 2)}`;
+    let result: any = null;
+    let model = 'anthropic/claude-sonnet-4.6';
+    try {
+      result = await c.env.AI.run(model as any, {
+        max_tokens: 2400,
+        messages: [{ role: 'user', content: prompt }],
+        system: 'You are a senior reviewer for a Nigerian education technology company. Be direct, specific, and practical.',
+      } as any);
+    } catch {
+      model = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+      result = await c.env.AI.run(model as any, {
+        messages: [{ role: 'system', content: 'You are a senior product engineer. Be direct, specific and practical.' }, { role: 'user', content: prompt }],
+        max_tokens: 2200,
+      } as any);
+    }
+    const report = String(
+      result?.response ||
+      result?.result?.response ||
+      result?.choices?.[0]?.message?.content ||
+      result?.content?.[0]?.text ||
+      ''
+    ).trim();
+    if (!report) return fail(c, 502, 'The review model returned no report');
+    return c.json({ success: true, data: { model, report, snapshot, generatedAt: new Date().toISOString() } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Platform review failed');
+  }
+});
+
 admin.get('/ai-usage', async (c) => {
   try {
     const db = getDb(c.env);

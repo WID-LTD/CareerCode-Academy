@@ -22,6 +22,8 @@ export default function AdminSystemHealth() {
   const [actions, setActions] = useState<any>(null);
   const [usage, setUsage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState<any>(null);
+  const [reviewing, setReviewing] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -40,6 +42,19 @@ export default function AdminSystemHealth() {
   };
 
   useEffect(() => { void load(); }, []);
+
+  const runReview = async () => {
+    setReviewing(true);
+    try {
+      const { data } = await api.post('/admin/platform-review');
+      setReview(data.data);
+      toast.success('Platform review ready');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Platform review failed');
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   if (loading) return <PageSkeleton />;
 
@@ -139,6 +154,26 @@ export default function AdminSystemHealth() {
             </tbody>
           </table>
         </div>
+      </GlassCard>
+
+      <GlassCard className="p-4" hover={false}>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 className="text-sm font-semibold flex items-center gap-2"><Brain className="w-4 h-4 text-violet-500" /> Independent platform review</h2>
+            <p className="text-xs text-gray-500 mt-1">Ask Claude to review a sanitized snapshot of platform health, content, payments and recent errors.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={runReview} disabled={reviewing} icon={<RefreshCw className={`w-4 h-4 ${reviewing ? 'animate-spin' : ''}`} />}>
+            {reviewing ? 'Reviewing…' : 'Run review'}
+          </Button>
+        </div>
+        {review?.report ? (
+          <div>
+            <p className="text-[11px] text-gray-400 mb-2">Model: {review.model} · {new Date(review.generatedAt).toLocaleString()}</p>
+            <pre className="whitespace-pre-wrap text-xs leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/60 rounded-xl p-3 max-h-[420px] overflow-y-auto">{review.report}</pre>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">No review has been run yet. This uses the Cloudflare AI binding and is admin-only.</p>
+        )}
       </GlassCard>
     </motion.div>
   );
