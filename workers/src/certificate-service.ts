@@ -62,6 +62,23 @@ export async function certificateEligibility(env: Env, userId: string, courseId:
     }
   }
 
+  // Courses with portfolio projects require at least one verified submission.
+  const projectCount = Number((await db.query<any>(
+    'SELECT COUNT(*)::int AS n FROM course_projects WHERE course_id = $1',
+    [courseId]
+  )).rows[0]?.n) || 0;
+  if (projectCount > 0) {
+    const verified = (await db.query<any>(
+      `SELECT p.id FROM projects p
+       JOIN course_projects cp ON cp.id = p.project_id
+       WHERE p.user_id = $1 AND cp.course_id = $2 AND p.repo_verified = 1 LIMIT 1`,
+      [userId, courseId]
+    )).rows[0];
+    if (!verified) {
+      return { eligible: false, reason: 'Submit and verify at least one course project before a certificate can be issued.', course, enrollment, template, lessons: { total, completed } };
+    }
+  }
+
   return { eligible: true, reason: 'Eligible', course, enrollment, template, lessons: { total, completed } };
 }
 

@@ -4,6 +4,7 @@ import { ingestJobs, jobsAreStale } from './jobs-ingest';
 import { sendMentoringReminders } from './mentoring-reminders';
 import { sendPushToUser } from './push';
 import { sendEmail } from './email';
+import { reconcilePendingPayments } from './routes/payments';
 
 // Cloudflare Cron Triggers:
 //   */15 * * * *  -> mentorship + to-do due reminders
@@ -236,6 +237,13 @@ export async function runScheduled(env: Env, cron: string): Promise<void> {
     await record(env, 'jobs', 'ok', jobsDetail);
   } catch (e: any) {
     await record(env, 'jobs', 'error', e?.message || 'failed');
+  }
+
+  try {
+    const paymentResult = await reconcilePendingPayments(env);
+    await record(env, 'payments', 'ok', `checked=${paymentResult.checked} completed=${paymentResult.completed} failed=${paymentResult.failed}`);
+  } catch (e: any) {
+    await record(env, 'payments', 'error', e?.message || 'payment reconciliation failed');
   }
 
   if (now.getHours() === 7) {

@@ -1681,4 +1681,122 @@ instructor.put('/profile', async (c) => {
   }
 });
 
+// ── Instructor compatibility endpoints ───────────────────────────────────
+// These keep the existing instructor dashboard screens working without
+// duplicating the course ownership checks in each page.
+
+instructor.get('/certificates', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT cert.*, c.title AS course_title, u.name AS student_name, u.email AS student_email
+       FROM certificates cert
+       JOIN courses c ON c.id = cert.course_id
+       JOIN users u ON u.id = cert.user_id
+       WHERE c.instructor_id = $1
+       ORDER BY cert.issued_at DESC LIMIT 500`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load certificates'); }
+});
+
+instructor.post('/certificates/:id/reissue', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT cert.id FROM certificates cert JOIN courses c ON c.id = cert.course_id
+       WHERE cert.id = $1 AND c.instructor_id = $2 LIMIT 1`,
+      [c.req.param('id'), s.userId]
+    );
+    if (!rows.length) return fail(c, 404, 'Certificate not found');
+    return c.json({ success: true, data: rows[0] });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to reissue certificate'); }
+});
+
+instructor.get('/resources', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT r.*, c.title AS course_title, l.title AS lesson_title
+       FROM resources r JOIN courses c ON c.id = r.course_id
+       LEFT JOIN lessons l ON l.id = r.lesson_id
+       WHERE c.instructor_id = $1 ORDER BY r.created_at DESC LIMIT 500`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load resources'); }
+});
+
+instructor.get('/notifications', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load notifications'); }
+});
+
+instructor.put('/notifications/:id/read', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    await getDb(c.env).query('UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2', [c.req.param('id'), s.userId]);
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to mark notification read'); }
+});
+
+instructor.put('/notifications/read-all', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    await getDb(c.env).query('UPDATE notifications SET read = true WHERE user_id = $1 AND read = false', [s.userId]);
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to mark notifications read'); }
+});
+
+instructor.get('/discussions', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const { rows } = await getDb(c.env).query<any>(
+      `SELECT d.*, u.name AS author_name FROM discussions d JOIN users u ON u.id = d.user_id
+       WHERE d.course_id IN (SELECT id FROM courses WHERE instructor_id = $1)
+       ORDER BY d.created_at DESC LIMIT 200`,
+      [s.userId]
+    ).catch(() => ({ rows: [] } as any));
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load discussions'); }
+});
+
+instructor.get('/earnings', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const db = getDb(c.env);
+    const summary = await db.query<any>(
+      `SELECT COALESCE(SUM(amount),0)::float AS gross,
+              COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END),0)::float AS completed
+       FROM instructor_revenue WHERE instructor_id = $1`,
+      [s.userId]
+    );
+    const monthly = await db.query<any>(
+      `SELECT substr(created_at,1,7) AS month, COALESCE(SUM(amount),0)::float AS amount
+       FROM instructor_revenue WHERE instructor_id = $1 AND status = 'completed'
+       GROUP BY month ORDER BY month DESC LIMIT 12`,
+      [s.userId]
+    );
+    return c.json({ success: true, data: { summary: summary.rows[0] || { gross: 0, completed: 0 }, monthly: monthly.rows } });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load earnings'); }
+});
+
+instructor.get('/withdrawals', async (c) => {
+  try {
+    const s = await requireRole(c, STAFF_ROLES);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT * FROM payouts WHERE instructor_id = $1 ORDER BY created_at DESC LIMIT 100',
+      [s.userId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load withdrawals'); }
+});
+
 export default instructor;

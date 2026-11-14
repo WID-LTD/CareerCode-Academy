@@ -1,37 +1,17 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 90000,
-  expect: { timeout: 10000 },
-  fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  workers: 1,
-  reporter: [['list'], ['html', { outputFolder: 'test-report' }]],
+  fullyParallel: true,
+  retries: 1,
+  reporter: [['list']],
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    channel: 'chrome',
-    headless: false,
-    viewport: { width: 1280, height: 720 },
-    actionTimeout: 15000,
-    trace: process.env.CI ? 'on-first-retry' : 'on',
-    video: 'on',
+    baseURL: process.env.E2E_BASE_URL || 'https://careercode.com.ng',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [
-    {
-      name: 'exam-proctoring',
-      testMatch: 'exam-proctoring.spec.ts',
-    },
-    {
-      name: 'guided-mode',
-      testMatch: 'guided-mode.spec.ts',
-      use: { headless: true, video: 'off', trace: 'retain-on-failure' },
-    },
-    {
-      name: 'admin-calendar',
-      testMatch: 'admin-calendar.spec.ts',
-      use: { headless: true, video: 'off', trace: 'retain-on-failure' },
-    },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile', use: { ...devices['iPhone 13'] } },
   ],
 });

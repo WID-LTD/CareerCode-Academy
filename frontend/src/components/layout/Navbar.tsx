@@ -26,8 +26,8 @@ const navLinks = [
 
 const megaMenuSchools = [
   { icon: Code2, name: 'Software Development', desc: 'Web, mobile, and backend', slug: 'software-development', color: 'from-blue-500 to-cyan-500' },
-  { icon: Database, name: 'Data & AI', desc: 'Data science, ML, AI', slug: 'data-ai', color: 'from-purple-500 to-pink-500' },
-  { icon: Palette, name: 'Design & Creative', desc: 'UI/UX and product design', slug: 'design-creative', color: 'from-pink-500 to-rose-500' },
+  { icon: Database, name: 'Data & Artificial Intelligence', desc: 'Data science, machine learning and artificial intelligence', slug: 'data-ai', color: 'from-purple-500 to-pink-500' },
+  { icon: Palette, name: 'Design & Creative', desc: 'Product design and user experience', slug: 'design-creative', color: 'from-pink-500 to-rose-500' },
   { icon: Briefcase, name: 'Business & Digital', desc: 'Product management, analytics', slug: 'business-digital', color: 'from-amber-500 to-orange-500' },
   { icon: GraduationCap, name: 'Career Readiness', desc: 'Resume, interviews, freelancing', slug: 'career-readiness', color: 'from-emerald-500 to-teal-500' },
 ];

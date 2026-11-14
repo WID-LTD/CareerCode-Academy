@@ -20,7 +20,7 @@ function XpBreakdown({ lessonsXp, coursesXp, certsXp }: { lessonsXp: number; cou
       className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 space-y-2 text-xs overflow-hidden"
     >
       <p className="font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
-        <TrendingUp className="w-3 h-3" /> XP Breakdown
+        <TrendingUp className="w-3 h-3" /> Experience points breakdown
       </p>
       <div className="space-y-1">
         {[
@@ -78,11 +78,11 @@ export function AchievementCenter() {
               Level {currentLevel}
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 text-xs tabular-nums">{xpProgress} / {xpToNextLevel} XP</span>
+              <span className="text-gray-500 text-xs tabular-nums">{xpProgress} / {xpToNextLevel} experience points</span>
               <button
                 onClick={() => setShowXpBreakdown(!showXpBreakdown)}
                 className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title="XP breakdown"
+                title="Experience points breakdown"
               >
                 <Info className="w-3.5 h-3.5 text-gray-400" />
               </button>
@@ -98,7 +98,7 @@ export function AchievementCenter() {
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="text-[10px] text-gray-400">{earnedCount} badges earned</span>
-            <span className="text-[10px] text-gray-400 tabular-nums">{xpToNextLevel - xpProgress} XP to next level</span>
+            <span className="text-[10px] text-gray-400 tabular-nums">{xpToNextLevel - xpProgress} experience points to next level</span>
           </div>
         </div>
 

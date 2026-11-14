@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/axios';
 import { OnboardingProvider } from '@/guides/OnboardingContext';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
+import { InAppMessagePopup } from '@/components/notifications/InAppMessagePopup';
 import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
@@ -302,6 +303,7 @@ function App() {
       <AnalyticsTracker />
       <PlatformConfig />
       <NotificationBridge />
+      <InAppMessagePopup />
       <RoleWatcher />
       <PwaBridge />
       {!isPortfolioRoute && <MaintenanceBanner />}

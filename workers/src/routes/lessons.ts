@@ -126,6 +126,66 @@ lessons.get('/:id/ai-notes', async (c) => {
   }
 });
 
+// GET /api/v1/lessons/:id/study-pack — downloadable study pack built from
+// generated notes, the lesson description, and verified course projects.
+lessons.get('/:id/study-pack', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const db = getDb(c.env);
+    const lesson = await courseOfLesson(c.env, c.req.param('id'));
+    if (!lesson) return fail(c, 404, 'Lesson not found');
+    const enrolled = await db.query<any>(
+      'SELECT 1 FROM enrollments WHERE user_id = $1 AND course_id = $2 LIMIT 1',
+      [s.userId, lesson.course_id]
+    );
+    if (!enrolled.rows.length && !['admin', 'super_admin'].includes(s.role)) {
+      return fail(c, 403, 'Enroll in this course to download the study pack');
+    }
+    const course = (await db.query<any>('SELECT title FROM courses WHERE id = $1', [lesson.course_id])).rows[0];
+    const notes = (await db.query<any>(
+      'SELECT notes FROM lesson_ai_notes WHERE lesson_id = $1 AND status = $2 LIMIT 1',
+      [lesson.id, 'ready']
+    )).rows[0]?.notes || '';
+    const projects = await db.query<any>(
+      'SELECT title, description, requirements, steps FROM course_projects WHERE course_id = $1 ORDER BY order_index ASC LIMIT 3',
+      [lesson.course_id]
+    ).catch(() => ({ rows: [] } as any));
+    const resources = await db.query<any>(
+      `SELECT title, file_url FROM resources WHERE lesson_id = $1 OR course_id = $2
+       AND title NOT LIKE '%Transcript%' ORDER BY created_at DESC LIMIT 20`,
+      [lesson.id, lesson.course_id]
+    ).catch(() => ({ rows: [] } as any));
+
+    const parts = [
+      `# ${lesson.title}`,
+      '',
+      `Course: ${course?.title || ''}`,
+      '',
+      '## Lesson summary',
+      lesson.description || 'No summary recorded yet.',
+      '',
+      '## Detailed study notes',
+      notes || 'Detailed notes are still being generated. Use the lesson video and your own notes for now.',
+      '',
+      '## Practice project',
+      ...(projects.rows.length
+        ? projects.rows.map((p: any) => `### ${p.title}\n${p.description || ''}\n${p.requirements ? `\nRequirements: ${p.requirements}` : ''}`)
+        : ['No project attached to this lesson yet.']),
+      '',
+      '## Recommended resources',
+      ...(resources.rows.length
+        ? resources.rows.map((r: any) => `- [${r.title}](${r.file_url})`)
+        : ['Use the lesson notes and course project as your primary resource.']),
+      '',
+      '---',
+      'CareerCode Academy · WID LTD',
+    ];
+    return c.json({ success: true, data: { title: `${lesson.title} — Study Pack`, markdown: parts.join('\n'), lesson } });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to build study pack');
+  }
+});
+
 // POST /api/v1/lessons/:id/notes
 lessons.post('/:id/notes', async (c) => {
   try {

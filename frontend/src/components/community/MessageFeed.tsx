@@ -143,7 +143,7 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
             >
               <Reply className="w-4 h-4" />
             </button>
-            {isOwn && (
+            {isOwn && message.can_edit !== false && (
               <button
                 onClick={() => { setIsEditing(true); setEditContent(message.content); }}
                 className="p-1.5 hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
@@ -263,6 +263,13 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
                   );
                 })}
               </div>
+            )}
+
+            {/* Read receipt for your own messages */}
+            {isOwn && typeof message.read_percent === 'number' && (
+              <p className="text-[10px] text-gray-500 mt-1">
+                {message.read_percent >= 100 ? 'Read by everyone' : `${message.read_percent}% read`}
+              </p>
             )}
 
             {/* Thread indicator */}

@@ -505,6 +505,24 @@ export default function CourseView() {
     try { const c = await api.get(`/challenges/lesson/${lesson.id}`); setChallenges(c.data.data || []); } catch { setChallenges([]); }
   };
 
+  const downloadStudyPack = async () => {
+    if (!currentLesson) return;
+    try {
+      const { data } = await api.get(`/lessons/${currentLesson.id}/study-pack`);
+      const blob = new Blob([data.data.markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentLesson.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-study-pack.md`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Could not build the study pack');
+    }
+  };
+
   const moduleCompletedCount = (moduleLessons: Lesson[]) => moduleLessons.filter(l => lessonProgress[l.id]).length;
 
   const isModuleLocked = (modIdx: number) => {
@@ -970,11 +988,24 @@ export default function CourseView() {
                     </div>
                   )}
 
-                  {resources.length > 0 && (
+                  <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-2 flex-1">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <div>
+                        <p className="text-sm font-medium text-white">Study pack</p>
+                        <p className="text-xs text-gray-400">Notes, lesson summary, project brief and recommended resources in one file.</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={downloadStudyPack}>
+                      <Download className="w-3.5 h-3.5 mr-1" /> Download study pack
+                    </Button>
+                  </div>
+
+                  {resources.filter((r: any) => !/transcript/i.test(String(r.title || ''))).length > 0 && (
                     <div>
-                      <h4 className="text-sm font-medium text-gray-300 mb-2 flex items-center gap-2"><Download className="w-4 h-4" /> Downloadable Resources</h4>
+                      <h4 className="text-sm font-medium text-gray-300 mb-2 flex items-center gap-2"><Download className="w-4 h-4" /> Course resources</h4>
                       <div className="space-y-2">
-                        {resources.map((res: any) => (
+                        {resources.filter((r: any) => !/transcript/i.test(String(r.title || ''))).map((res: any) => (
                           <a key={res.id} href={res.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors">
                             <Download className="w-4 h-4 text-blue-400 shrink-0" />
                             <div className="min-w-0">

@@ -54,7 +54,7 @@ quizzes.get('/lesson/:lessonId', async (c) => {
     const s = await requireAuth(c);
     const db = getDb(c.env);
     const { rows } = await db.query<any>(
-      'SELECT * FROM quizzes WHERE lesson_id = $1 LIMIT 1',
+      'SELECT * FROM quizzes WHERE lesson_id = $1 AND published = 1 ORDER BY created_at DESC LIMIT 1',
       [c.req.param('lessonId')]
     );
     const quiz: any = rows[0] || null;

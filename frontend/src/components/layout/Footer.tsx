@@ -8,7 +8,7 @@ const footerLinks = {
     { label: 'Pricing', path: '/pricing' },
     { label: 'Community', path: '/community' },
     { label: 'Blog', path: '/blog' },
-    { label: 'FAQ', path: '/faq' },
+    { label: 'Common questions', path: '/faq' },
   ],
   Company: [
     { label: 'About', path: '/about' },

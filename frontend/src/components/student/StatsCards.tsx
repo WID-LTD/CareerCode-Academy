@@ -90,7 +90,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
     { icon: Clock, label: 'Learning Hours', value: stats?.totalLearningHours || 0, color: 'text-purple-500', bg: 'bg-purple-500/10', suffix: 'h', delay: 0.2 },
     { icon: Flame, label: 'Current Streak', value: stats?.currentStreak || 0, color: 'text-orange-500', bg: 'bg-orange-500/10', suffix: 'd', delay: 0.25 },
     { icon: Trophy, label: 'Best Streak', value: stats?.bestStreak || 0, color: 'text-amber-400', bg: 'bg-amber-400/10', suffix: 'd', delay: 0.28 },
-    { icon: Zap, label: 'XP Points', value: stats?.xpPoints || 0, color: 'text-yellow-500', bg: 'bg-yellow-500/10', delay: 0.3 },
+    { icon: Zap, label: 'Experience points', value: stats?.xpPoints || 0, color: 'text-yellow-500', bg: 'bg-yellow-500/10', delay: 0.3 },
   ];
 
   return (

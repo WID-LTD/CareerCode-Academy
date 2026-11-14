@@ -609,6 +609,29 @@ payments.post('/validate-discount', async (c) => {
   }
 });
 
+// ── Reconciliation ────────────────────────────────────────────────────────
+// Called by the hourly cron. Pending checkouts older than 30 minutes are
+// re-checked with the provider so a missed webhook never leaves a paid learner
+// without access.
+export async function reconcilePendingPayments(env: Env): Promise<{ checked: number; completed: number; failed: number }> {
+  const db = getDb(env);
+  const { rows } = await db.query<any>(
+    `SELECT reference FROM payments
+     WHERE status = 'pending' AND created_at < NOW() - INTERVAL '30 minutes'
+     ORDER BY created_at ASC LIMIT 40`
+  );
+  let completed = 0;
+  let failed = 0;
+  for (const row of rows) {
+    try {
+      const updated = await verifyPaymentByReference(env, row.reference);
+      if (updated?.status === 'completed') completed++;
+      else if (updated?.status === 'failed') failed++;
+    } catch { /* provider may be down; retry next hour */ }
+  }
+  return { checked: rows.length, completed, failed };
+}
+
 // GET /api/v1/payments/:reference/receipt
 payments.get('/:reference/receipt', async (c) => {
   try {

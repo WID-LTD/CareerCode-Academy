@@ -10,6 +10,31 @@ import api from '@/lib/axios';
 import type { Community } from '@/store/communityStore';
 
 const CATEGORIES = ['General', 'Tech', 'Design', 'Business', 'Other'];
+const CHANNEL_TEMPLATES: Record<string, Array<{ name: string; slug: string; description: string; type: string }>> = {
+  study: [
+    { name: 'General', slug: 'general', description: 'Introductions and everyday discussion.', type: 'text' },
+    { name: 'Announcements', slug: 'announcements', description: 'Important updates from the team.', type: 'announcement' },
+    { name: 'Questions', slug: 'questions', description: 'Ask anything and help each other.', type: 'text' },
+    { name: 'Projects', slug: 'projects', description: 'Share work in progress and get feedback.', type: 'project_showcase' },
+    { name: 'Resources', slug: 'resources', description: 'Useful links, notes and references.', type: 'text' },
+  ],
+  cohort: [
+    { name: 'General', slug: 'general', description: 'Cohort-wide discussion.', type: 'text' },
+    { name: 'Announcements', slug: 'announcements', description: 'Schedule and cohort updates.', type: 'announcement' },
+    { name: 'Weekly Check-in', slug: 'weekly-check-in', description: 'Share your weekly progress.', type: 'text' },
+    { name: 'Projects', slug: 'projects', description: 'Cohort project showcase.', type: 'project_showcase' },
+  ],
+  project: [
+    { name: 'General', slug: 'general', description: 'Project team discussion.', type: 'text' },
+    { name: 'Standups', slug: 'standups', description: 'Daily or weekly standup notes.', type: 'text' },
+    { name: 'Blockers', slug: 'blockers', description: 'Raise blockers early.', type: 'text' },
+    { name: 'Showcase', slug: 'showcase', description: 'Share completed work.', type: 'project_showcase' },
+  ],
+  general: [
+    { name: 'General', slug: 'general', description: 'General discussion for this community.', type: 'text' },
+    { name: 'Announcements', slug: 'announcements', description: 'Community announcements.', type: 'announcement' },
+  ],
+};
 const VISIBILITY_ICONS: Record<string, any> = { public: Globe, private: Lock, restricted: EyeOff };
 
 export default function InstructorCommunities() {
@@ -18,7 +43,7 @@ export default function InstructorCommunities() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingCommunity, setEditingCommunity] = useState<Community | null>(null);
-  const [form, setForm] = useState({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open' });
+  const [form, setForm] = useState({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study' });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [requestsFor, setRequestsFor] = useState<Community | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
@@ -53,9 +78,9 @@ export default function InstructorCommunities() {
         if ((editingCommunity as any).created_by !== user?.id && user?.role !== 'admin' && user?.role !== 'super_admin') return;
         await updateCommunity(editingCommunity.id, { name: form.name, slug: form.slug, description: form.description || null, image_url: form.image_url || null, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
       } else {
-        await createCommunity({ name: form.name, slug: form.slug, description: form.description || undefined, image_url: form.image_url || undefined, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
+        await createCommunity({ name: form.name, slug: form.slug, description: form.description || undefined, image_url: form.image_url || undefined, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any, channels: CHANNEL_TEMPLATES[form.template] || CHANNEL_TEMPLATES.study } as any);
       }
-      setShowForm(false); setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open' });
+      setShowForm(false); setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study' });
     } finally { setSaving(false); }
   };
 
@@ -79,7 +104,7 @@ export default function InstructorCommunities() {
           <h1 className="text-2xl sm:text-3xl font-bold">Communities</h1>
           <p className="text-gray-500 mt-1">Create and manage your communities. You can delete/rename only those you created; admins can manage any.</p>
         </div>
-        <Button onClick={() => { setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open' }); setShowForm(true); }} icon={<Plus className="w-4 h-4" />}>Create Community</Button>
+        <Button onClick={() => { setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study' }); setShowForm(true); }} icon={<Plus className="w-4 h-4" />}>Create Community</Button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -118,6 +143,18 @@ export default function InstructorCommunities() {
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Category</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30">{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Visibility</label><select value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30 capitalize">{['public','private','restricted'].map(v => <option key={v} value={v}>{v}</option>)}</select></div>
                 <div><label className="text-xs font-medium text-gray-400 mb-1 block">Join Policy</label><select value={form.join_policy} onChange={(e) => setForm({ ...form, join_policy: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30 capitalize">{['open','approval','invite_only'].map(p => <option key={p} value={p}>{p.replace('_',' ')}</option>)}</select></div>
+                {!editingCommunity && (
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-gray-400 mb-1 block">Channel setup</label>
+                    <select value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30">
+                      <option value="study">Study group — General, Announcements, Questions, Projects, Resources</option>
+                      <option value="cohort">Cohort — General, Announcements, Weekly Check-in, Projects</option>
+                      <option value="project">Project team — General, Standups, Blockers, Showcase</option>
+                      <option value="general">General — General, Announcements</option>
+                    </select>
+                    <p className="text-[11px] text-gray-500 mt-1">Channels are created automatically. You can rename or add more after creation.</p>
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
@@ -157,7 +194,7 @@ export default function InstructorCommunities() {
                       <span className="flex items-center gap-1 text-xs text-gray-500"><Calendar className="w-3 h-3" /> {new Date(community.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', image_url: community.image_url || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
+                      {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', image_url: community.image_url || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy, template: 'study' }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
                       {canEdit(community as Community) && (
                         <Button variant="ghost" size="sm" onClick={async () => {
                           setInviteFor(community as Community); setInviteLink(''); setInviteCopied(false); setInviteLoading(true);

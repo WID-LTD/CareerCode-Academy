@@ -56,6 +56,10 @@ export interface ChannelMessage {
   author_role?: string;
   reactions?: ReactionGroup[];
   is_pinned?: boolean;
+  member_count?: number;
+  read_count?: number;
+  read_percent?: number;
+  can_edit?: boolean;
 }
 
 export interface ReactionGroup {

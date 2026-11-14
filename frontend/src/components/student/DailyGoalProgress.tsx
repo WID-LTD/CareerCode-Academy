@@ -23,7 +23,7 @@ export function DailyGoalProgress({ xpEarned, goal }: DailyGoalProgressProps) {
             {reached ? 'Goal reached!' : `Daily Goal`}
           </span>
           <span className="text-xs font-bold text-white">
-            {xpEarned}/{goal} XP
+            {xpEarned}/{goal} experience points
           </span>
         </div>
         <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">

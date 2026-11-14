@@ -380,6 +380,22 @@ community.put('/channels/:channelId/messages/:msgId', async (c) => {
       return validationError(c, { content: ['String must contain at least 1 character(s)'] });
     }
 
+    const existing = await Community.getMessageById(c.env, c.req.param('msgId'));
+    if (!existing || existing.author_id !== s.userId) return fail(c, 404, 'Message not found');
+
+    // Once half of the channel has read a message, editing is closed.
+    const stats = await getDb(c.env).query<any>(
+      `SELECT
+         (SELECT COUNT(*)::int FROM channel_members WHERE channel_id = $1) AS total,
+         (SELECT COUNT(*)::int FROM channel_members WHERE channel_id = $1 AND last_read_at >= $2) AS read_count`,
+      [c.req.param('channelId'), existing.created_at]
+    );
+    const total = Number(stats.rows[0]?.total) || 0;
+    const readCount = Number(stats.rows[0]?.read_count) || 0;
+    if (total > 0 && readCount / total >= 0.5) {
+      return fail(c, 409, 'This message can no longer be edited because most of the channel has read it');
+    }
+
     const message = await Community.editMessage(c.env, c.req.param('msgId'), s.userId, input.content);
     if (!message) return fail(c, 404, 'Message not found');
     return c.json({ success: true, data: message });

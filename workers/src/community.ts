@@ -318,7 +318,9 @@ export async function getChannelMessages(
 ): Promise<any[]> {
   let sql = `
     SELECT cm.*,
-      u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role
+      u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role,
+      (SELECT COUNT(*)::int FROM channel_members m WHERE m.channel_id = cm.channel_id) AS member_count,
+      (SELECT COUNT(*)::int FROM channel_members m WHERE m.channel_id = cm.channel_id AND m.last_read_at >= cm.created_at) AS read_count
     FROM channel_messages cm
     JOIN users u ON u.id = cm.author_id
     WHERE cm.channel_id = $1 AND cm.parent_message_id IS NULL
@@ -335,6 +337,12 @@ export async function getChannelMessages(
 
   const { rows } = await getDb(env).query<any>(sql, params);
   await attachReactions(env, rows);
+  for (const row of rows) {
+    const total = Number(row.member_count) || 0;
+    const read = Number(row.read_count) || 0;
+    row.read_percent = total > 0 ? Math.min(100, Math.round((read / total) * 100)) : 0;
+    row.can_edit = row.read_percent < 50;
+  }
   return rows.reverse(); // oldest first for display
 }
 
@@ -711,6 +719,7 @@ export async function createCommunity(env: Env, input: {
   join_policy?: string;
   rules?: string;
   created_by: string;
+  channels?: Array<{ name: string; slug?: string; description?: string; type?: string }>;
 }): Promise<any> {
   const db = getDb(env);
   const { rows } = await db.query<any>(
@@ -745,16 +754,40 @@ export async function createCommunity(env: Env, input: {
     [community.id]
   );
 
-  // Every community starts with a General channel so it is usable immediately.
-  try {
-    await db.query(
-      `INSERT INTO community_channels (name, slug, description, created_by, community_id, is_public, member_count)
-       VALUES ('General', 'general', 'General discussion for this community.', $1, $2, 1, 1)`,
-      [input.created_by, community.id]
-    );
-    await db.query('UPDATE communities SET channel_count = 1 WHERE id = $1', [community.id]);
-    community.channel_count = 1;
-  } catch { /* channel creation is best-effort */ }
+  // Every community starts with General plus any template channels selected
+  // during creation. Channel creation is best-effort and never blocks setup.
+  const requested = Array.isArray(input.channels) && input.channels.length
+    ? input.channels
+    : [{ name: 'General', slug: 'general', description: 'General discussion for this community.', type: 'text' }];
+  const seenSlugs = new Set<string>();
+  let created = 0;
+  for (const channel of requested.slice(0, 12)) {
+    const name = String(channel.name || '').trim().slice(0, 80);
+    if (!name) continue;
+    const slug = String(channel.slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || `channel-${created + 1}`;
+    if (seenSlugs.has(slug)) continue;
+    seenSlugs.add(slug);
+    try {
+      await db.query(
+        `INSERT INTO community_channels (name, slug, description, type, created_by, community_id, is_public, member_count)
+         VALUES ($1, $2, $3, $4, $5, $6, 1, 1)`,
+        [name, slug, String(channel.description || `${name} discussion.`).slice(0, 500), String(channel.type || 'text'), input.created_by, community.id]
+      );
+      created++;
+    } catch { /* skip a duplicate or invalid channel */ }
+  }
+  if (created === 0) {
+    try {
+      await db.query(
+        `INSERT INTO community_channels (name, slug, description, created_by, community_id, is_public, member_count)
+         VALUES ('General', 'general', 'General discussion for this community.', $1, $2, 1, 1)`,
+        [input.created_by, community.id]
+      );
+      created = 1;
+    } catch { /* channel creation is best-effort */ }
+  }
+  await db.query('UPDATE communities SET channel_count = $1 WHERE id = $2', [created, community.id]).catch(() => {});
+  community.channel_count = created;
 
   community.member_count = 1;
   return community;
