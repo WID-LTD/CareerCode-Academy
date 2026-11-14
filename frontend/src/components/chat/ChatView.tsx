@@ -88,7 +88,7 @@ export function ChatView({
   const {
     conversations, messages, activeConversation, isLoading,
     initializeSocket, disconnectSocket, fetchConversations,
-    setActiveConversation, sendMessage, setApiPrefix,
+    setActiveConversation, refreshMessages, sendMessage, setApiPrefix,
     deleteMessage, emitTyping, onlineUsers, typingUsers,
     markAllAsRead,
   } = useChatStore();
@@ -122,6 +122,12 @@ export function ChatView({
     }
     return () => { disconnectSocket(); };
   }, [user, apiPrefix]);
+
+  useEffect(() => {
+    if (!activeConversation) return;
+    const timer = window.setInterval(() => { void refreshMessages(activeConversation); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [activeConversation, refreshMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

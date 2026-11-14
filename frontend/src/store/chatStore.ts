@@ -48,6 +48,7 @@ interface ChatState {
   disconnectSocket: () => void;
   fetchConversations: () => Promise<void>;
   setActiveConversation: (userId: string) => Promise<void>;
+  refreshMessages: (receiverId: string) => Promise<void>;
   sendMessage: (receiverId: string, content: string, attachment?: File) => Promise<void>;
   addMessage: (message: Message) => void;
   deleteMessage: (messageId: string) => Promise<void>;
@@ -139,6 +140,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       console.error(error);
       set({ isLoading: false });
     }
+  },
+
+  refreshMessages: async (receiverId: string) => {
+    try {
+      const prefix = get().apiPrefix;
+      const { data } = await api.get(`${prefix}/messages/${receiverId}`);
+      set({ messages: data.data || [] });
+    } catch { /* silent background refresh */ }
   },
 
   sendMessage: async (receiverId: string, content: string, attachment?: File) => {
