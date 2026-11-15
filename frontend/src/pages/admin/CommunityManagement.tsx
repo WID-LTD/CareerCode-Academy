@@ -167,7 +167,12 @@ export default function CommunityManagement() {
           name: form.name, slug: form.slug, description: form.description || undefined,
           category: form.category, visibility: form.visibility, join_policy: form.join_policy,
           image_url: form.image_url || undefined,
-        });
+          channels: [
+            { name: 'General', slug: 'general', description: 'General discussion.', type: 'text' },
+            { name: 'Announcements', slug: 'announcements', description: 'Important updates.', type: 'announcement' },
+            { name: 'Questions', slug: 'questions', description: 'Ask and help each other.', type: 'text' },
+          ],
+        } as any);
       }
       resetForm();
     } finally { setSaving(false); }
