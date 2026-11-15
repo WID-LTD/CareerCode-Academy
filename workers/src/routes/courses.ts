@@ -105,8 +105,15 @@ async function courseDetail(env: Env, course: any): Promise<any> {
     db.query<{ n: number }>('SELECT COUNT(*)::int AS n FROM enrollments WHERE course_id = $1', [course.id]),
   ]);
   const decorated = await decorate(env, course);
+  let learningOutcomes: string[] = [];
+  try {
+    learningOutcomes = typeof decorated.learning_outcomes === 'string'
+      ? JSON.parse(decorated.learning_outcomes || '[]')
+      : (decorated.learning_outcomes || []);
+  } catch { learningOutcomes = []; }
   return {
     ...decorated,
+    learningOutcomes,
     lessons: lessons.rows,
     reviews: reviews.rows,
     averageRating: rating.rows[0]?.average || 0,

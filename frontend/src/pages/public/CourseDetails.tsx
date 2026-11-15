@@ -243,7 +243,12 @@ export default function CourseDetails() {
   const reviews = course.reviews || [];
   const avgRating = course.averageRating ? Number(course.averageRating).toFixed(1) : '0.0';
   const enrollmentCount = course.enrollmentCount || 0;
-  const learningOutcomes = course.learningOutcomes || [];
+  const learningOutcomes = course.learningOutcomes || (() => {
+    try {
+      const raw = (course as any).learning_outcomes;
+      return typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+    } catch { return []; }
+  })();
   const relatedCourses = courses.filter(c => c.id !== course.id).slice(0, 4);
   const programName = (course as any).program_name;
   const programSlug = (course as any).program_slug;
