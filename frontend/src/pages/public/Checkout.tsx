@@ -182,11 +182,16 @@ export default function Checkout() {
         discountCode: appliedDiscount !== null && codeStatus === 'valid' ? discountCode.trim().toUpperCase() : undefined,
       });
 
-      if (data.data?.course_slug) {
+      // Redirect to the provider first. A course_slug is present on normal
+      // initialization too, so it must not be treated as proof of enrollment.
+      if (data.data?.authorizationUrl) {
+        window.location.href = data.data.authorizationUrl;
+      } else if (data.data?.alreadyEnrolled) {
+        toast.success('You already have access to this course');
+        navigate(`/student/courses/${data.data.course_slug}`);
+      } else if (data.data?.course_slug) {
         toast.success('Enrolled successfully!');
         navigate(`/student/courses/${data.data.course_slug}`);
-      } else if (data.data?.authorizationUrl) {
-        window.location.href = data.data.authorizationUrl;
       } else {
         toast.success('Enrolled successfully!');
         navigate('/student/dashboard');

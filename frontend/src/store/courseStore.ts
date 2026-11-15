@@ -94,7 +94,7 @@ interface CourseState {
   fetchCourseBySlug: (slug: string) => Promise<void>;
   enrollCourse: (courseId: string) => Promise<void>;
   unenrollCourse: (courseId: string) => Promise<void>;
-  initializePayment: (courseId: string, provider?: string) => Promise<string>;
+  initializePayment: (courseId: string, provider?: string) => Promise<any>;
 }
 
 export const useCourseStore = create<CourseState>((set) => ({
@@ -183,7 +183,7 @@ export const useCourseStore = create<CourseState>((set) => ({
         provider,
       });
       set({ isLoading: false });
-      return data.data.authorizationUrl;
+      return data.data;
     } catch (error: any) {
       set({ 
         isLoading: false, 

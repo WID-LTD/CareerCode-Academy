@@ -349,8 +349,8 @@ function App() {
           <Route path="/c/:slug" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
           <Route path="/community/join/:code" element={<SuspenseWrapper><CommunityInvite /></SuspenseWrapper>} />
           <Route path="/community/:id" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
-          <Route path="/login" element={<SuspenseWrapper><Login /></SuspenseWrapper>} />
-          <Route path="/signup" element={<SuspenseWrapper><Signup /></SuspenseWrapper>} />
+          <Route path="/login" element={<GuestRoute><SuspenseWrapper><Login /></SuspenseWrapper></GuestRoute>} />
+          <Route path="/signup" element={<GuestRoute><SuspenseWrapper><Signup /></SuspenseWrapper></GuestRoute>} />
           <Route path="/forgot-password" element={<SuspenseWrapper><ForgotPassword /></SuspenseWrapper>} />
           <Route path="/reset-password/:token" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
           <Route path="/auth/set-password/:token" element={<SuspenseWrapper><SetPassword /></SuspenseWrapper>} />

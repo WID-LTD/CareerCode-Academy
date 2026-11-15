@@ -114,7 +114,10 @@ export default function CourseDetails() {
         navigate(`/student/courses/${course.slug}`);
       } else {
         const result: any = await initializePayment(course.id, 'paystack');
-        if (result?.authorizationUrl) {
+        if (result?.alreadyEnrolled) {
+          toast.success('You already have access to this course');
+          navigate(`/student/courses/${course.slug}`);
+        } else if (result?.authorizationUrl) {
           window.location.href = result.authorizationUrl;
         } else {
           navigate(`/checkout?courseId=${course.id}`);
