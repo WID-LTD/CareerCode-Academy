@@ -5,9 +5,10 @@ import { useAuthStore } from '@/store/authStore';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 import {
   Send, User as UserIcon, Search, Loader2, Trash2, X,
-  PlusCircle, CheckCheck, Reply, Smile, MessageSquare,
+  PlusCircle, CheckCheck, Reply, Smile, MessageSquare, Pencil,
   Users, GraduationCap, Shield, ChevronDown, Check,
   Clock, Filter, Paperclip, Image as ImageIcon, FileText,
 } from 'lucide-react';
@@ -97,6 +98,8 @@ export function ChatView({
   const [search, setSearch] = useState('');
   const [msgSearch, setMsgSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
@@ -125,8 +128,14 @@ export function ChatView({
 
   useEffect(() => {
     if (!activeConversation) return;
-    const timer = window.setInterval(() => { void refreshMessages(activeConversation); }, 5000);
-    return () => window.clearInterval(timer);
+    const apiBase = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
+    let source: EventSource | null = null;
+    try {
+      source = new EventSource(`${apiBase}/messages/stream/${activeConversation}`, { withCredentials: true });
+      source.addEventListener('message', () => { void refreshMessages(activeConversation); });
+    } catch { /* polling fallback below */ }
+    const timer = window.setInterval(() => { void refreshMessages(activeConversation); }, 8000);
+    return () => { source?.close(); window.clearInterval(timer); };
   }, [activeConversation, refreshMessages]);
 
   useEffect(() => {
@@ -222,6 +231,19 @@ export function ChatView({
     setShowEmojiPicker(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  const saveEdit = async (messageId: string) => {
+    if (!editText.trim()) return;
+    try {
+      await api.put(`${apiPrefix}/messages/${messageId}`, { content: editText.trim() });
+      setEditingId(null);
+      setEditText('');
+      if (activeConversation) await refreshMessages(activeConversation);
+    } catch (e: any) {
+      // The edit lock is a feature, not a generic failure.
+      toast.error(e?.response?.data?.message || 'This message can no longer be edited.');
     }
   };
 
@@ -492,7 +514,21 @@ export function ChatView({
                                     )}
                                   </div>
                                 )}
-                                {msgSearch ? (
+                                {editingId === msg.id ? (
+                                  <div>
+                                    <textarea
+                                      value={editText}
+                                      onChange={(e) => setEditText(e.target.value)}
+                                      rows={2}
+                                      className="w-full min-w-[220px] rounded-lg bg-black/10 dark:bg-black/20 px-2 py-1.5 text-sm text-inherit outline-none resize-none"
+                                      autoFocus
+                                    />
+                                    <div className="flex gap-2 mt-1">
+                                      <button type="button" onClick={() => saveEdit(msg.id)} className="text-[11px] font-medium">Save</button>
+                                      <button type="button" onClick={() => { setEditingId(null); setEditText(''); }} className="text-[11px] opacity-70">Cancel</button>
+                                    </div>
+                                  </div>
+                                ) : msgSearch ? (
                                   <div>{highlightText(actualContent || msg.content, msgSearch)}</div>
                                 ) : (
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -503,7 +539,7 @@ export function ChatView({
                               <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? 'text-primary-200' : 'text-gray-400'}`}>
                                 {!isGrouped && (
                                   <span className="text-[10px]" title={new Date(msg.created_at).toLocaleString()}>
-                                    {formatMessageTime(msg.created_at)}
+                                    {formatMessageTime(msg.created_at)}{msg.edited ? ' · edited' : ''}
                                   </span>
                                 )}
                                 {isMine && !isGrouped && (
@@ -530,6 +566,15 @@ export function ChatView({
                                     title="Reply"
                                   >
                                     <Reply className="w-3 h-3 text-primary-500" />
+                                  </button>
+                                )}
+                                {isMine && !msg.is_read && (
+                                  <button
+                                    onClick={() => { setEditingId(msg.id); setEditText(actualContent || msg.content); }}
+                                    className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow border border-gray-200 dark:border-gray-600 flex items-center justify-center hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Pencil className="w-3 h-3 text-primary-500" />
                                   </button>
                                 )}
                                 {isMine && (

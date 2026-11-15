@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, requireRole, statusOf } from '../route-utils';
@@ -176,6 +177,55 @@ community.put('/channels/:id', async (c) => {
   }
 });
 
+// GET /api/v1/community/channels/:id/permissions
+community.get('/channels/:id/permissions', async (c) => {
+  try {
+    await requireAuth(c);
+    const { rows } = await getDb(c.env).query<any>(
+      'SELECT role, can_read, can_post FROM community_channel_permissions WHERE channel_id = $1 ORDER BY role',
+      [c.req.param('id')]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load channel permissions');
+  }
+});
+
+// PUT /api/v1/community/channels/:id/permissions
+community.put('/channels/:id/permissions', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const channelId = c.req.param('id');
+    const channel = await Community.getChannelById(c.env, channelId);
+    if (!channel) return fail(c, 404, 'Channel not found');
+    if (!['admin', 'super_admin'].includes(s.role)) {
+      const member = await Community.isChannelMember(c.env, channelId, s.userId);
+      if (!member || !['owner', 'moderator'].includes(member.role)) {
+        return fail(c, 403, 'Only channel owners and moderators can change permissions');
+      }
+    }
+    const input: any = await body(c);
+    const permissions = Array.isArray(input.permissions) ? input.permissions : [];
+    const db = getDb(c.env);
+    for (const p of permissions.slice(0, 10)) {
+      const role = ['owner', 'moderator', 'member'].includes(String(p.role)) ? String(p.role) : 'member';
+      await db.query(
+        `INSERT INTO community_channel_permissions (channel_id, role, can_read, can_post)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (channel_id, role) DO UPDATE SET can_read = $3, can_post = $4`,
+        [channelId, role, p.can_read === false ? 0 : 1, p.can_post === false ? 0 : 1]
+      );
+    }
+    const { rows } = await db.query<any>(
+      'SELECT role, can_read, can_post FROM community_channel_permissions WHERE channel_id = $1 ORDER BY role',
+      [channelId]
+    );
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to update channel permissions');
+  }
+});
+
 // DELETE /api/v1/community/channels/:id
 community.delete('/channels/:id', async (c) => {
   try {
@@ -267,6 +317,11 @@ community.get('/channels/:id/messages', async (c) => {
     const channelId = c.req.param('id');
     const member = await Community.isChannelMember(c.env, channelId, s.userId);
     if (!member) return fail(c, 403, 'You must be a member to view messages');
+    const readRule = await getDb(c.env).query<any>(
+      'SELECT can_read FROM community_channel_permissions WHERE channel_id = $1 AND role = $2 LIMIT 1',
+      [channelId, member.role || 'member']
+    ).catch(() => ({ rows: [] } as any));
+    if (readRule.rows[0] && !readRule.rows[0].can_read) return fail(c, 403, 'You do not have permission to read this channel');
 
     const limit = Math.min(parseInt(c.req.query('limit') || '') || 50, 100);
     const before = c.req.query('before') || undefined;
@@ -282,6 +337,33 @@ community.get('/channels/:id/messages', async (c) => {
   }
 });
 
+// GET /api/v1/community/channels/:id/stream — server-sent events
+community.get('/channels/:id/stream', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const channelId = c.req.param('id');
+    const member = await Community.isChannelMember(c.env, channelId, s.userId);
+    if (!member) return fail(c, 403, 'You must be a member to follow this channel');
+
+    let after = c.req.query('after') || new Date(Date.now() - 5000).toISOString();
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({ event: 'ready', data: JSON.stringify({ channelId, after }) });
+      for (let i = 0; i < 40; i++) {
+        if (stream.aborted) break;
+        const messages = await Community.getChannelMessagesAfter(c.env, channelId, after, 50).catch(() => []);
+        for (const message of messages) {
+          after = message.created_at > after ? message.created_at : after;
+          await stream.writeSSE({ event: 'message', data: JSON.stringify(message) });
+        }
+        await stream.sleep(3000);
+      }
+      await stream.writeSSE({ event: 'reconnect', data: JSON.stringify({ after }) });
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to open the channel stream');
+  }
+});
+
 // POST /api/v1/community/channels/:id/messages
 community.post('/channels/:id/messages', async (c) => {
   try {
@@ -290,6 +372,11 @@ community.post('/channels/:id/messages', async (c) => {
     const member = await Community.isChannelMember(c.env, channelId, s.userId);
     if (!member) return fail(c, 403, 'You must be a member to send messages');
     if (member.is_muted) return fail(c, 403, 'You are muted in this channel');
+    const postRule = await getDb(c.env).query<any>(
+      'SELECT can_post FROM community_channel_permissions WHERE channel_id = $1 AND role = $2 LIMIT 1',
+      [channelId, member.role || 'member']
+    ).catch(() => ({ rows: [] } as any));
+    if (postRule.rows[0] && !postRule.rows[0].can_post) return fail(c, 403, 'You do not have permission to post in this channel');
 
     const { fields: input, file } = await parseBody(c as any);
     const rawContent = input.content;

@@ -43,7 +43,7 @@ export default function InstructorCommunities() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingCommunity, setEditingCommunity] = useState<Community | null>(null);
-  const [form, setForm] = useState({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study' });
+  const [form, setForm] = useState({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study', postPolicy: 'everyone', rules: '' });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [requestsFor, setRequestsFor] = useState<Community | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
@@ -78,9 +78,22 @@ export default function InstructorCommunities() {
         if ((editingCommunity as any).created_by !== user?.id && user?.role !== 'admin' && user?.role !== 'super_admin') return;
         await updateCommunity(editingCommunity.id, { name: form.name, slug: form.slug, description: form.description || null, image_url: form.image_url || null, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any } as any);
       } else {
-        await createCommunity({ name: form.name, slug: form.slug, description: form.description || undefined, image_url: form.image_url || undefined, category: form.category, visibility: form.visibility as any, join_policy: form.join_policy as any, channels: CHANNEL_TEMPLATES[form.template] || CHANNEL_TEMPLATES.study } as any);
+        const channels = (CHANNEL_TEMPLATES[form.template] || CHANNEL_TEMPLATES.study).map((channel) => ({
+          ...channel,
+          permissions: [
+            { role: 'member', can_read: true, can_post: form.postPolicy === 'everyone' },
+            { role: 'moderator', can_read: true, can_post: true },
+            { role: 'owner', can_read: true, can_post: true },
+          ],
+        }));
+        await createCommunity({
+          name: form.name, slug: form.slug, description: form.description || undefined,
+          image_url: form.image_url || undefined, category: form.category,
+          visibility: form.visibility as any, join_policy: form.join_policy as any,
+          rules: form.rules || undefined, channels,
+        } as any);
       }
-      setShowForm(false); setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study' });
+      setShowForm(false); setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study', postPolicy: 'everyone', rules: '' });
     } finally { setSaving(false); }
   };
 
@@ -104,7 +117,7 @@ export default function InstructorCommunities() {
           <h1 className="text-2xl sm:text-3xl font-bold">Communities</h1>
           <p className="text-gray-500 mt-1">Create and manage your communities. You can delete/rename only those you created; admins can manage any.</p>
         </div>
-        <Button onClick={() => { setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study' }); setShowForm(true); }} icon={<Plus className="w-4 h-4" />}>Create Community</Button>
+        <Button onClick={() => { setEditingCommunity(null); setForm({ name: '', slug: '', description: '', image_url: '', category: 'General', visibility: 'public', join_policy: 'open', template: 'study', postPolicy: 'everyone', rules: '' }); setShowForm(true); }} icon={<Plus className="w-4 h-4" />}>Create Community</Button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -152,9 +165,22 @@ export default function InstructorCommunities() {
                       <option value="project">Project team — General, Standups, Blockers, Showcase</option>
                       <option value="general">General — General, Announcements</option>
                     </select>
-                    <p className="text-[11px] text-gray-500 mt-1">Channels are created automatically. You can rename or add more after creation.</p>
+                    <p className="text-[11px] text-gray-500 mt-1">Channels are created automatically with sensible permissions. You can edit them after creation.</p>
                   </div>
                 )}
+                {!editingCommunity && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-400 mb-1 block">Who can post in member channels?</label>
+                    <select value={form.postPolicy} onChange={(e) => setForm({ ...form, postPolicy: e.target.value })} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30">
+                      <option value="everyone">Everyone can post</option>
+                      <option value="moderators">Only moderators can post</option>
+                    </select>
+                  </div>
+                )}
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium text-gray-400 mb-1 block">Community rules</label>
+                  <textarea value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} rows={3} className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-primary-500/30 resize-none" placeholder="Be respectful. No spam. Ask questions in the Questions channel." />
+                </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
@@ -194,7 +220,7 @@ export default function InstructorCommunities() {
                       <span className="flex items-center gap-1 text-xs text-gray-500"><Calendar className="w-3 h-3" /> {new Date(community.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', image_url: community.image_url || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy, template: 'study' }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
+                      {canEdit(community as Community) && <Button variant="ghost" size="sm" onClick={() => { setEditingCommunity(community as Community); setForm({ name: community.name, slug: community.slug, description: community.description || '', image_url: community.image_url || '', category: community.category, visibility: community.visibility, join_policy: community.join_policy, template: 'study', postPolicy: 'everyone', rules: community.rules || '' }); setShowForm(true); }} icon={<Edit className="w-3.5 h-3.5" />}>Rename</Button>}
                       {canEdit(community as Community) && (
                         <Button variant="ghost" size="sm" onClick={async () => {
                           setInviteFor(community as Community); setInviteLink(''); setInviteCopied(false); setInviteLoading(true);

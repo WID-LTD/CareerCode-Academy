@@ -359,7 +359,7 @@ function MessageBubble({ message, isGrouped }: { message: ChannelMessage; isGrou
 }
 
 export function MessageFeed() {
-  const { messages, activeChannel, isLoading, typingUsers, fetchMessages } = useCommunityStore();
+  const { messages, activeChannel, isLoading, typingUsers, fetchMessages, addMessage } = useCommunityStore();
   const { user } = useAuthStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -376,9 +376,20 @@ export function MessageFeed() {
 
   useEffect(() => {
     if (!activeChannel) return;
-    const timer = window.setInterval(() => fetchMessages(activeChannel.id), 8000);
-    return () => window.clearInterval(timer);
-  }, [activeChannel?.id]);
+    const apiBase = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
+    let source: EventSource | null = null;
+    try {
+      source = new EventSource(`${apiBase}/community/channels/${activeChannel.id}/stream`, { withCredentials: true });
+      source.addEventListener('message', (event) => {
+        try {
+          const message = JSON.parse((event as MessageEvent).data);
+          addMessage(message);
+        } catch { /* ignore malformed event */ }
+      });
+    } catch { /* polling fallback below */ }
+    const timer = window.setInterval(() => fetchMessages(activeChannel.id), 12000);
+    return () => { source?.close(); window.clearInterval(timer); };
+  }, [activeChannel?.id, addMessage, fetchMessages]);
 
   const handleScroll = () => {
     if (!containerRef.current) return;

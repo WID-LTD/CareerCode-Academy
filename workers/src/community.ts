@@ -346,6 +346,32 @@ export async function getChannelMessages(
   return rows.reverse(); // oldest first for display
 }
 
+export async function getChannelMessagesAfter(
+  env: Env,
+  channelId: string,
+  after: string,
+  limit = 50
+): Promise<any[]> {
+  const { rows } = await getDb(env).query<any>(
+    `SELECT cm.*, u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role,
+      (SELECT COUNT(*)::int FROM channel_members m WHERE m.channel_id = cm.channel_id) AS member_count,
+      (SELECT COUNT(*)::int FROM channel_members m WHERE m.channel_id = cm.channel_id AND m.last_read_at >= cm.created_at) AS read_count
+     FROM channel_messages cm
+     JOIN users u ON u.id = cm.author_id
+     WHERE cm.channel_id = $1 AND cm.parent_message_id IS NULL AND cm.created_at > $2
+     ORDER BY cm.created_at ASC LIMIT $3`,
+    [channelId, after, limit]
+  );
+  await attachReactions(env, rows);
+  for (const row of rows) {
+    const total = Number(row.member_count) || 0;
+    const read = Number(row.read_count) || 0;
+    row.read_percent = total > 0 ? Math.min(100, Math.round((read / total) * 100)) : 0;
+    row.can_edit = row.read_percent < 50;
+  }
+  return rows;
+}
+
 export async function getMessageById(env: Env, id: string): Promise<any | null> {
   const { rows } = await getDb(env).query<any>(
     `SELECT cm.*, u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role
@@ -768,11 +794,23 @@ export async function createCommunity(env: Env, input: {
     if (seenSlugs.has(slug)) continue;
     seenSlugs.add(slug);
     try {
-      await db.query(
+      const channelRows = await db.query<any>(
         `INSERT INTO community_channels (name, slug, description, type, created_by, community_id, is_public, member_count)
-         VALUES ($1, $2, $3, $4, $5, $6, 1, 1)`,
+         VALUES ($1, $2, $3, $4, $5, $6, 1, 1) RETURNING id`,
         [name, slug, String(channel.description || `${name} discussion.`).slice(0, 500), String(channel.type || 'text'), input.created_by, community.id]
       );
+      const channelId = channelRows.rows[0]?.id;
+      if (channelId && Array.isArray((channel as any).permissions)) {
+        for (const p of (channel as any).permissions.slice(0, 10)) {
+          const role = ['owner', 'moderator', 'member'].includes(String(p.role)) ? String(p.role) : 'member';
+          await db.query(
+            `INSERT INTO community_channel_permissions (channel_id, role, can_read, can_post)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (channel_id, role) DO UPDATE SET can_read = $3, can_post = $4`,
+            [channelId, role, p.can_read === false ? 0 : 1, p.can_post === false ? 0 : 1]
+          ).catch(() => {});
+        }
+      }
       created++;
     } catch { /* skip a duplicate or invalid channel */ }
   }

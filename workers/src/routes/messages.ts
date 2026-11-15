@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import type { Env } from '../env';
 import { getDb } from '../db';
 import { fail, requireAuth, statusOf } from '../route-utils';
@@ -140,6 +141,27 @@ messages.put('/read', async (c) => {
   }
 });
 
+// PUT /api/v1/messages/:messageId — edit only before the recipient reads it
+messages.put('/:messageId', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const body: any = await c.req.json().catch(() => ({}));
+    const content = String(body.content || '').trim();
+    if (!content) return fail(c, 400, 'content is required');
+    const { rows } = await getDb(c.env).query<any>('SELECT * FROM messages WHERE id = $1', [c.req.param('messageId')]);
+    const message = rows[0];
+    if (!message || message.sender_id !== s.userId) return fail(c, 404, 'Message not found');
+    if (message.is_read) return fail(c, 409, 'This message can no longer be edited because it has been read');
+    const updated = await getDb(c.env).query<any>(
+      `UPDATE messages SET content = $1, edited = 1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [content, message.id]
+    );
+    return c.json({ success: true, data: updated.rows[0] });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to edit message');
+  }
+});
+
 // DELETE /api/v1/messages/:messageId
 messages.delete('/:messageId', async (c) => {
   try {
@@ -151,12 +173,49 @@ messages.delete('/:messageId', async (c) => {
   }
 });
 
+// GET /api/v1/messages/stream/:userId — server-sent events for a conversation
+messages.get('/stream/:userId', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const otherUserId = c.req.param('userId');
+    let after = c.req.query('after') || new Date(Date.now() - 5000).toISOString();
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({ event: 'ready', data: JSON.stringify({ userId: otherUserId, after }) });
+      for (let i = 0; i < 40; i++) {
+        if (stream.aborted) break;
+        const { rows } = await getDb(c.env).query<any>(
+          `SELECT id, sender_id, receiver_id, content, is_read, edited, created_at, updated_at
+           FROM messages
+           WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+             AND created_at > $3
+           ORDER BY created_at ASC LIMIT 50`,
+          [s.userId, otherUserId, after]
+        ).catch(() => ({ rows: [] } as any));
+        for (const message of rows) {
+          after = message.created_at > after ? message.created_at : after;
+          await stream.writeSSE({ event: 'message', data: JSON.stringify(message) });
+        }
+        if (rows.some((m: any) => m.receiver_id === s.userId && !m.is_read)) {
+          await getDb(c.env).query(
+            'UPDATE messages SET is_read = true WHERE receiver_id = $1 AND sender_id = $2 AND is_read = false',
+            [s.userId, otherUserId]
+          ).catch(() => {});
+        }
+        await stream.sleep(3000);
+      }
+      await stream.writeSSE({ event: 'reconnect', data: JSON.stringify({ after }) });
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to open the conversation stream');
+  }
+});
+
 // GET /api/v1/messages/:userId — conversation with one user
 messages.get('/:userId', async (c) => {
   try {
     const s = await requireAuth(c);
     const { rows } = await getDb(c.env).query<any>(
-      `SELECT id, sender_id, receiver_id, content, is_read, created_at
+      `SELECT id, sender_id, receiver_id, content, is_read, edited, created_at, updated_at
        FROM messages
        WHERE (sender_id = $1 AND receiver_id = $2)
           OR (sender_id = $2 AND receiver_id = $1)

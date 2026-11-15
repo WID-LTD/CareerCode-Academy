@@ -10,7 +10,9 @@ export interface Message {
   content: string;
   attachment_url?: string;
   is_read: boolean;
+  edited?: number | boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ConversationUser {
