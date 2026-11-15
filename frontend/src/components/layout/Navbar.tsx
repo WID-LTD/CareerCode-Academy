@@ -38,7 +38,7 @@ const megaMenuCourses = [
   { name: 'Mobile Development', count: 0, slug: 'mobile-development', category: 'Mobile' },
   { name: 'DevOps', count: 0, slug: 'devops', category: 'DevOps' },
   { name: 'Security', count: 0, slug: 'security', category: 'Security' },
-  { name: 'AI & Machine Learning', count: 0, slug: 'ai-machine-learning', category: 'AI' },
+  { name: 'Artificial Intelligence & Machine Learning', count: 0, slug: 'ai-machine-learning', category: 'AI' },
   { name: 'Design', count: 0, slug: 'design', category: 'Design' },
   { name: 'Cloud Computing', count: 0, slug: 'cloud-computing', category: 'Cloud Computing' },
 ];

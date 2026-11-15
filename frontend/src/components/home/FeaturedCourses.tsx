@@ -28,10 +28,10 @@ const careerOutcomes: Record<string, string> = {
   'Web Development': 'Frontend Developer',
   'Data Science': 'Data Scientist',
   'Mobile': 'Mobile Developer',
-  'AI': 'AI Engineer',
+  'AI': 'Artificial Intelligence Engineer',
   'DevOps': 'DevOps Engineer',
   'Security': 'Security Analyst',
-  'Design': 'UI/UX Designer',
+  'Design': 'Product Designer',
 };
 
 const skillSets: Record<string, string[]> = {

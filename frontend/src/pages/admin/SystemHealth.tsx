@@ -119,6 +119,7 @@ export default function AdminSystemHealth() {
               ['Failed payments', actions?.failedPayments],
               ['Refunds', actions?.refunds],
               ['Open tickets', actions?.openTickets],
+              ['Open bug reports', actions?.openBugReports],
               ['AI requests today', actions?.aiToday],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-xl border border-gray-200 dark:border-gray-800 p-2.5">

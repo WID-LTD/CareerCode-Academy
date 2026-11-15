@@ -23,7 +23,7 @@ const floatingShapes = [
 
 // Learning tracks — not employer logos. We only show claims we can stand behind.
 const learningTracks = [
-  'Frontend', 'Backend', 'Full Stack', 'Data Science', 'AI & ML', 'Cloud', 'Cybersecurity', 'Product Design', 'Mobile', 'DevOps',
+  'Frontend', 'Backend', 'Full Stack', 'Data Science', 'Artificial Intelligence', 'Cloud', 'Cybersecurity', 'Product Design', 'Mobile', 'DevOps',
 ];
 
 const styles = {

@@ -2283,7 +2283,7 @@ admin.get('/action-center', async (c) => {
     const one = async (sql: string, params: any[] = []) => {
       try { return Number((await db.query<any>(sql, params)).rows[0]?.n) || 0; } catch { return 0; }
     };
-    const [applications, proposals, flaggedReviews, communityReports, pendingPayouts, failedPayments, refunds, openTickets, aiToday] = await Promise.all([
+    const [applications, proposals, flaggedReviews, communityReports, pendingPayouts, failedPayments, refunds, openTickets, aiToday, openBugReports] = await Promise.all([
       one(`SELECT COUNT(*)::int AS n FROM instructor_applications WHERE status = 'pending'`),
       one(`SELECT COUNT(*)::int AS n FROM course_proposals WHERE status = 'pending'`),
       one(`SELECT COUNT(*)::int AS n FROM reviews WHERE reported = 1`),
@@ -2293,6 +2293,7 @@ admin.get('/action-center', async (c) => {
       one(`SELECT COUNT(*)::int AS n FROM payments WHERE status = 'refunded'`),
       one(`SELECT COUNT(*)::int AS n FROM support_tickets WHERE status = 'open'`),
       one(`SELECT COALESCE(SUM(requests), 0)::int AS n FROM ai_usage WHERE day = date('now')`),
+      one(`SELECT COUNT(*)::int AS n FROM bug_reports WHERE status = 'open'`),
     ]);
     const payoutAmount = await db.query<any>(`SELECT COALESCE(SUM(amount),0)::float AS amount FROM payouts WHERE status='pending'`).catch(() => ({ rows: [{ amount: 0 }] } as any));
     const lastJob = await db.query<any>(`SELECT value FROM system_settings WHERE key='jobs_last_ingest'`).catch(() => ({ rows: [] } as any));
@@ -2301,7 +2302,7 @@ admin.get('/action-center', async (c) => {
       data: {
         applications, proposals, flaggedReviews, communityReports, pendingPayouts,
         pendingPayoutAmount: Number(payoutAmount.rows[0]?.amount) || 0,
-        failedPayments, refunds, openTickets, aiToday,
+        failedPayments, refunds, openTickets, aiToday, openBugReports,
         jobsLastIngest: lastJob.rows[0]?.value || null,
       },
     });
