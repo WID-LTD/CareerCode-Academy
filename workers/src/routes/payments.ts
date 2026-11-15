@@ -162,32 +162,76 @@ async function verifyPaymentByReference(env: Env, reference: string) {
     const paystackKey = env.PAYSTACK_SECRET_KEY || '';
     const flutterwaveKey = env.FLUTTERWAVE_SECRET_KEY || '';
     let verified = false;
+    let providerFailed = false;
+    let providerMessage = 'Payment is still pending';
+    let providerAmount: number | null = null;
+    let providerCurrency = '';
 
     if (payment.provider === 'paystack' && gatewayConfigured(paystackKey)) {
       try {
-        const resp = await fetchWithTimeout(`https://api.paystack.co/transaction/verify/${reference}`, {
+        const resp = await fetchWithTimeout(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
           headers: { Authorization: `Bearer ${paystackKey}` },
         });
         const data: any = await resp.json();
-        if (data.status && data.data?.status === 'success') verified = true;
-      } catch { /* fall through */ }
+        if (resp.ok && data.status && data.data) {
+          const tx = data.data;
+          providerAmount = Number(tx.amount) / 100; // Paystack returns kobo
+          providerCurrency = String(tx.currency || '').toUpperCase();
+          if (tx.status === 'success') verified = true;
+          else if (['failed', 'abandoned', 'reversed'].includes(String(tx.status))) providerFailed = true;
+          else providerMessage = `Payment is ${tx.status || 'pending'}`;
+        } else {
+          providerMessage = data?.message || `Paystack HTTP ${resp.status}`;
+        }
+      } catch (e: any) {
+        providerMessage = e?.message || 'Paystack is unreachable';
+      }
     } else if (payment.provider === 'flutterwave' && gatewayConfigured(flutterwaveKey)) {
       try {
-        const resp = await fetchWithTimeout(`https://api.flutterwave.com/v3/transactions/${reference}/verify`, {
-          headers: { Authorization: `Bearer ${flutterwaveKey}` },
-        });
+        const resp = await fetchWithTimeout(
+          `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
+          { headers: { Authorization: `Bearer ${flutterwaveKey}` } }
+        );
         const data: any = await resp.json();
-        if (data.status === 'success' && data.data?.status === 'successful') verified = true;
-      } catch { /* fall through */ }
-    } else {
-      // No gateway configured (dev/test): trust the reference.
+        if (resp.ok && data.status === 'success' && data.data) {
+          const tx = data.data;
+          providerAmount = Number(tx.amount);
+          providerCurrency = String(tx.currency || '').toUpperCase();
+          if (tx.status === 'successful') verified = true;
+          else if (['failed', 'cancelled'].includes(String(tx.status))) providerFailed = true;
+          else providerMessage = `Payment is ${tx.status || 'pending'}`;
+        } else {
+          providerMessage = data?.message || `Flutterwave HTTP ${resp.status}`;
+        }
+      } catch (e: any) {
+        providerMessage = e?.message || 'Flutterwave is unreachable';
+      }
+    } else if (env.ALLOW_UNVERIFIED_PAYMENTS) {
+      // Local integration tests only. Never enabled in production.
       verified = true;
+      providerMessage = 'Unverified payment allowed by test configuration';
+    } else {
+      throw Object.assign(new Error('Payment provider is not configured. Contact support.'), { statusCode: 503 });
+    }
+
+    const expectedAmount = Number(payment.amount);
+    const expectedCurrency = String(payment.currency || 'NGN').toUpperCase();
+    const amountMatches = providerAmount === null || Math.abs(providerAmount - expectedAmount) <= 0.05;
+    const currencyMatches = !providerCurrency || providerCurrency === expectedCurrency;
+
+    if (verified && (!amountMatches || !currencyMatches)) {
+      await db.query(
+        'UPDATE payments SET status = $1, metadata = $2 WHERE reference = $3',
+        ['failed', JSON.stringify({ verified: false, reason: 'provider_mismatch', providerAmount, expectedAmount, providerCurrency, expectedCurrency }), reference]
+      );
+      throw Object.assign(new Error('The provider returned a different amount or currency. Payment was not completed.'), { statusCode: 409 });
     }
 
     if (verified) {
+      const priorMeta = safeJson(payment.metadata);
       await db.query(
         'UPDATE payments SET status = $1, metadata = $2 WHERE reference = $3',
-        ['completed', JSON.stringify({ verified: true }), reference]
+        ['completed', JSON.stringify({ ...priorMeta, verified: true, verifiedAt: new Date().toISOString(), providerAmount, providerCurrency }), reference]
       );
       if (payment.discount_code_id) {
         await markDiscountCodeUsed(env, payment.discount_code_id, payment.id);
@@ -195,6 +239,18 @@ async function verifyPaymentByReference(env: Env, reference: string) {
       if (payment.coupon_id) await markCouponUsed(env, payment.coupon_id);
       if (payment.course_id) await enrollIfMissing(env, payment.user_id, payment.course_id);
       else await enrollBundleCourses(env, payment);
+    } else if (providerFailed) {
+      const priorMeta = safeJson(payment.metadata);
+      await db.query(
+        'UPDATE payments SET status = $1, metadata = $2 WHERE reference = $3',
+        ['failed', JSON.stringify({ ...priorMeta, verified: false, providerMessage }), reference]
+      );
+    } else {
+      const priorMeta = safeJson(payment.metadata);
+      await db.query(
+        'UPDATE payments SET metadata = $1 WHERE reference = $2',
+        [JSON.stringify({ ...priorMeta, lastVerification: { at: new Date().toISOString(), message: providerMessage } }), reference]
+      );
     }
   }
 
@@ -449,6 +505,34 @@ payments.get('/verify/:reference', async (c) => {
     return c.json({ success: true, data: { ...updated, course_slug: await courseSlug(c.env, updated.course_id) }, enrollment: true });
   } catch (e: any) {
     return fail(c, statusOf(e), e?.message || 'Failed to verify payment');
+  }
+});
+
+// GET /api/v1/payments/status/:reference — DB-only status for safe polling
+payments.get('/status/:reference', async (c) => {
+  try {
+    const s = await requireAuth(c);
+    const { rows } = await getDb(c.env).query<any>('SELECT * FROM payments WHERE reference = $1', [c.req.param('reference')]);
+    const payment = rows[0];
+    if (!payment) return fail(c, 404, 'Payment not found');
+    if (payment.user_id !== s.userId && !['admin', 'super_admin'].includes(s.role)) return fail(c, 403, 'Forbidden');
+    return c.json({
+      success: true,
+      data: {
+        reference: payment.reference,
+        status: payment.status,
+        amount: payment.amount,
+        currency: payment.currency,
+        course_slug: await courseSlug(c.env, payment.course_id),
+        message: payment.status === 'completed'
+          ? 'Payment confirmed'
+          : payment.status === 'failed'
+            ? 'Payment failed'
+            : 'Payment is still being confirmed',
+      },
+    });
+  } catch (e: any) {
+    return fail(c, statusOf(e), e?.message || 'Failed to load payment status');
   }
 });
 

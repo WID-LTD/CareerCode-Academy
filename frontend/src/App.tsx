@@ -8,6 +8,7 @@ import api from '@/lib/axios';
 import { OnboardingProvider } from '@/guides/OnboardingContext';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { InAppMessagePopup } from '@/components/notifications/InAppMessagePopup';
+import { GuidedTour } from '@/components/guides/GuidedTour';
 import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
@@ -257,6 +258,13 @@ function App() {
   const initialize = useAuthStore((s) => s.initialize);
   const initialized = useAuthStore((s) => s.initialized);
   const [backendReady, setBackendReady] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEffect(() => {
+    const open = () => setTourOpen(true);
+    window.addEventListener('tour:open', open);
+    return () => window.removeEventListener('tour:open', open);
+  }, []);
 
   useEffect(() => {
     // Skip initialize on OAuth callback — let SocialCallback handle it via cookie
@@ -304,6 +312,7 @@ function App() {
       <PlatformConfig />
       <NotificationBridge />
       <InAppMessagePopup />
+      <GuidedTour open={tourOpen} onClose={() => setTourOpen(false)} />
       <RoleWatcher />
       <PwaBridge />
       {!isPortfolioRoute && <MaintenanceBanner />}

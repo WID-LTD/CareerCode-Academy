@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, MessageSquare, Sparkles, Target } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, MessageSquare, Sparkles, Target } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { useStudentStore } from '@/store/studentStore';
@@ -18,6 +18,7 @@ export function GiGoCoachCard() {
   };
 
   return (
+    <div data-tour="gigo-coach">
     <GlassCard className="p-5" hover={false}>
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center flex-shrink-0">
@@ -41,9 +42,13 @@ export function GiGoCoachCard() {
             <Button size="sm" variant="ghost" onClick={() => ask('Build me a realistic study plan for the next 7 days and add it to my To-Do list.')}>
               <Target className="w-3.5 h-3.5 mr-1" /> Build a plan <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
+            <Button size="sm" variant="ghost" onClick={() => window.dispatchEvent(new Event('tour:open'))}>
+              <Compass className="w-3.5 h-3.5 mr-1" /> Take a tour
+            </Button>
           </div>
         </div>
       </div>
     </GlassCard>
+    </div>
   );
 }

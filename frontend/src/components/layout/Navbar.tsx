@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, Sun, Moon, User, LogOut, ChevronDown, BookOpen, Code2, Search,
-  Shield, Globe, Database, Palette, Briefcase, GraduationCap, Star, Zap, Heart,
+  Shield, Globe, Database, Palette, Briefcase, GraduationCap, Star, Zap, Heart, Compass,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -312,6 +312,14 @@ export function Navbar() {
                             Wishlist
                           </Link>
                         )}
+                        <button
+                          role="menuitem"
+                          onClick={() => { setShowDropdown(false); window.dispatchEvent(new Event('tour:open')); }}
+                          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <Compass className="w-4 h-4 flex-shrink-0" />
+                          Take a guided tour
+                        </button>
                         <hr className="my-1 border-gray-200 dark:border-gray-700" />
                         <button
                           role="menuitem"

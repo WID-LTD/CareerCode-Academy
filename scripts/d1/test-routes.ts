@@ -67,6 +67,7 @@ const env: any = {
   JWT_REFRESH_SECRET,
   FRONTEND_URL: 'https://careercode.com.ng',
   CORS_ORIGINS: 'https://careercode.com.ng',
+  ALLOW_UNVERIFIED_PAYMENTS: true,
   AUTH_DO,
   JWT_EXPIRES_IN: '15m',
   JWT_REFRESH_EXPIRES_IN: '7d',

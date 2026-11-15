@@ -666,6 +666,7 @@ export function GigoWidget() {
           onPointerMove={onDragMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
+          data-tour="gigo-button"
           onClick={() => { if (!suppressClick.current) { setOpen(true); setMinimized(false); } }}
           style={launcherStyle}
           className="fixed z-[65] h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-2xl shadow-indigo-500/30 grid place-items-center hover:scale-105 transition-transform touch-none cursor-grab active:cursor-grabbing"

@@ -36,16 +36,49 @@ export default function VerifyPayment() {
 
   const verifyPayment = async () => {
     setState('loading');
+    setMessage('Contacting the payment provider…');
     try {
       const { data } = await api.get(`/payments/verify/${reference}`);
-      if (data.enrollment || data.data?.status === 'completed') {
+      let payment = data.data;
+      if (payment?.course_slug) setCourseSlug(payment.course_slug);
+
+      if (payment?.status === 'completed') {
         setState('success');
         setMessage('Payment verified successfully!');
-        if (data.data?.course_slug) setCourseSlug(data.data.course_slug);
-      } else {
-        setState('success');
-        setMessage('Payment successful!');
+        return;
       }
+      if (payment?.status === 'failed') {
+        setState('error');
+        setMessage('The payment provider says this transaction failed. You have not been charged for a successful enrollment.');
+        return;
+      }
+
+      // The provider may need a few seconds to settle. Poll the database-only
+      // status endpoint so we do not hammer the provider API.
+      setMessage('Payment received. Waiting for the provider to confirm…');
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        try {
+          const statusRes = await api.get(`/payments/status/${reference}`);
+          payment = statusRes.data.data;
+          if (payment?.course_slug) setCourseSlug(payment.course_slug);
+          if (payment?.status === 'completed') {
+            setState('success');
+            setMessage('Payment verified successfully!');
+            return;
+          }
+          if (payment?.status === 'failed') {
+            setState('error');
+            setMessage('The payment provider says this transaction failed. Please try again or contact support.');
+            return;
+          }
+          setMessage(`Still confirming with the provider… (${attempt + 1}/20)`);
+        } catch {
+          // Keep polling through transient errors.
+        }
+      }
+      setState('error');
+      setMessage('Payment is still processing. We have not marked it as failed. Press Try Again in a moment, or contact support with your reference.');
     } catch (error: any) {
       setState('error');
       setMessage(error?.response?.data?.message || error?.response?.data?.error || 'Payment verification failed');

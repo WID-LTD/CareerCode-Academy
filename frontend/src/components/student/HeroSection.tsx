@@ -41,6 +41,7 @@ export function HeroSection() {
 
   return (
     <motion.div
+      data-tour="dashboard-hero"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 p-6 sm:p-8"
