@@ -320,7 +320,7 @@ export default function CourseDetails() {
                 </div>
                 <div>
                   <p className="text-white font-medium">{course.instructor_name || 'Instructor'}</p>
-                  <p className="text-gray-500 text-sm">Course Instructor</p>
+                  <p className="text-gray-500 text-sm">Course faculty</p>
                 </div>
               </div>
 
