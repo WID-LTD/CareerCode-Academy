@@ -20,6 +20,7 @@ const footerLinks = {
     { label: 'Board of Directors', path: '/board' },
   ],
   Support: [
+    { label: 'User guide', path: '/guide' },
     { label: 'Help Center', path: '/help' },
     { label: 'Terms of Service', path: '/terms' },
     { label: 'Privacy Policy', path: '/privacy' },

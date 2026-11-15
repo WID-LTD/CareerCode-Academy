@@ -96,6 +96,7 @@ const Checkout = lazy(() => import('@/pages/public/Checkout'));
 const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const Contact = lazy(() => import('@/pages/Contact'));
+const Guide = lazy(() => import('@/pages/Guide'));
 const Pricing = lazy(() => import('@/pages/Pricing'));
 const Community = lazy(() => import('@/pages/Community'));
 const CommunityDetail = lazy(() => import('@/pages/CommunityDetail'));
@@ -341,6 +342,7 @@ function App() {
           <Route path="/blog" element={<SuspenseWrapper><Blog /></SuspenseWrapper>} />
           <Route path="/blog/:slug" element={<SuspenseWrapper><BlogPost /></SuspenseWrapper>} />
           <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
+          <Route path="/guide" element={<SuspenseWrapper><Guide /></SuspenseWrapper>} />
           <Route path="/pricing" element={<SuspenseWrapper><Pricing /></SuspenseWrapper>} />
           <Route path="/trial" element={<SuspenseWrapper><TrialCampaign /></SuspenseWrapper>} />
           <Route path="/community" element={<SuspenseWrapper><Community /></SuspenseWrapper>} />
