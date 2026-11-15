@@ -65,7 +65,7 @@ export default function AdminReports() {
     try {
       const { data } = await api.get('/admin/users?limit=10000');
       const users = data.data;
-      const header = 'ID,Name,Email,Role,Verified,Joined';
+      const header = 'Identifier,Name,Email,Role,Verified,Joined';
       const csvRows = users.map((u: any) => `"${u.id}","${u.name}","${u.email}","${u.role}","${u.is_verified}","${u.created_at}"`);
       const blob = new Blob([[header, ...csvRows].join('\n')], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);

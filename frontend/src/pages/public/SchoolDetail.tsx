@@ -42,10 +42,10 @@ const programValueProps: Record<string, string> = {
 };
 
 const programSkills: Record<string, string[]> = {
-  'frontend-development': ['React', 'TypeScript', 'Tailwind CSS', 'APIs'],
+  'frontend-development': ['React', 'TypeScript', 'Tailwind CSS', 'interfaces'],
   'backend-development': ['Node.js', 'Express', 'PostgreSQL', 'REST APIs'],
   'full-stack-development': ['React', 'Node.js', 'Databases', 'Deployment'],
-  'mobile-app-development': ['React Native', 'Flutter', 'Mobile UI', 'APIs'],
+  'mobile-app-development': ['React Native', 'Flutter', 'Mobile interface', 'interfaces'],
   'devops-engineering': ['Docker', 'Kubernetes', 'CI/CD', 'AWS'],
   'cybersecurity': ['Network Security', 'Penetration Testing', 'Threat Analysis', 'Incident Response'],
   'cloud-computing': ['AWS', 'Azure', 'GCP', 'Serverless'],
@@ -72,7 +72,7 @@ const programRoadmaps: Record<string, string[]> = {
   'frontend-development': ['HTML/CSS', 'JavaScript', 'React', 'TypeScript', 'Portfolio'],
   'backend-development': ['Node.js', 'Express', 'Databases', 'Auth', 'Deployment'],
   'full-stack-development': ['Frontend', 'Backend', 'Database', 'DevOps', 'Project'],
-  'mobile-app-development': ['Mobile UI', 'React Native', 'State Mgmt', 'APIs', 'App Store'],
+  'mobile-app-development': ['Mobile interface', 'React Native', 'State Mgmt', 'interfaces', 'App Store'],
   'devops-engineering': ['Linux', 'Docker', 'K8s', 'CI/CD', 'Cloud'],
   'cybersecurity': ['Networking', 'Security', 'Pen Testing', 'Response', 'Audit'],
   'cloud-computing': ['Cloud Basics', 'AWS', 'Azure', 'Serverless', 'Architecture'],

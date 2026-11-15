@@ -24,7 +24,7 @@ const zoneMeta: Record<string, { label: string; icon: any; color: string; bg: st
 const schoolCareers: Record<string, { careers: string[]; description: string }> = {
   'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'], description: 'Focused on preparing students for careers in software engineering and application development.' },
   'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'], description: 'Focused on data-driven careers and emerging technologies.' },
-  'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'], description: 'Focused on creating digital experiences and visual communication.' },
+  'School of Design & Creative Technology': { careers: ['Product Designer', 'Product Designer', 'Visual Designer'], description: 'Focused on creating digital experiences and visual communication.' },
   'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'], description: 'Focused on modern business and digital economy skills.' },
   'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'], description: 'Focused on preparing students for employment and professional success.' },
 };
@@ -89,7 +89,7 @@ export default function LearningPaths() {
   };
 
   const handleClaimXp = async () => {
-    toast('Keep completing lessons to earn XP! 1000 XP = ₦100 at checkout.', { icon: '⚡' });
+    toast('Keep completing lessons to earn experience points! 1000 experience points = ₦100 at checkout.', { icon: '⚡' });
   };
 
   if (isLoading) return <PageSkeleton />;

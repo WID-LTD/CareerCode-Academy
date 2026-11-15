@@ -24,7 +24,7 @@ const pillars = [
   { icon: Landmark, title: 'Venture Holding & Core IP Governance', desc: 'Building, incubating and governing proprietary technology ventures across the WID portfolio.' },
 ];
 
-const ventures = ['XperienceStore', 'GiGo AI', 'MedStack', 'Nova Flix', 'Flink'];
+const ventures = ['XperienceStore', 'GiGo', 'MedStack', 'Nova Flix', 'Flink'];
 
 export default function About() {
   const stats = usePublicStats();
@@ -202,7 +202,7 @@ export default function About() {
                 <h2 className="text-xl font-bold">Ike Wisdom Okemsinachi</h2>
                 <p className="text-sm text-primary-500 font-medium">Founder & Chief Executive, WID LTD</p>
                 <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                  Nigerian entrepreneur, full-stack software engineer and AI researcher. Sole inventor of the
+                  Nigerian entrepreneur, full-stack software engineer and artificial intelligence researcher. Sole inventor of the
                   Unified E-Commerce System (UES) architecture and a Cisco Networking Academy Junior Cybersecurity Analyst.
                   He leads WID LTD and its venture portfolio, including CareerCode Academy.
                 </p>

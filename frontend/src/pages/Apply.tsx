@@ -22,7 +22,7 @@ const specializations = [
   { value: 'fullstack', label: 'Full-Stack Development' },
   { value: 'mobile', label: 'Mobile Development' },
   { value: 'data', label: 'Data Science & ML' },
-  { value: 'design', label: 'UI/UX Design' },
+  { value: 'design', label: 'Product Design' },
   { value: 'devops', label: 'DevOps & Cloud' },
   { value: 'security', label: 'Cybersecurity' },
 ];
@@ -280,9 +280,9 @@ export default function Apply() {
                     <Link2 className="w-5 h-5 text-primary-500" /> Links & Uploads
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <Input label="GitHub URL" type="url" name="githubUrl" value={formData.githubUrl} onChange={handleChange} />
-                    <Input label="LinkedIn URL" type="url" name="linkedinUrl" value={formData.linkedinUrl} onChange={handleChange} required />
-                    <Input label="Portfolio URL" type="url" name="portfolioUrl" value={formData.portfolioUrl} onChange={handleChange} />
+                    <Input label="GitHub profile link" type="url" name="githubUrl" value={formData.githubUrl} onChange={handleChange} />
+                    <Input label="LinkedIn profile link" type="url" name="linkedinUrl" value={formData.linkedinUrl} onChange={handleChange} required />
+                    <Input label="Portfolio web address" type="url" name="portfolioUrl" value={formData.portfolioUrl} onChange={handleChange} />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

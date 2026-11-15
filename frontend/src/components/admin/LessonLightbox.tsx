@@ -108,7 +108,7 @@ export default function LessonLightbox({ lesson, courseId, onClose, onSaved }: {
   };
 
   const handleYoutubePaste = async () => {
-    if(!youtubeInput.trim() || !isYoutubeUrl(youtubeInput)){ toast.error('Enter valid YouTube URL'); return; }
+    if(!youtubeInput.trim() || !isYoutubeUrl(youtubeInput)){ toast.error('Enter a valid YouTube web address'); return; }
     if(stagedVideo || lesson.video_url){
       setConfirmReplace({type:'video', newUrl: youtubeInput});
       return;

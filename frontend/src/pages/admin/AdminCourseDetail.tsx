@@ -144,7 +144,7 @@ export default function AdminCourseDetail() {
             <div className="space-y-1.5">
               <label className="block text-sm font-medium">Category</label>
               <select value={form.category} onChange={e=>setForm({...form, category:e.target.value})} className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm">
-                {['Web Development','Data Science','Design','Mobile','DevOps','AI/ML','Cloud','Cybersecurity'].map(c=> <option key={c} value={c}>{c}</option>)}
+                {['Web Development','Data Science','Design','Mobile','DevOps','Artificial Intelligence','Cloud','Cybersecurity'].map(c=> <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">

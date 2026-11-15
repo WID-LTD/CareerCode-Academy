@@ -70,7 +70,7 @@ export default function StudentRoadmap() {
   const schoolCareers: Record<string, { careers: string[] }> = {
     'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'] },
     'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'] },
-    'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'] },
+    'School of Design & Creative Technology': { careers: ['Product Designer', 'Product Designer', 'Visual Designer'] },
     'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'] },
     'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'] },
   };
@@ -122,12 +122,12 @@ export default function StudentRoadmap() {
 
   const handleRedeem = async () => {
     if (!xpBalance) return;
-    if (redeemAmount < (xpBalance.minRedeem || 1000)) { toast.error(`Minimum ${xpBalance.minRedeem} XP`); return; }
+    if (redeemAmount < (xpBalance.minRedeem || 1000)) { toast.error(`Minimum ${xpBalance.minRedeem} experience points`); return; }
     if (redeemAmount % (xpBalance.step || 1000) !== 0) { toast.error(`Must be multiples of ${xpBalance.step}`); return; }
     setRedeeming(true);
     try {
       const { data } = await api.post('/gamification/redeem', { xpAmount: redeemAmount });
-      toast.success(`Redeemed ${redeemAmount} XP for code ${data.data.code} (₦${data.data.discount_amount})`);
+      toast.success(`Redeemed ${redeemAmount} experience points for code ${data.data.code} (₦${data.data.discount_amount})`);
       const [b, c] = await Promise.all([api.get('/gamification/balance'), api.get('/gamification/discount-codes')]);
       setXpBalance(b.data.data);
       setDiscountCodes(c.data.data || []);

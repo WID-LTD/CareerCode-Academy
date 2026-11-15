@@ -74,6 +74,8 @@ export default function Settings() {
   const [twoFaCode, setTwoFaCode] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [twoFaBusy, setTwoFaBusy] = useState(false);
+  const [disableTwoFaOpen, setDisableTwoFaOpen] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
   const twoFaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -164,7 +166,7 @@ export default function Settings() {
       const { data } = await api.post('/auth/2fa/setup');
       setTwoFaSetup(data.data);
       setBackupCodes([]);
-    } catch { toast.error('Could not start 2FA setup'); }
+    } catch { toast.error('Could not start two-step verification setup'); }
     finally { setTwoFaBusy(false); }
   };
 
@@ -182,15 +184,16 @@ export default function Settings() {
   };
 
   const disableTwoFa = async () => {
-    const password = window.prompt('Enter your password to disable 2FA');
-    if (!password) return;
+    if (!disablePassword) return;
     setTwoFaBusy(true);
     try {
-      await api.post('/auth/2fa/disable', { password });
+      await api.post('/auth/2fa/disable', { password: disablePassword });
       setTwoFactor({ enabled: false });
       setBackupCodes([]);
-      toast.success('Two-factor authentication disabled');
-    } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to disable 2FA'); }
+      setDisableTwoFaOpen(false);
+      setDisablePassword('');
+      toast.success('Two-step verification disabled');
+    } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to disable two-step verification'); }
     finally { setTwoFaBusy(false); }
   };
 
@@ -303,7 +306,7 @@ export default function Settings() {
                 <option value="private">Private</option>
               </select>
             </Row>
-            <Row icon={Shield} label="Two-Factor Authentication" description={twoFactor?.enabled ? 'Enabled with an authenticator app' : 'Add an authenticator app'}>
+            <Row icon={Shield} label="Two-step verification" description={twoFactor?.enabled ? 'Enabled with an authenticator app' : 'Add an authenticator app'}>
               <Button size="sm" variant="outline" onClick={() => twoFaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
                 {twoFactor?.enabled ? 'Manage' : 'Set up'}
               </Button>
@@ -318,7 +321,7 @@ export default function Settings() {
           <GlassCard className="p-5" hover={false}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="font-semibold">Two-Factor Authentication</h2>
+                <h2 className="font-semibold">Two-step verification</h2>
                 <p className="text-xs text-gray-500 mt-0.5">Protect your account with an authenticator app (TOTP).</p>
               </div>
               <span className={`text-xs px-2 py-1 rounded-lg ${twoFactor?.enabled ? 'bg-emerald-500/10 text-emerald-500' : 'bg-gray-500/10 text-gray-500'}`}>
@@ -327,8 +330,8 @@ export default function Settings() {
             </div>
 
             {twoFactor?.enabled ? (
-              <button onClick={disableTwoFa} disabled={twoFaBusy} className="mt-4 px-3 py-2 rounded-xl border border-red-300 text-red-500 text-sm">
-                {twoFaBusy ? 'Working…' : 'Disable 2FA'}
+              <button onClick={() => setDisableTwoFaOpen(true)} disabled={twoFaBusy} className="mt-4 px-3 py-2 rounded-xl border border-red-300 text-red-500 text-sm">
+                {twoFaBusy ? 'Working…' : 'Disable two-step verification'}
               </button>
             ) : twoFaSetup ? (
               <div className="mt-4 space-y-3">
@@ -349,7 +352,7 @@ export default function Settings() {
               </div>
             ) : (
               <button onClick={startTwoFa} disabled={twoFaBusy} className="mt-4 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-semibold">
-                {twoFaBusy ? 'Preparing…' : 'Set up 2FA'}
+                {twoFaBusy ? 'Preparing…' : 'Set up two-step verification'}
               </button>
             )}
 
@@ -390,6 +393,23 @@ export default function Settings() {
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="ghost" onClick={() => setPasswordOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={passwordBusy}>{passwordBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Change password'}</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {disableTwoFaOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm grid place-items-center p-4" role="dialog" aria-label="Disable two-step verification">
+          <form onSubmit={(e) => { e.preventDefault(); void disableTwoFa(); }} className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-900 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Disable two-step verification</h2>
+              <button type="button" onClick={() => setDisableTwoFaOpen(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-sm text-gray-500">Enter your password to confirm. This makes your account easier to access.</p>
+            <input type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Current password" required className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm" />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="ghost" onClick={() => setDisableTwoFaOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="danger" disabled={twoFaBusy || !disablePassword}>{twoFaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Disable'}</Button>
             </div>
           </form>
         </div>

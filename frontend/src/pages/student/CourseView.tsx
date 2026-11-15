@@ -138,7 +138,7 @@ function ProjectSubmitForm({ project, submission, onSubmitted }: { project: any;
   const [verification, setVerification] = useState<any>(submission?.verification || null);
 
   const submit = async () => {
-    if (!githubUrl.trim()) { toast.error('GitHub repository URL is required'); return; }
+    if (!githubUrl.trim()) { toast.error('GitHub repository link is required'); return; }
     try { new URL(githubUrl); if (liveUrl) new URL(liveUrl); } catch { toast.error('Enter valid URLs'); return; }
     setSubmitting(true);
     try {
@@ -181,7 +181,7 @@ function ProjectSubmitForm({ project, submission, onSubmitted }: { project: any;
     try {
       const { data } = await api.get('/course-projects/github/status');
       const d = data.data;
-      toast.success(d.reachable ? `GitHub reachable${d.remaining != null ? ` · ${d.remaining} API calls left` : ''}` : d.message);
+      toast.success(d.reachable ? `GitHub reachable${d.remaining != null ? ` · ${d.remaining} interface calls left` : ''}` : d.message);
     } catch {
       toast.error('Could not reach GitHub from CareerCode right now');
     } finally { setChecking(false); }
@@ -436,7 +436,7 @@ export default function CourseView() {
     try {
       await api.post('/progress', { lessonId: currentLesson.id, completed: newCompleted, courseId: course.id });
       setLessonProgress(prev => ({ ...prev, [currentLesson.id]: newCompleted }));
-      toast.success(newCompleted ? 'Lesson completed! +10 XP' : 'Progress updated');
+      toast.success(newCompleted ? 'Lesson completed! +10 experience points' : 'Progress updated');
       if (newCompleted) {
         setShowXpPopup(true);
         setTimeout(() => setShowXpPopup(false), 2000);
@@ -1262,7 +1262,7 @@ export default function CourseView() {
         {showXpPopup && (
           <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.9 }} className="fixed top-24 left-1/2 -translate-x-1/2 z-50">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 border border-yellow-500/40 shadow-lg shadow-yellow-500/20">
-              <span className="text-yellow-400 font-bold text-lg">+10 XP</span>
+              <span className="text-yellow-400 font-bold text-lg">+10 experience points</span>
               <CheckCircle className="w-4 h-4 text-yellow-400" />
             </div>
           </motion.div>

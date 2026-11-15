@@ -18,7 +18,7 @@ const iconMap: Record<string, any> = {
 const schoolCareers: Record<string, { careers: string[] }> = {
   'School of Software Development': { careers: ['Frontend Developer', 'Backend Developer', 'Full-Stack Engineer'] },
   'School of Data & Artificial Intelligence': { careers: ['Data Scientist', 'ML Engineer', 'Data Analyst'] },
-  'School of Design & Creative Technology': { careers: ['UI/UX Designer', 'Product Designer', 'Visual Designer'] },
+  'School of Design & Creative Technology': { careers: ['Product Designer', 'Product Designer', 'Visual Designer'] },
   'School of Business & Digital Careers': { careers: ['Product Manager', 'Business Analyst', 'Tech Consultant'] },
   'School of Career Readiness': { careers: ['Career Coach', 'Talent Specialist', 'HR Coordinator'] },
 };

@@ -103,7 +103,7 @@ export default function ProjectWorkspace() {
 
   const submitDefense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!defenseUrl.trim() && !defenseFile) { toast.error('Upload a video or paste a video URL'); return; }
+    if (!defenseUrl.trim() && !defenseFile) { toast.error('Upload a video or paste a video link'); return; }
     setSavingDefense(true);
     try {
       let payload: any;

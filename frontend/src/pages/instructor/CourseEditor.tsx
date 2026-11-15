@@ -597,7 +597,7 @@ export default function CourseEditor() {
                           <option value="file_upload">File Upload</option>
                           <option value="text">Text Answer</option>
                           <option value="both">File + Text</option>
-                          <option value="link">Link/URL</option>
+                          <option value="link">Link or web address</option>
                         </select>
                       </div>
                       <div className="space-y-1">

@@ -46,7 +46,7 @@ export default function AdminFeatureFlags() {
       <GlassCard className="p-4 mb-4 border-amber-500/20 bg-amber-500/5" hover={false}>
         <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
           <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <p>Maintenance mode only blocks non-admin API access when enforced by the route guards. Disabling AI or payments takes effect immediately.</p>
+          <p>Maintenance mode only blocks non-admin interface access when enforced by the route guards. Disabling Artificial Intelligence or payments takes effect immediately.</p>
         </div>
       </GlassCard>
 

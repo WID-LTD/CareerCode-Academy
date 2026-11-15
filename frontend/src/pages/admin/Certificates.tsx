@@ -125,7 +125,7 @@ export default function AdminCertificates() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
-          type="text" placeholder="Search by name, course, or ID..."
+          type="text" placeholder="Search by name, course, or identifier..."
           value={search} onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 border-0 outline-none focus:ring-2 focus:ring-primary-500/30 text-sm"
         />

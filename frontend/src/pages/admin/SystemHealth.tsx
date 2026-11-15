@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 const services = [
   { key: 'database', label: 'D1 database', icon: Database },
   { key: 'r2', label: 'R2 storage', icon: HardDrive },
-  { key: 'ai', label: 'Workers AI', icon: Brain },
+  { key: 'ai', label: 'Workers Artificial Intelligence', icon: Brain },
   { key: 'email', label: 'Email Service', icon: Mail },
   { key: 'push', label: 'Web Push', icon: Bell },
   { key: 'turnstile', label: 'Turnstile', icon: ShieldCheck },
@@ -120,7 +120,7 @@ export default function AdminSystemHealth() {
               ['Refunds', actions?.refunds],
               ['Open tickets', actions?.openTickets],
               ['Open bug reports', actions?.openBugReports],
-              ['AI requests today', actions?.aiToday],
+              ['Artificial Intelligence requests today', actions?.aiToday],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-xl border border-gray-200 dark:border-gray-800 p-2.5">
                 <p className="text-lg font-bold tabular-nums">{Number(value) || 0}</p>

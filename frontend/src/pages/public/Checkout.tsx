@@ -127,7 +127,7 @@ export default function Checkout() {
         navigate(`/student/courses/${courseRes.value.data.data.slug}`);
         return;
       }
-      // Fetch XP balance for redeem section
+      // Fetch experience points balance for redeem section
       try {
         const { data } = await api.get('/gamification/balance');
         if (data.success) setXpBalance(data.data);
@@ -146,7 +146,7 @@ export default function Checkout() {
       const { data } = await api.post('/payments/validate-discount', { code: discountCode.trim(), courseId: courseId || undefined, pathId: pathId || undefined });
       setAppliedDiscount(data.data.discount);
       setCodeStatus('valid');
-      setCodeMessage(`Applied ₦${data.data.discount.toLocaleString()} off • ${data.data.xpRedeemed} XP`);
+      setCodeMessage(`Applied ₦${data.data.discount.toLocaleString()} off • ${data.data.xpRedeemed} experience points`);
       toast.success(`Code applied: -₦${data.data.discount.toLocaleString()}`);
     } catch (err: any) {
       setAppliedDiscount(null);
@@ -158,11 +158,11 @@ export default function Checkout() {
 
   const handleRedeem = async () => {
     if (!xpBalance) return;
-    if (redeemAmount < (xpBalance.minRedeem || 1000)) { toast.error(`Minimum ${xpBalance.minRedeem} XP`); return; }
+    if (redeemAmount < (xpBalance.minRedeem || 1000)) { toast.error(`Minimum ${xpBalance.minRedeem} experience points`); return; }
     setRedeeming(true);
     try {
       const { data } = await api.post('/gamification/redeem', { xpAmount: redeemAmount });
-      toast.success(`Redeemed ${redeemAmount} XP → Code ${data.data.code} (₦${data.data.discount_amount})`);
+      toast.success(`Redeemed ${redeemAmount} experience points → Code ${data.data.code} (₦${data.data.discount_amount})`);
       setDiscountCode(data.data.code);
       setAppliedDiscount(data.data.discount_amount);
       setCodeStatus('valid');
@@ -366,7 +366,7 @@ export default function Checkout() {
               <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium"><Ticket className="w-4 h-4 text-primary-500" /> Have a discount code?</div>
                 <div className="flex gap-2">
-                  <input value={discountCode} onChange={(e)=>{setDiscountCode(e.target.value.toUpperCase()); setCodeStatus('idle'); setCodeMessage(''); setAppliedDiscount(null);}} placeholder="e.g. XP-AB12CD34" className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm uppercase tracking-wider" />
+                  <input value={discountCode} onChange={(e)=>{setDiscountCode(e.target.value.toUpperCase()); setCodeStatus('idle'); setCodeMessage(''); setAppliedDiscount(null);}} placeholder="e.g. EXP-AB12CD34" className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm uppercase tracking-wider" />
                   <Button size="sm" variant="outline" onClick={handleApplyCode} disabled={!discountCode.trim()}>Apply</Button>
                 </div>
                 {codeMessage && <p className={`text-xs ${codeStatus==='valid' ? 'text-emerald-600' : 'text-red-500'}`}>{codeMessage}</p>}
@@ -494,19 +494,19 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* XP Redeem + Discount Code — 1000 XP = 100 NGN */}
+            {/* experience points Redeem + Discount Code — 1000 experience points = 100 NGN */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Coins className="w-5 h-5 text-amber-500" />
-                XP Discount • 1000 XP = ₦100
-                {xpBalance && <span className="text-xs font-normal text-gray-500 ml-auto">{xpBalance.available?.toLocaleString() || 0} XP available ≈ ₦{xpBalance.ngnValue?.toLocaleString() || 0}</span>}
+                Experience points discount • 1000 experience points = ₦100
+                {xpBalance && <span className="text-xs font-normal text-gray-500 ml-auto">{xpBalance.available?.toLocaleString() || 0} experience points available ≈ ₦{xpBalance.ngnValue?.toLocaleString() || 0}</span>}
               </h2>
 
               {xpBalance ? (
                 <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 dark:bg-amber-500/10 p-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm">
                     <Zap className="w-4 h-4 text-amber-500" />
-                    <span className="font-medium">Redeem XP for discount code</span>
+                    <span className="font-medium">Redeem experience points for discount code</span>
                     <span className="text-xs text-gray-500 ml-auto">Min {xpBalance.minRedeem} • Step {xpBalance.step} • {xpBalance.redeemEnabled ? 'Enabled' : 'Disabled'}</span>
                   </div>
                   <div className="flex gap-2">
@@ -517,17 +517,17 @@ export default function Checkout() {
                       disabled={!xpBalance.redeemEnabled}
                     >
                       {[1000,2000,3000,5000,10000].filter(v=> v<= (xpBalance.available||0) || v===1000).map(v=>(
-                        <option key={v} value={v}>{v.toLocaleString()} XP → ₦{Math.floor(v * (xpBalance.rate||0.1)).toLocaleString()}</option>
+                        <option key={v} value={v}>{v.toLocaleString()} experience points → ₦{Math.floor(v * (xpBalance.rate||0.1)).toLocaleString()}</option>
                       ))}
                     </select>
                     <Button size="sm" onClick={handleRedeem} disabled={redeeming || !xpBalance.redeemEnabled || (xpBalance.available||0) < redeemAmount} variant="primary" className="whitespace-nowrap">
                       {redeeming ? 'Redeeming...' : 'Redeem'}
                     </Button>
                   </div>
-                  {(xpBalance.available||0) < (xpBalance.minRedeem||1000) && <p className="text-xs text-gray-500">Earn more XP by completing lessons. You need {xpBalance.minRedeem} XP to redeem.</p>}
+                  {(xpBalance.available||0) < (xpBalance.minRedeem||1000) && <p className="text-xs text-gray-500">Earn more experience points by completing lessons. You need {xpBalance.minRedeem} experience points to redeem.</p>}
                 </div>
               ) : (
-                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-sm text-gray-500">Login to see XP balance and redeem for discounts.</div>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-sm text-gray-500">Login to see experience points balance and redeem for discounts.</div>
               )}
 
               <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 space-y-3">
@@ -538,7 +538,7 @@ export default function Checkout() {
                   <input
                     value={discountCode}
                     onChange={(e)=>{setDiscountCode(e.target.value.toUpperCase()); setCodeStatus('idle'); setCodeMessage(''); setAppliedDiscount(null);}}
-                    placeholder="e.g. XP-AB12CD34"
+                    placeholder="e.g. EXP-AB12CD34"
                     className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm uppercase tracking-wider"
                   />
                   <Button size="sm" variant="outline" onClick={handleApplyCode} disabled={!discountCode.trim()}>
@@ -634,7 +634,7 @@ export default function Checkout() {
                     )}
                     {appliedDiscount !== null && codeStatus==='valid' && (
                       <div className="flex justify-between text-amber-600 dark:text-amber-400">
-                        <span className="flex items-center gap-1"><Gift className="w-3 h-3" /> XP Discount ({discountCode})</span>
+                        <span className="flex items-center gap-1"><Gift className="w-3 h-3" /> Experience points discount ({discountCode})</span>
                         <span>-₦{appliedDiscount.toLocaleString()}</span>
                       </div>
                     )}

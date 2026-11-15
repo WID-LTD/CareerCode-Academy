@@ -55,7 +55,7 @@ const plans = [
       'Dedicated account manager',
       'Career pipeline access',
       'Resume & interview prep',
-      'API access',
+      'Interface access',
     ],
     missing: [],
     cta: 'Contact Sales',

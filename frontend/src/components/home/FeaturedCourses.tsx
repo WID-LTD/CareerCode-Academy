@@ -40,7 +40,7 @@ const skillSets: Record<string, string[]> = {
   'Backend': ['Node.js', 'APIs', 'Databases'],
   'Full-Stack': ['React', 'Node.js', 'Databases'],
   'Data Science': ['Python', 'Statistics', 'Machine Learning'],
-  'Mobile': ['React Native', 'Flutter', 'Mobile UX'],
+  'Mobile': ['React Native', 'Flutter', 'Mobile user experience'],
   'AI': ['Python', 'Machine Learning', 'Neural Networks'],
   'DevOps': ['Docker', 'CI/CD', 'Cloud Infrastructure'],
   'Security': ['Network Security', 'Penetration Testing', 'Security Audits'],

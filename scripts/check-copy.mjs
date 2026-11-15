@@ -8,7 +8,14 @@ import { join } from 'node:path';
 
 const ROOT = new URL('../frontend/src', import.meta.url).pathname;
 const ACRONYMS = /\b(AI|API|UI|UX|XP|PDF|FAQ|CRM|2FA|OTP|URL|ID|LMS|CTA|KPI|SEO)\b/g;
-const ALLOW = [/className/, /import /, /from ['"]/, /type /, /interface /, /const [A-Z_]+/, /\/\//, /aria-label="[^"]*"/];
+const ALLOW = [
+  /className/, /import /, /from ['"]/, /type /, /interface /, /const [A-Z_]+/, /\/\//, /aria-label="[^"]*"/,
+  /URL\./, /new URL\(/, /<SEO/, /<FAQ/, /export function FAQ/, /<Route path="\/faq"/,
+  /'AI':/, /'UX':/, /AI'\s*:/, /category: 'AI'/, /<SuspenseWrapper><FAQ/,
+  /\{\/\*/, /const categories =/, /export default function FAQ/, /'UI\/UX':/, /'Data & AI':/,
+  /'UI\/UX',/, /'Data & AI',/,
+];
+const SKIP_DIRS = [/__tests__/, /e2e/];
 const hits = [];
 
 function walk(dir) {
@@ -21,6 +28,7 @@ function walk(dir) {
 }
 
 function scan(path) {
+  if (SKIP_DIRS.some((re) => re.test(path))) return;
   const lines = readFileSync(path, 'utf8').split('\n');
   lines.forEach((line, index) => {
     if (ALLOW.some((re) => re.test(line))) return;

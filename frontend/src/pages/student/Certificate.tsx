@@ -188,7 +188,7 @@ export default function Certificate() {
                     </div>
 
                     <div className="text-xs text-gray-400 mb-6 font-mono">
-                      ID: {cert.verification_code}
+                      Verification code: {cert.verification_code}
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-3">

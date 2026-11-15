@@ -125,7 +125,7 @@ export default function GuidedModePage() {
         blocks_completed: Number(blocks),
       });
       setCheckinMsg(data.data.claimed_xp
-        ? 'Logged! You earned +30 XP for 4+ blocks today.'
+        ? 'Logged! You earned +30 experience points for 4+ blocks today.'
         : 'Logged! Check in after finishing 4 blocks to earn a bonus.')
       ;
       refresh();
@@ -318,7 +318,7 @@ export default function GuidedModePage() {
                 </form>
               )}
               {checkinMsg && <p className="text-xs text-green-500 mt-2">{checkinMsg}</p>}
-              <p className="text-xs text-gray-500 mt-3">Earn +30 XP when you complete 4+ guided blocks in a day.</p>
+              <p className="text-xs text-gray-500 mt-3">Earn +30 experience points when you complete 4+ guided blocks in a day.</p>
             </GlassCard>
 
             <GlassCard className="p-5">

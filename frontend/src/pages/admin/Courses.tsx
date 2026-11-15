@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 
 const TABS = ['all', 'draft', 'pending_review', 'published', 'rejected', 'archived'];
-const CATEGORIES = ['all', 'Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'AI/ML', 'Cloud', 'Cybersecurity'];
+const CATEGORIES = ['all', 'Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'Artificial Intelligence', 'Cloud', 'Cybersecurity'];
 
 export default function AdminCourses() {
   const { courses, isLoading, error, fetchCourses, createCourse, updateCourse, approveCourse, rejectCourse, archiveCourse, featureCourse, deleteCourse } = useAdminStore();
@@ -573,7 +573,7 @@ export default function AdminCourses() {
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50"
                     >
-                      {['Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'AI/ML', 'Cloud', 'Cybersecurity'].map((c) => (
+                      {['Web Development', 'Data Science', 'Design', 'Mobile', 'DevOps', 'Artificial Intelligence', 'Cloud', 'Cybersecurity'].map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>

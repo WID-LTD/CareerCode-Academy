@@ -88,7 +88,7 @@ export default function AdminPayments() {
   };
 
   const handleExport = () => {
-    const csv = [['ID', 'User', 'Course', 'Amount', 'Status', 'Date'].join(',')];
+    const csv = [['Identifier', 'User', 'Course', 'Amount', 'Status', 'Date'].join(',')];
     filtered.forEach((p) => csv.push([p._id, p.user?.name, p.course?.title, p.amount, p.status, new Date(p.created_at).toISOString()].join(',')));
     const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

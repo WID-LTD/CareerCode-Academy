@@ -65,7 +65,7 @@ export default function Certificates() {
       toast.success('Download link ready');
       window.open(cert.certificateUrl, '_blank');
     } else {
-      toast.error('No certificate URL available');
+      toast.error('No certificate link available');
     }
   };
 

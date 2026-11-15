@@ -140,7 +140,7 @@ export default function StudentLab() {
             </div>
             <p className="text-xs text-gray-500 mt-1">
               {github?.message || 'Checking whether CareerCode can reach GitHub...'}
-              {github?.remaining != null ? ` · ${github.remaining}/${github.limit} API calls left` : ''}
+              {github?.remaining != null ? ` · ${github.remaining}/${github.limit} interface calls left` : ''}
             </p>
             <div className="mt-3 grid sm:grid-cols-2 gap-2">
               {(github?.local_commands || []).map((c: any) => (

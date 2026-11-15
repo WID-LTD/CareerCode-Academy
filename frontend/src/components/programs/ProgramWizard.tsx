@@ -387,7 +387,7 @@ export function ProgramWizard({ initial, schools, onClose, onSaved }: ProgramWiz
               </div>
               <div>
                 <Input
-                  label="Thumbnail URL"
+                  label="Thumbnail web address"
                   value={basics.thumbnail_url}
                   onChange={(e) => setBasics({ ...basics, thumbnail_url: e.target.value })}
                   placeholder="https://…"

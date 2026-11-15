@@ -89,7 +89,7 @@ export default function SolveChallenge({ challenge, submission, onSubmitted }: S
       {subType === 'file_upload' || subType === 'both' || subType === 'link' ? (
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1.5">
-            {subType === 'link' ? 'Submission Link/URL' : 'Upload a file or paste a URL'}
+            {subType === 'link' ? 'Submission link or web address' : 'Upload a file or paste a web address'}
           </label>
           <div className="flex gap-2">
             <input

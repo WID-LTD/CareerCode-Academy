@@ -382,7 +382,7 @@ export default function AdminManagement() {
             <h2 className="text-lg font-bold mb-2">Promote User to Admin</h2>
             <p className="text-sm text-gray-500 mb-4">Enter the email or user ID of the user to promote.</p>
             <Input
-              placeholder="User email or ID..."
+              placeholder="User email or identifier..."
               value={promoteEmail}
               onChange={(e) => setPromoteEmail(e.target.value)}
             />

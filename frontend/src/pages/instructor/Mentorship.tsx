@@ -314,7 +314,7 @@ export default function InstructorMentorship() {
             onChange={(e) => setNewSlot({ ...newSlot, end_time: e.target.value })}
           />
           <Input
-            label="Meeting URL (optional)"
+            label="Meeting web address (optional)"
             type="url"
             placeholder="https://meet.google.com/..."
             value={newSlot.meeting_url}

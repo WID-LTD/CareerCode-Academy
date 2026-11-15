@@ -70,10 +70,10 @@ function ListingFormModal({ open, onClose, editing, kind, onSaved }: {
         <Input label="Description" name="description" required defaultValue={editing?.description} placeholder="Role overview, requirements..." />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input label="Salary Range" name="salary_range" defaultValue={editing?.salary_range || ''} placeholder="e.g. ₦3,000,000 / year" />
-          <Input label="Application URL (optional)" name="application_url" defaultValue={editing?.application_url || ''} placeholder="Direct external link" />
+          <Input label="Application link (optional)" name="application_url" defaultValue={editing?.application_url || ''} placeholder="Direct external link" />
         </div>
         <Input label="Expires At" name="expires_at" type="datetime-local" defaultValue={editing?.expires_at ? String(editing.expires_at).slice(0, 16) : ''} />
-        <Input label="Skills (comma separated)" name="skills" defaultValue={editing?.skills?.join(', ') || ''} placeholder="React, Node.js, UI/UX..." />
+        <Input label="Skills (comma separated)" name="skills" defaultValue={editing?.skills?.join(', ') || ''} placeholder="React, Node.js, product design..." />
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>{editing ? 'Save' : 'Create'}</Button>

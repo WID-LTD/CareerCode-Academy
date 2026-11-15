@@ -81,7 +81,7 @@ export default function AdminVideos() {
 
   async function handleSave() {
     if (!form.title || !form.video_url) {
-      toast.error('Title and video URL are required');
+      toast.error('Title and video link are required');
       return;
     }
     setSaving(true);

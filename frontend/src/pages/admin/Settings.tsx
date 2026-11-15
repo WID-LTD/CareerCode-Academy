@@ -293,12 +293,12 @@ export default function AdminSettings() {
                   <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-1">XP Business Model</h3>
                   <p className="text-xs text-gray-500">Admin-customizable. Students redeem XP for discount codes applied at checkout.</p>
                 </div>
-                <Input label={`XP to ${getSetting('platform_currency','NGN')} Rate (${getSetting('platform_currency','NGN')} per 1 XP)`} type="number" step="0.01" value={getSetting('xp_to_ngn_rate', '0.1')} onChange={(e) => handleChange('xp_to_ngn_rate', e.target.value)} />
+                <Input label={`Experience points to ${getSetting('platform_currency','NGN')} Rate (${getSetting('platform_currency','NGN')} per 1 experience point)`} type="number" step="0.01" value={getSetting('xp_to_ngn_rate', '0.1')} onChange={(e) => handleChange('xp_to_ngn_rate', e.target.value)} />
                 <p className="text-xs text-gray-400 -mt-3">e.g., 0.1 = 1000 XP → {(SUPPORTED_CURRENCIES as any)[getSetting('platform_currency','NGN')]?.symbol || '₦'}100. Example: {getSetting('xp_min_redeem','1000')} XP → {(SUPPORTED_CURRENCIES as any)[getSetting('platform_currency','NGN')]?.symbol || '₦'}{Math.floor(parseInt(getSetting('xp_min_redeem','1000')) * parseFloat(getSetting('xp_to_ngn_rate','0.1')) || 0)}</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Minimum Redeem (XP)" type="number" value={getSetting('xp_min_redeem', '1000')} onChange={(e) => handleChange('xp_min_redeem', e.target.value)} />
-                  <Input label="Redeem Step (XP increments)" type="number" value={getSetting('xp_redeem_step', '1000')} onChange={(e) => handleChange('xp_redeem_step', e.target.value)} />
+                  <Input label="Minimum Redeem (experience points)" type="number" value={getSetting('xp_min_redeem', '1000')} onChange={(e) => handleChange('xp_min_redeem', e.target.value)} />
+                  <Input label="Redeem Step (experience point increments)" type="number" value={getSetting('xp_redeem_step', '1000')} onChange={(e) => handleChange('xp_redeem_step', e.target.value)} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input label="Max Discount % per Course" type="number" value={getSetting('xp_max_discount_percent', '50')} onChange={(e) => handleChange('xp_max_discount_percent', e.target.value)} />

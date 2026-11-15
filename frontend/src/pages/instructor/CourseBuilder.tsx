@@ -59,7 +59,7 @@ const STEPS = [
 const LESSON_TYPES = [
   { value: 'video', label: 'Video', icon: Video, color: 'text-blue-500' },
   { value: 'text', label: 'Text', icon: FileText, color: 'text-green-500' },
-  { value: 'pdf', label: 'PDF', icon: File, color: 'text-red-500' },
+  { value: 'pdf', label: 'Document', icon: File, color: 'text-red-500' },
   { value: 'slides', label: 'Slide Presentation', icon: Presentation, color: 'text-orange-500' },
   { value: 'assignment', label: 'Assignment', icon: ClipboardList, color: 'text-purple-500' },
   { value: 'quiz', label: 'Quiz', icon: CheckCircle2, color: 'text-yellow-500' },
@@ -695,7 +695,7 @@ export default function CourseBuilder() {
           { value: 'devops', label: 'DevOps' },
           { value: 'cybersecurity', label: 'Cybersecurity' },
           { value: 'cloud-computing', label: 'Cloud Computing' },
-          { value: 'ui-ux', label: 'UI/UX Design' },
+          { value: 'ui-ux', label: 'Product Design' },
           { value: 'game-development', label: 'Game Development' },
           { value: 'blockchain', label: 'Blockchain' },
         ]}
