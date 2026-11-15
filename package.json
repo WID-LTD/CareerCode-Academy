@@ -18,6 +18,7 @@
     "dev:env": "npm run test:env --workspace=backend && npm run test:env --workspace=frontend",
     "test:env": "npm run test:env --workspace=backend && npm run test:env --workspace=frontend",
     "check:copy": "node scripts/check-copy.mjs",
+    "test:contract": "node scripts/contract-test.mjs",
     "env:check": "npm run test:env",
     "start": "npm run dev:all",
     "start:backend": "npm run dev --workspace=backend",
