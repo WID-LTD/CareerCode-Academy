@@ -17,9 +17,10 @@ import api from '@/lib/axios';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import CrmMore from './CrmMore';
+import LegalEditor from './LegalEditor';
 
 type Scope = 'admin' | 'instructor';
-type TabKey = 'overview' | 'people' | 'pipeline' | 'accounts' | 'segments' | 'campaigns' | 'inbox' | 'tasks' | 'reports' | 'settings' | 'more';
+type TabKey = 'overview' | 'people' | 'pipeline' | 'accounts' | 'segments' | 'campaigns' | 'inbox' | 'tasks' | 'reports' | 'settings' | 'more' | 'legal';
 
 interface Props { scope: Scope }
 
@@ -120,6 +121,7 @@ export default function CrmWorkspace({ scope }: Props) {
       { key: 'tasks', label: 'Tasks', icon: ListChecks },
       { key: 'reports', label: 'Reports', icon: TrendingUp },
       { key: 'more', label: 'Success and operations', icon: Layers },
+      { key: 'legal', label: 'Legal pages', icon: FileText },
       { key: 'settings', label: 'Settings', icon: Settings },
     ];
     const instructorTabs = [
@@ -166,6 +168,7 @@ export default function CrmWorkspace({ scope }: Props) {
       {tab === 'tasks' && <TasksTab base={base} scope={scope} refreshKey={refreshKey} onOpenPerson={setSelectedPerson} />}
       {tab === 'reports' && <ReportsTab base={base} scope={scope} refreshKey={refreshKey} />}
       {tab === 'more' && scope === 'admin' && <CrmMore base={base} refreshKey={refreshKey} />}
+      {tab === 'legal' && scope === 'admin' && <LegalEditor base={base} />}
       {tab === 'settings' && scope === 'admin' && <SettingsTab base={base} refreshKey={refreshKey} />}
 
       {selectedPerson && (

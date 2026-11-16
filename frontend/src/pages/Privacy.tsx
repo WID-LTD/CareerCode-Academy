@@ -2,8 +2,13 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Shield, FileText } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { usePageContent } from '@/hooks/usePageContent';
 
-const sections = [
+const defaultPrivacy = {
+  title: 'Privacy Policy',
+  updated: 'November 11, 2026',
+  intro: 'At CareerCode Academy, a venture of WID LTD (RC 8824091), we take your privacy seriously. This policy describes how we collect, use, and protect your personal information when you use our platform.',
+  sections: [
   { title: '1. Information We Collect', content: 'We collect information you provide directly, including name, email address, payment information, and profile details. We also automatically collect usage data such as pages visited, time spent on courses, and interaction patterns to improve our platform.' },
   { title: '2. How We Use Your Information', content: 'Your information is used to provide and improve our educational services, process payments, send updates and marketing communications (with consent), personalize your learning experience, and analyze platform usage to enhance our curriculum.' },
   { title: '3. Data Sharing & Disclosure', content: 'We do not sell your personal information. We may share data with trusted third-party service providers who help us operate the platform (payment processors, cloud hosting, analytics). These providers are contractually bound to protect your data.' },
@@ -15,9 +20,13 @@ const sections = [
   { title: '9. International Transfers', content: 'Your data may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place through standard contractual clauses and data processing agreements.' },
   { title: '10. Changes to This Policy', content: 'We may update this Privacy Policy periodically. Material changes will be notified via email or platform notice. Continued use after changes constitutes acceptance of the updated policy.' },
   { title: '11. Contact', content: 'The data controller is WID LTD (RC 8824091), Agbara, Ogun State, Nigeria. Contact contact@widltd.com.ng or +234 816 496 1457 for privacy requests.' },
-];
+],
+};
 
 export default function Privacy() {
+  const page = usePageContent('privacy', defaultPrivacy);
+  const privacy = { ...defaultPrivacy, ...(page as any) };
+  const sections = Array.isArray(privacy.sections) ? privacy.sections : defaultPrivacy.sections;
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <section className="py-20 relative">
@@ -28,22 +37,21 @@ export default function Privacy() {
               <Shield className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold mb-4">
-              Privacy <span className="gradient-text">Policy</span>
+              {privacy.title}
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Last updated: November 11, 2026
+              Last updated: {privacy.updated}
             </p>
           </motion.div>
 
           <GlassCard className="p-8 mb-8">
             <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-              At CareerCode Academy, a venture of WID LTD (RC 8824091), we take your privacy seriously. This policy describes how we collect, 
-              use, and protect your personal information when you use our platform.
+              {privacy.intro}
             </p>
           </GlassCard>
 
           <div className="space-y-6">
-            {sections.map((section, i) => (
+            {sections.map((section: any, i: number) => (
               <motion.div
                 key={section.title}
                 initial={{ opacity: 0, y: 20 }}

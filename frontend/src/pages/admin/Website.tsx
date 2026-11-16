@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Globe, Home, Info, Mail, HelpCircle, PanelBottom, Plus, Save, Trash2, Loader2, BookOpen, Pencil } from 'lucide-react';
+import { Globe, Home, Info, Mail, HelpCircle, PanelBottom, Plus, Save, Trash2, Loader2, BookOpen, Pencil, Scale } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Tabs } from '@/components/ui/Tabs';
 import SEO from '@/components/seo/SEO';
+import LegalEditor from '@/components/crm/LegalEditor';
 import api from '@/lib/axios';
 import toast from 'react-hot-toast';
 
@@ -115,6 +116,7 @@ export default function AdminWebsite() {
             { key: 'faq', label: 'Questions', icon: HelpCircle },
             { key: 'footer', label: 'Footer', icon: PanelBottom },
             { key: 'blog', label: 'Blog', icon: BookOpen },
+            { key: 'legal', label: 'Legal', icon: Scale },
           ]}
           activeKey={tab}
           onChange={setTab}
@@ -207,6 +209,8 @@ export default function AdminWebsite() {
                 </div>
               </Section>
             )}
+
+            {tab === 'legal' && <LegalEditor />}
 
             {tab === 'blog' && (
               <Section title="Blog posts">
