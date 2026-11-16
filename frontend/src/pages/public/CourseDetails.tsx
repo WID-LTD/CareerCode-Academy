@@ -443,7 +443,7 @@ export default function CourseDetails() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={handleEnroll}
+                      onClick={() => navigate(`/checkout?courseId=${course.id}`)}
                       disabled={isEnrolling || isStartingTrial || checkingEnrollment}
                     >
                       Buy this course only — {priceDisplay}
@@ -679,7 +679,7 @@ export default function CourseDetails() {
               {isEnrolled ? 'Go to Course' : isFree ? 'Enroll Free' : 'Start free trial'}
             </Button>
             {!isEnrolled && !isFree && (
-              <Button variant="outline" onClick={handleEnroll} disabled={isEnrolling || isStartingTrial || checkingEnrollment}>
+              <Button variant="outline" onClick={() => navigate(`/checkout?courseId=${course.id}`)} disabled={isEnrolling || isStartingTrial || checkingEnrollment}>
                 Buy — {priceDisplay}
               </Button>
             )}

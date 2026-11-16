@@ -80,6 +80,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   ],
   instructor: [
     { label: 'Dashboard Overview', path: '/instructor/dashboard', icon: LayoutDashboard },
+    { label: 'Learner relationships', path: '/instructor/crm', icon: Users },
     { label: 'To-Do', path: '/instructor/todos', icon: ListChecks },
     { label: 'My Programs', path: '/instructor/programs', icon: GitBranch },
     { label: 'My Courses', path: '/instructor/courses', icon: BookOpen },
@@ -100,6 +101,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   ],
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Relationships', path: '/admin/crm', icon: Target },
     { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
     { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
     { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },
@@ -133,6 +135,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   ],
   adminNarrow: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Relationships', path: '/admin/crm', icon: Target },
     { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
     { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
     { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },

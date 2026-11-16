@@ -234,6 +234,8 @@ const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
 const AdminCoupons = lazy(() => import('@/pages/admin/Coupons'));
 const AdminProjectAnalytics = lazy(() => import('@/pages/admin/ProjectAnalytics'));
 const InstructorHubReview = lazy(() => import('@/pages/instructor/HubReview'));
+const InstructorCrm = lazy(() => import('@/pages/instructor/Crm'));
+const AdminCrm = lazy(() => import('@/pages/admin/Crm'));
 const AdminTrialSettings = lazy(() => import('@/pages/admin/TrialSettings'));
 const AdminBoardOversight = lazy(() => import('@/pages/admin/BoardOversight'));
 const AdminPrograms = lazy(() => import('@/pages/admin/Programs'));
@@ -423,6 +425,7 @@ function App() {
 
         <Route path="/instructor" element={<DashboardLayout requiredRole="instructor" />}>
           <Route path="dashboard" element={<SuspenseWrapper><InstructorDashboard /></SuspenseWrapper>} />
+          <Route path="crm" element={<SuspenseWrapper><InstructorCrm /></SuspenseWrapper>} />
           <Route path="todos" element={<SuspenseWrapper><Todos /></SuspenseWrapper>} />
           <Route path="analytics" element={<SuspenseWrapper><InstructorAnalytics /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><InstructorManageCourses /></SuspenseWrapper>} />
@@ -460,6 +463,7 @@ function App() {
           <Route path="learning-paths" element={<SuspenseWrapper><AdminLearningPaths /></SuspenseWrapper>} />
           <Route path="feature-flags" element={<SuspenseWrapper><AdminFeatureFlags /></SuspenseWrapper>} />
           <Route path="system-health" element={<SuspenseWrapper><AdminSystemHealth /></SuspenseWrapper>} />
+          <Route path="crm" element={<SuspenseWrapper><AdminCrm /></SuspenseWrapper>} />
           <Route path="users" element={<SuspenseWrapper><AdminUsers /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><AdminCourses /></SuspenseWrapper>} />
           <Route path="courses/:id" element={<SuspenseWrapper><AdminCourseDetail /></SuspenseWrapper>} />
