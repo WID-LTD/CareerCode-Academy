@@ -41,6 +41,8 @@ export function OnboardingWizard() {
       localStorage.setItem('careercode-onboarding', JSON.stringify(preferences));
       if (isAuthenticated) await api.put('/users/me/preferences', preferences).catch(() => {});
       dismissOnboarding();
+      const role = useAuthStore.getState().user?.role || 'student';
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent('tour:start', { detail: { role } })), 900);
       if (browse) navigate('/courses');
       else if (goal?.slug && isAuthenticated) navigate(`/student/career-goals/${goal.slug}`);
       else if (goal?.slug) navigate(`/signup?next=${encodeURIComponent(`/student/career-goals/${goal.slug}`)}`);

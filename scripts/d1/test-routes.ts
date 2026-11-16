@@ -393,6 +393,44 @@ async function main() {
     }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['DELETE /api/v1/admin/crm/leads/:id (cleanup)', () => call(`/api/v1/admin/crm/leads/${(globalThis as any).__crmLead}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/instructor/crm/overview', () => call('/api/v1/instructor/crm/overview', { token: adminToken }), (r) => (r.json?.data?.students ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/mentoring/instructors', () => call('/api/v1/mentoring/instructors', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/mentoring/slots', () => call('/api/v1/mentoring/slots', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/mentoring/my-bookings', () => call('/api/v1/mentoring/my-bookings', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/mentoring/instructor/profile', () => call('/api/v1/mentoring/instructor/profile', { token: adminToken }), (r) => (r.json?.data?.user_id ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/mentoring/instructor/availability', () => call('/api/v1/mentoring/instructor/availability', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/mentoring/instructor/availability', async () => {
+      const r = await call('/api/v1/mentoring/instructor/availability', { method: 'POST', token: adminToken, body: { weekday: 1, start_time: '09:00', end_time: '10:00', timezone: 'Africa/Lagos', slot_minutes: 30, buffer_minutes: 5 } });
+      (globalThis as any).__mentoringAvailability = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/mentoring/instructor/availability/:id/preview', () => call(`/api/v1/mentoring/instructor/availability/${(globalThis as any).__mentoringAvailability}/preview`, { method: 'POST', token: adminToken, body: { weeks: 1 } }), (r) => (Array.isArray(r.json?.data?.slots) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/mentoring/instructor/availability/:id (cleanup)', () => call(`/api/v1/mentoring/instructor/availability/${(globalThis as any).__mentoringAvailability}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/mentoring/instructor/stats', () => call('/api/v1/mentoring/instructor/stats', { token: adminToken }), (r) => (r.json?.data ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/guide/tours', () => call('/api/v1/guide/tours', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/guide/tours/student-journey', () => call('/api/v1/guide/tours/student-journey', { token }), (r) => (Array.isArray(r.json?.data?.steps) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/guide/progress', () => call('/api/v1/guide/progress', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['PUT /api/v1/guide/progress', () => call('/api/v1/guide/progress', { method: 'PUT', token, body: { tour_key: 'student-journey', step_index: 2, status: 'in_progress' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/guide/events', () => call('/api/v1/guide/events', { method: 'POST', token, body: { tour_key: 'student-journey', step_index: 2, event: 'step_view' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/guide/admin/tours', () => call('/api/v1/guide/admin/tours', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/guide/admin/tours/:id/steps', async () => {
+      const tours = await call('/api/v1/guide/admin/tours', { token: adminToken });
+      const tour = (tours.json?.data || []).find((t: any) => t.key === 'student-journey');
+      (globalThis as any).__guideTourId = tour?.id;
+      return call(`/api/v1/guide/admin/tours/${tour?.id}/steps`, { token: adminToken });
+    }, (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/guide/admin/tours', async () => {
+      const r = await call('/api/v1/guide/admin/tours', { method: 'POST', token: adminToken, body: { name: `Guide test ${Date.now()}`, role: 'student', type: 'page_tour' } });
+      (globalThis as any).__guideTestTour = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/guide/admin/tours/:id/steps', async () => {
+      const r = await call(`/api/v1/guide/admin/tours/${(globalThis as any).__guideTestTour}/steps`, { method: 'POST', token: adminToken, body: { title: 'Test step', route: '/student/dashboard', body: 'Test body' } });
+      (globalThis as any).__guideTestStep = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/guide/admin/tours/:id/publish', () => call(`/api/v1/guide/admin/tours/${(globalThis as any).__guideTestTour}/publish`, { method: 'POST', token: adminToken, body: {} }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/guide/admin/tours/:id (cleanup)', () => call(`/api/v1/guide/admin/tours/${(globalThis as any).__guideTestTour}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/guide/admin/analytics', () => call('/api/v1/guide/admin/analytics', { token: adminToken }), (r) => (r.json?.data ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/crm/success-plans', () => call('/api/v1/admin/crm/success-plans', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/crm/referrals', () => call('/api/v1/admin/crm/referrals', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/crm/surveys', () => call('/api/v1/admin/crm/surveys', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],

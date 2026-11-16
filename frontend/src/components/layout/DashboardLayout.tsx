@@ -99,7 +99,7 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
 
       <div className="lg:pl-64 xl:pl-[clamp(260px,15vw,360px)] pt-14 sm:pt-16 safe-bottom">
         {/* Top Bar with Search */}
-        <div className="sticky top-14 sm:top-16 z-30 glass border-b border-gray-200/60 dark:border-gray-800/50 px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3">
+        <div data-tour="topbar" className="sticky top-14 sm:top-16 z-30 glass border-b border-gray-200/60 dark:border-gray-800/50 px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden touch-target flex items-center justify-center"
@@ -192,7 +192,7 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
         </div>
 
         <TrialStatusBanner />
-        <main className="container-page py-4 sm:py-6 lg:py-8" id="main-content">
+        <main data-tour="page-content" className="container-page py-4 sm:py-6 lg:py-8" id="main-content">
           <Outlet />
         </main>
       </div>

@@ -104,6 +104,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Relationships', path: '/admin/crm', icon: Target },
     { label: 'Website', path: '/admin/website', icon: Globe },
+    { label: 'Guided tours', path: '/admin/guides', icon: Compass },
     { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
     { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
     { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },
@@ -139,6 +140,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Relationships', path: '/admin/crm', icon: Target },
     { label: 'Website', path: '/admin/website', icon: Globe },
+    { label: 'Guided tours', path: '/admin/guides', icon: Compass },
     { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
     { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
     { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },
@@ -253,7 +255,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         />
       )}
 
-      <aside
+      <aside data-tour="sidebar"
         className={cn(
           'fixed top-14 sm:top-16 left-0 bottom-0 z-40 glass border-r border-gray-200/60 dark:border-gray-800/50 overflow-y-auto scrollbar-thin transition-transform duration-300 lg:translate-x-0 safe-bottom',
           collapsed ? 'w-16' : 'w-64 xl:w-[clamp(260px,15vw,360px)]',

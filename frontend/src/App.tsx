@@ -8,7 +8,7 @@ import api from '@/lib/axios';
 import { OnboardingProvider } from '@/guides/OnboardingContext';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { InAppMessagePopup } from '@/components/notifications/InAppMessagePopup';
-import { GuidedTour } from '@/components/guides/GuidedTour';
+import { GuidedExperience } from '@/components/guides/GuidedExperience';
 import { OnboardingModal } from '@/guides/OnboardingModal';
 import { AnalyticsTracker } from '@/hooks/useAnalyticsTracker';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
@@ -237,6 +237,7 @@ const InstructorHubReview = lazy(() => import('@/pages/instructor/HubReview'));
 const InstructorCrm = lazy(() => import('@/pages/instructor/Crm'));
 const AdminCrm = lazy(() => import('@/pages/admin/Crm'));
 const AdminWebsite = lazy(() => import('@/pages/admin/Website'));
+const AdminGuides = lazy(() => import('@/pages/admin/Guides'));
 const AdminTrialSettings = lazy(() => import('@/pages/admin/TrialSettings'));
 const AdminBoardOversight = lazy(() => import('@/pages/admin/BoardOversight'));
 const AdminPrograms = lazy(() => import('@/pages/admin/Programs'));
@@ -262,13 +263,51 @@ function App() {
   const initialize = useAuthStore((s) => s.initialize);
   const initialized = useAuthStore((s) => s.initialized);
   const [backendReady, setBackendReady] = useState(false);
-  const [tourOpen, setTourOpen] = useState(false);
+  const [activeTour, setActiveTour] = useState<any>(null);
+  const [tourPreview, setTourPreview] = useState(false);
+  const user = useAuthStore((s) => s.user);
+
+  const startTour = React.useCallback(async (role?: string, preview = false) => {
+    try {
+      const { data } = await api.get('/guide/tours');
+      const tours = data.data || [];
+      const wantedRole = role || user?.role || 'student';
+      const key = wantedRole === 'instructor' ? 'instructor-journey' : (wantedRole === 'admin' || wantedRole === 'super_admin') ? 'admin-journey' : 'student-journey';
+      const tour = tours.find((t: any) => t.key === key) || tours.find((t: any) => t.role === wantedRole);
+      if (!tour) return;
+      const full = await api.get(`/guide/tours/${tour.key}`);
+      setTourPreview(preview);
+      setActiveTour(full.data.data);
+    } catch { /* tour is optional */ }
+  }, [user?.role]);
 
   useEffect(() => {
-    const open = () => setTourOpen(true);
+    const open = () => startTour();
+    const start = (e: any) => startTour(e?.detail?.role);
+    const preview = (e: any) => {
+      if (e?.detail?.tour) { setTourPreview(true); setActiveTour(e.detail.tour); }
+      else startTour(e?.detail?.role, true);
+    };
     window.addEventListener('tour:open', open);
-    return () => window.removeEventListener('tour:open', open);
-  }, []);
+    window.addEventListener('tour:start', start);
+    window.addEventListener('tour:preview', preview);
+    return () => {
+      window.removeEventListener('tour:open', open);
+      window.removeEventListener('tour:start', start);
+      window.removeEventListener('tour:preview', preview);
+    };
+  }, [startTour]);
+
+  useEffect(() => {
+    if (!user || !initialized) return;
+    if (window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/signup')) return;
+    const done = localStorage.getItem('careercode-guided-tour-v2-done');
+    const onboardingDone = localStorage.getItem('onboarding_completed');
+    if (!done && onboardingDone) {
+      const timer = setTimeout(() => startTour(), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [user, initialized, startTour]);
 
   useEffect(() => {
     // Skip initialize on OAuth callback — let SocialCallback handle it via cookie
@@ -316,7 +355,7 @@ function App() {
       <PlatformConfig />
       <NotificationBridge />
       <InAppMessagePopup />
-      <GuidedTour open={tourOpen} onClose={() => setTourOpen(false)} />
+      <GuidedExperience open={!!activeTour} tour={activeTour} preview={tourPreview} onClose={() => setActiveTour(null)} />
       <RoleWatcher />
       <PwaBridge />
       {!isPortfolioRoute && <MaintenanceBanner />}
@@ -466,6 +505,7 @@ function App() {
           <Route path="system-health" element={<SuspenseWrapper><AdminSystemHealth /></SuspenseWrapper>} />
           <Route path="crm" element={<SuspenseWrapper><AdminCrm /></SuspenseWrapper>} />
           <Route path="website" element={<SuspenseWrapper><AdminWebsite /></SuspenseWrapper>} />
+          <Route path="guides" element={<SuspenseWrapper><AdminGuides /></SuspenseWrapper>} />
           <Route path="users" element={<SuspenseWrapper><AdminUsers /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><AdminCourses /></SuspenseWrapper>} />
           <Route path="courses/:id" element={<SuspenseWrapper><AdminCourseDetail /></SuspenseWrapper>} />
