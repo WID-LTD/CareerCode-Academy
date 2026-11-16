@@ -373,6 +373,21 @@ async function main() {
     ['GET /api/v1/admin/crm/settings', () => call('/api/v1/admin/crm/settings', { token: adminToken }), (r) => (Array.isArray(r.json?.data?.stages) ? null : JSON.stringify(r.json).slice(0, 200))],
     ['POST /api/v1/admin/crm/people/:id/notes', () => call(`/api/v1/admin/crm/people/${user.id}/notes`, { method: 'POST', token: adminToken, body: { subject: 'Test note', body: 'CRM route test' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['POST /api/v1/admin/crm/tasks', () => call('/api/v1/admin/crm/tasks', { method: 'POST', token: adminToken, body: { title: 'CRM route test task', person_id: user.id, priority: 'low' } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/admin/crm/segments/:id/preview', () => call('/api/v1/admin/crm/segments/seg-new-leads/preview', { method: 'POST', token: adminToken, body: {} }), (r) => (r.json?.data?.count !== undefined ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/admin/crm/segments/:id/refresh', () => call('/api/v1/admin/crm/segments/seg-new-leads/refresh', { method: 'POST', token: adminToken, body: {} }), (r) => (r.json?.data?.count !== undefined ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/segments/:id/members', () => call('/api/v1/admin/crm/segments/seg-new-leads/members', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/admin/crm/accounts', async () => {
+      const r = await call('/api/v1/admin/crm/accounts', { method: 'POST', token: adminToken, body: { name: `Test Account ${Date.now()}`, type: 'school' } });
+      (globalThis as any).__crmAccount = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/admin/crm/accounts/:id (cleanup)', () => call(`/api/v1/admin/crm/accounts/${(globalThis as any).__crmAccount}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/admin/crm/leads', async () => {
+      const r = await call('/api/v1/admin/crm/leads', { method: 'POST', token: adminToken, body: { name: 'CRM Test Lead', email: `lead-${Date.now()}@example.com` } });
+      (globalThis as any).__crmLead = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/admin/crm/leads/:id (cleanup)', () => call(`/api/v1/admin/crm/leads/${(globalThis as any).__crmLead}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/instructor/crm/overview', () => call('/api/v1/instructor/crm/overview', { token: adminToken }), (r) => (r.json?.data?.students ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/analytics (admin)', () => call('/api/v1/admin/analytics', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/courses (admin)', () => call('/api/v1/admin/courses?limit=3', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
