@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Globe, Home, Info, Mail, HelpCircle, PanelBottom, Plus, Save, Trash2, Loader2 } from 'lucide-react';
+import { Globe, Home, Info, Mail, HelpCircle, PanelBottom, Plus, Save, Trash2, Loader2, BookOpen, Pencil } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Tabs } from '@/components/ui/Tabs';
 import SEO from '@/components/seo/SEO';
 import api from '@/lib/axios';
@@ -45,6 +46,11 @@ export default function AdminWebsite() {
   const [existing, setExisting] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [blogs, setBlogs] = useState<any[]>([]);
+  const [blogOpen, setBlogOpen] = useState(false);
+  const [blogSaving, setBlogSaving] = useState(false);
+  const [blogForm, setBlogForm] = useState<any>({ title: '', excerpt: '', content: '', category: 'Learning', tags: '', imageUrl: '' });
+  const [editingBlog, setEditingBlog] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -61,6 +67,7 @@ export default function AdminWebsite() {
       }
       setContent(next);
       setExisting(has);
+      api.get('/blogs?all=true&limit=100').then(({ data }) => setBlogs(data.data || [])).catch(() => {});
     }).catch(() => toast.error('Failed to load website content')).finally(() => setLoading(false));
   }, []);
 
@@ -107,6 +114,7 @@ export default function AdminWebsite() {
             { key: 'contact', label: 'Contact', icon: Mail },
             { key: 'faq', label: 'Questions', icon: HelpCircle },
             { key: 'footer', label: 'Footer', icon: PanelBottom },
+            { key: 'blog', label: 'Blog', icon: BookOpen },
           ]}
           activeKey={tab}
           onChange={setTab}
@@ -200,6 +208,24 @@ export default function AdminWebsite() {
               </Section>
             )}
 
+            {tab === 'blog' && (
+              <Section title="Blog posts">
+                <div className="flex justify-end"><Button size="sm" onClick={() => { setEditingBlog(null); setBlogForm({ title: '', excerpt: '', content: '', category: 'Learning', tags: '', imageUrl: '' }); setBlogOpen(true); }} icon={<Plus className="w-4 h-4" />}>New post</Button></div>
+                <div className="space-y-2">
+                  {blogs.length === 0 ? <p className="text-sm text-gray-400">No posts yet.</p> : blogs.map((post) => (
+                    <div key={post.id} className="flex items-start justify-between gap-3 rounded-xl border border-gray-100 dark:border-gray-800 p-3">
+                      <div className="min-w-0"><p className="text-sm font-medium truncate">{post.title}</p><p className="text-xs text-gray-400">{post.category} · {post.author_name || 'Author'} · {post.published ? 'Published' : 'Draft'}</p></div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingBlog(post.id); setBlogForm({ title: post.title, excerpt: post.excerpt || '', content: post.content, category: post.category, tags: Array.isArray(post.tags) ? post.tags.join(', ') : '', imageUrl: post.image_url || '' }); setBlogOpen(true); }}><Pencil className="w-3.5 h-3.5" /></Button>
+                        <Button size="sm" variant="outline" onClick={async () => { await api.put(`/blogs/${post.id}`, { published: !post.published }); toast.success(post.published ? 'Unpublished' : 'Published'); load(); }}>{post.published ? 'Unpublish' : 'Publish'}</Button>
+                        <Button size="sm" variant="ghost" onClick={async () => { await api.delete(`/blogs/${post.id}`); toast.success('Post deleted'); load(); }}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
             {tab === 'footer' && (
               <Section title="Footer">
                 <Textarea label="Description" value={footer.description} onChange={(e) => update(['description'], e.target.value)} />
@@ -212,6 +238,29 @@ export default function AdminWebsite() {
           </GlassCard>
         )}
       </div>
+
+      <Modal isOpen={blogOpen} onClose={() => setBlogOpen(false)} title={editingBlog ? 'Edit blog post' : 'New blog post'} size="lg">
+        <div className="space-y-3">
+          <Input label="Title" value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })} />
+          <Input label="Category" value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} />
+          <Input label="Excerpt" value={blogForm.excerpt} onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })} />
+          <Input label="Image link" value={blogForm.imageUrl} onChange={(e) => setBlogForm({ ...blogForm, imageUrl: e.target.value })} />
+          <Input label="Tags (comma separated)" value={blogForm.tags} onChange={(e) => setBlogForm({ ...blogForm, tags: e.target.value })} />
+          <Textarea label="Content" value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} />
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setBlogOpen(false)}>Cancel</Button><Button loading={blogSaving} onClick={async () => {
+            setBlogSaving(true);
+            try {
+              const payload = { ...blogForm, tags: String(blogForm.tags || '').split(',').map((t) => t.trim()).filter(Boolean) };
+              if (editingBlog) await api.put(`/blogs/${editingBlog}`, payload);
+              else await api.post('/blogs', payload);
+              toast.success(editingBlog ? 'Post updated' : 'Post created');
+              setBlogOpen(false);
+              load();
+            } catch (e: any) { toast.error(e?.response?.data?.message || 'Failed to save post'); }
+            finally { setBlogSaving(false); }
+          }}>Save post</Button></div>
+        </div>
+      </Modal>
     </>
   );
 }

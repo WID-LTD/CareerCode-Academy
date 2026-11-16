@@ -1565,6 +1565,585 @@ crm.get('/search', async (c) => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// Success plans, referrals, surveys and contracts
+// ─────────────────────────────────────────────────────────────
+crm.get('/success-plans', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT sp.*, u.name AS person_name, u.email AS person_email, o.name AS owner_name,
+        (SELECT COUNT(*)::int FROM crm_success_milestones m WHERE m.plan_id=sp.id) AS milestones,
+        (SELECT COUNT(*)::int FROM crm_success_milestones m WHERE m.plan_id=sp.id AND m.status='completed') AS completed
+       FROM crm_success_plans sp JOIN users u ON u.id=sp.person_id LEFT JOIN users o ON o.id=sp.owner_id
+       ORDER BY sp.created_at DESC LIMIT 200`
+    );
+    return c.json({ success: true, data: rows.rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load success plans'); }
+});
+
+crm.post('/success-plans', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!b.person_id || !String(b.name || '').trim()) return fail(c, 400, 'Person and plan name are required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_success_plans (id,person_id,name,goal,status,owner_id,start_date,target_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, b.person_id, b.name, b.goal || null, b.status || 'active', b.owner_id || session.userId, b.start_date || null, b.target_date || null]
+    );
+    await audit(c, session, 'create', 'crm_success_plan', id, `Created success plan ${b.name}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create success plan'); }
+});
+
+crm.put('/success-plans/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['name', 'goal', 'status', 'owner_id', 'start_date', 'target_date']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (!fields.length) return c.json({ success: true });
+    fields.push('updated_at=NOW()'); values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_success_plans SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_success_plan', c.req.param('id'), 'Updated success plan');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update success plan'); }
+});
+
+crm.delete('/success-plans/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_success_plans WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_success_plan', c.req.param('id'), 'Deleted success plan');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete success plan'); }
+});
+
+crm.get('/success-plans/:id/milestones', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>('SELECT * FROM crm_success_milestones WHERE plan_id=$1 ORDER BY position, created_at', [c.req.param('id')]);
+    return c.json({ success: true, data: rows.rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load milestones'); }
+});
+
+crm.post('/success-plans/:id/milestones', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!String(b.title || '').trim()) return fail(c, 400, 'Milestone title is required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_success_milestones (id,plan_id,title,description,due_at,status,position) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, c.req.param('id'), b.title, b.description || null, b.due_at || null, b.status || 'open', asInt(b.position, 0)]
+    );
+    await audit(c, session, 'create', 'crm_success_milestone', id, `Added milestone ${b.title}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to add milestone'); }
+});
+
+crm.put('/success-plans/:id/milestones/:milestoneId', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['title', 'description', 'due_at', 'status', 'position']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (b.status === 'completed') fields.push('completed_at=NOW()');
+    if (!fields.length) return c.json({ success: true });
+    values.push(c.req.param('milestoneId'));
+    await getDb(c.env).query(`UPDATE crm_success_milestones SET ${fields.join(', ')} WHERE id=$${values.length} AND plan_id=$${values.length + 1}`, [...values, c.req.param('id')]);
+    await audit(c, session, 'update', 'crm_success_milestone', c.req.param('milestoneId'), 'Updated milestone');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update milestone'); }
+});
+
+crm.delete('/success-plans/:id/milestones/:milestoneId', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_success_milestones WHERE id=$1 AND plan_id=$2', [c.req.param('milestoneId'), c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_success_milestone', c.req.param('milestoneId'), 'Deleted milestone');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete milestone'); }
+});
+
+crm.get('/referrals', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT r.*, u.name AS referrer_name, u.email AS referrer_email FROM crm_referrals r LEFT JOIN users u ON u.id=r.referrer_id ORDER BY r.created_at DESC LIMIT 200`
+    );
+    return c.json({ success: true, data: rows.rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load referrals'); }
+});
+
+crm.post('/referrals', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_referrals (id,referrer_id,referred_name,referred_email,referred_user_id,code,status,reward_amount,currency) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, b.referrer_id || null, b.referred_name || null, b.referred_email || null, b.referred_user_id || null, b.code || null, b.status || 'invited', Number(b.reward_amount) || 0, b.currency || 'NGN']
+    );
+    await audit(c, session, 'create', 'crm_referral', id, 'Created referral');
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create referral'); }
+});
+
+crm.put('/referrals/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['referrer_id', 'referred_name', 'referred_email', 'referred_user_id', 'code', 'status', 'reward_amount', 'currency']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (b.status === 'converted') fields.push('converted_at=NOW()');
+    if (!fields.length) return c.json({ success: true });
+    values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_referrals SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_referral', c.req.param('id'), 'Updated referral');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update referral'); }
+});
+
+crm.delete('/referrals/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_referrals WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_referral', c.req.param('id'), 'Deleted referral');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete referral'); }
+});
+
+crm.get('/surveys', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT s.*, (SELECT COUNT(*)::int FROM crm_survey_responses r WHERE r.survey_id=s.id) AS responses,
+        (SELECT COALESCE(AVG(r.score),0)::float FROM crm_survey_responses r WHERE r.survey_id=s.id) AS average_score
+       FROM crm_surveys s ORDER BY s.created_at DESC`
+    );
+    return c.json({ success: true, data: rows.rows.map((r: any) => ({ ...r, questions: json(r.questions, []) })) });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load surveys'); }
+});
+
+crm.post('/surveys', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!String(b.name || '').trim()) return fail(c, 400, 'Survey name is required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_surveys (id,name,type,questions,status) VALUES ($1,$2,$3,$4,$5)`,
+      [id, b.name, b.type || 'nps', JSON.stringify(b.questions || []), b.status || 'draft']
+    );
+    await audit(c, session, 'create', 'crm_survey', id, `Created survey ${b.name}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create survey'); }
+});
+
+crm.put('/surveys/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['name', 'type', 'status']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (b.questions !== undefined) { fields.push(`questions=$${values.length + 1}`); values.push(JSON.stringify(b.questions)); }
+    if (!fields.length) return c.json({ success: true });
+    fields.push('updated_at=NOW()'); values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_surveys SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_survey', c.req.param('id'), 'Updated survey');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update survey'); }
+});
+
+crm.delete('/surveys/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_surveys WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_survey', c.req.param('id'), 'Deleted survey');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete survey'); }
+});
+
+crm.get('/surveys/:id/responses', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT r.*, u.name AS person_name FROM crm_survey_responses r LEFT JOIN users u ON u.id=r.person_id WHERE r.survey_id=$1 ORDER BY r.created_at DESC LIMIT 200`,
+      [c.req.param('id')]
+    );
+    return c.json({ success: true, data: rows.rows.map((r: any) => ({ ...r, answers: json(r.answers, {}) })) });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load responses'); }
+});
+
+crm.post('/surveys/:id/responses', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_survey_responses (id,survey_id,person_id,score,answers,comment) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, c.req.param('id'), b.person_id || null, b.score === undefined ? null : asInt(b.score, 0), JSON.stringify(b.answers || {}), b.comment || null]
+    );
+    await audit(c, session, 'create', 'crm_survey_response', id, 'Recorded survey response');
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to record response'); }
+});
+
+crm.get('/contracts', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT ct.*, a.name AS account_name, u.name AS person_name FROM crm_contracts ct LEFT JOIN crm_accounts a ON a.id=ct.account_id LEFT JOIN users u ON u.id=ct.person_id ORDER BY ct.created_at DESC LIMIT 200`
+    );
+    return c.json({ success: true, data: rows.rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load contracts'); }
+});
+
+crm.post('/contracts', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!String(b.title || '').trim()) return fail(c, 400, 'Contract title is required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_contracts (id,account_id,person_id,title,type,value,currency,start_date,end_date,renewal_date,status,notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [id, b.account_id || null, b.person_id || null, b.title, b.type || 'training', Number(b.value) || 0, b.currency || 'NGN', b.start_date || null, b.end_date || null, b.renewal_date || null, b.status || 'draft', b.notes || null]
+    );
+    await audit(c, session, 'create', 'crm_contract', id, `Created contract ${b.title}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create contract'); }
+});
+
+crm.put('/contracts/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['account_id', 'person_id', 'title', 'type', 'value', 'currency', 'start_date', 'end_date', 'renewal_date', 'status', 'notes']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (!fields.length) return c.json({ success: true });
+    fields.push('updated_at=NOW()'); values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_contracts SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_contract', c.req.param('id'), 'Updated contract');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update contract'); }
+});
+
+crm.delete('/contracts/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_contracts WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_contract', c.req.param('id'), 'Deleted contract');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete contract'); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// Playbooks, approvals, targets, automations and custom fields
+// ─────────────────────────────────────────────────────────────
+crm.get('/playbooks', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>('SELECT * FROM crm_playbooks ORDER BY name');
+    return c.json({ success: true, data: rows.rows.map((r: any) => ({ ...r, steps: json(r.steps, []) })) });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load playbooks'); }
+});
+
+crm.post('/playbooks', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!String(b.name || '').trim()) return fail(c, 400, 'Playbook name is required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_playbooks (id,name,description,trigger,steps,status) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, b.name, b.description || null, b.trigger || null, JSON.stringify(b.steps || []), b.status || 'active']
+    );
+    await audit(c, session, 'create', 'crm_playbook', id, `Created playbook ${b.name}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create playbook'); }
+});
+
+crm.put('/playbooks/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['name', 'description', 'trigger', 'status']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (b.steps !== undefined) { fields.push(`steps=$${values.length + 1}`); values.push(JSON.stringify(b.steps)); }
+    if (!fields.length) return c.json({ success: true });
+    fields.push('updated_at=NOW()'); values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_playbooks SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_playbook', c.req.param('id'), 'Updated playbook');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update playbook'); }
+});
+
+crm.delete('/playbooks/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_playbooks WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_playbook', c.req.param('id'), 'Deleted playbook');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete playbook'); }
+});
+
+crm.get('/approvals', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT ap.*, req.name AS requested_by_name, rev.name AS reviewed_by_name FROM crm_approvals ap
+       LEFT JOIN users req ON req.id=ap.requested_by LEFT JOIN users rev ON rev.id=ap.reviewed_by ORDER BY ap.created_at DESC LIMIT 200`
+    );
+    return c.json({ success: true, data: rows.rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load approvals'); }
+});
+
+crm.post('/approvals', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!b.type || !b.entity || !b.entity_id) return fail(c, 400, 'Type, entity and entity id are required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_approvals (id,type,entity,entity_id,requested_by,status,reason) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, b.type, b.entity, b.entity_id, session.userId, b.status || 'pending', b.reason || null]
+    );
+    await audit(c, session, 'create', 'crm_approval', id, `Requested approval for ${b.entity}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create approval'); }
+});
+
+crm.put('/approvals/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['status', 'reason']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(b[key]); }
+    }
+    if (b.status && b.status !== 'pending') { fields.push(`reviewed_by=$${values.length + 1}`); values.push(session.userId); fields.push('reviewed_at=NOW()'); }
+    if (!fields.length) return c.json({ success: true });
+    values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_approvals SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_approval', c.req.param('id'), 'Reviewed approval');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update approval'); }
+});
+
+crm.get('/targets', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(`SELECT t.*, u.name AS owner_name FROM crm_targets t LEFT JOIN users u ON u.id=t.owner_id ORDER BY t.created_at DESC`);
+    return c.json({ success: true, data: rows.rows });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load targets'); }
+});
+
+crm.post('/targets', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!b.period || !b.metric) return fail(c, 400, 'Period and metric are required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_targets (id,owner_id,period,metric,target_value,currency) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, b.owner_id || null, b.period, b.metric, Number(b.target_value) || 0, b.currency || 'NGN']
+    );
+    await audit(c, session, 'create', 'crm_target', id, `Created target ${b.metric} for ${b.period}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create target'); }
+});
+
+crm.delete('/targets/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_targets WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_target', c.req.param('id'), 'Deleted target');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete target'); }
+});
+
+crm.get('/custom-fields', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>('SELECT * FROM crm_custom_fields ORDER BY entity, position, label');
+    return c.json({ success: true, data: rows.rows.map((r: any) => ({ ...r, options: json(r.options, []) })) });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load custom fields'); }
+});
+
+crm.post('/custom-fields', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!b.key || !b.label) return fail(c, 400, 'Field key and label are required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_custom_fields (id,entity,key,label,type,options,required,position) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, b.entity || 'person', b.key, b.label, b.type || 'text', JSON.stringify(b.options || []), b.required ? 1 : 0, asInt(b.position, 0)]
+    );
+    await audit(c, session, 'create', 'crm_custom_field', id, `Created custom field ${b.label}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create custom field'); }
+});
+
+crm.delete('/custom-fields/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_custom_fields WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_custom_field', c.req.param('id'), 'Deleted custom field');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete custom field'); }
+});
+
+crm.get('/automations', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>(
+      `SELECT a.*, (SELECT COUNT(*)::int FROM crm_automation_runs r WHERE r.automation_id=a.id) AS runs
+       FROM crm_automations a ORDER BY a.created_at DESC`
+    );
+    return c.json({ success: true, data: rows.rows.map((r: any) => ({ ...r, conditions: json(r.conditions, {}), actions: json(r.actions, []) })) });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load automations'); }
+});
+
+crm.post('/automations', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!String(b.name || '').trim() || !b.trigger) return fail(c, 400, 'Automation name and trigger are required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_automations (id,name,trigger,conditions,actions,enabled,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, b.name, b.trigger, JSON.stringify(b.conditions || { match: 'all', rules: [] }), JSON.stringify(b.actions || []), b.enabled === false ? 0 : 1, session.userId]
+    );
+    await audit(c, session, 'create', 'crm_automation', id, `Created automation ${b.name}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create automation'); }
+});
+
+crm.put('/automations/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const fields: string[] = []; const values: any[] = [];
+    for (const key of ['name', 'trigger', 'enabled']) {
+      if (b[key] !== undefined) { fields.push(`${key}=$${values.length + 1}`); values.push(typeof b[key] === 'boolean' ? (b[key] ? 1 : 0) : b[key]); }
+    }
+    if (b.conditions !== undefined) { fields.push(`conditions=$${values.length + 1}`); values.push(JSON.stringify(b.conditions)); }
+    if (b.actions !== undefined) { fields.push(`actions=$${values.length + 1}`); values.push(JSON.stringify(b.actions)); }
+    if (!fields.length) return c.json({ success: true });
+    fields.push('updated_at=NOW()'); values.push(c.req.param('id'));
+    await getDb(c.env).query(`UPDATE crm_automations SET ${fields.join(', ')} WHERE id=$${values.length}`, values);
+    await audit(c, session, 'update', 'crm_automation', c.req.param('id'), 'Updated automation');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to update automation'); }
+});
+
+crm.delete('/automations/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_automations WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_automation', c.req.param('id'), 'Deleted automation');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete automation'); }
+});
+
+crm.post('/automations/:id/run', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    const id = c.req.param('id');
+    const runId = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_automation_runs (id,automation_id,person_id,status,log,finished_at) VALUES ($1,$2,$3,'success',$4,NOW())`,
+      [runId, id, b.person_id || null, JSON.stringify({ triggered_by: session.userId, at: new Date().toISOString(), note: b.note || 'Manual run' })]
+    );
+    await getDb(c.env).query('UPDATE crm_automations SET last_run_at=NOW(), run_count=run_count+1 WHERE id=$1', [id]);
+    await audit(c, session, 'run', 'crm_automation', id, 'Ran automation');
+    return c.json({ success: true, data: { run_id: runId } });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to run automation'); }
+});
+
+crm.get('/saved-views', async (c) => {
+  try {
+    await admin(c);
+    const rows = await getDb(c.env).query<any>('SELECT * FROM crm_saved_views ORDER BY created_at DESC');
+    return c.json({ success: true, data: rows.rows.map((r: any) => ({ ...r, filters: json(r.filters, {}), sort: json(r.sort, {}) })) });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to load saved views'); }
+});
+
+crm.post('/saved-views', async (c) => {
+  try {
+    const session = await admin(c);
+    const b: any = await c.req.json().catch(() => ({}));
+    if (!String(b.name || '').trim()) return fail(c, 400, 'View name is required');
+    const id = crypto.randomUUID();
+    await getDb(c.env).query(
+      `INSERT INTO crm_saved_views (id,name,entity,filters,sort,owner_id,is_shared) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, b.name, b.entity || 'people', JSON.stringify(b.filters || {}), JSON.stringify(b.sort || {}), session.userId, b.is_shared === false ? 0 : 1]
+    );
+    await audit(c, session, 'create', 'crm_saved_view', id, `Created saved view ${b.name}`);
+    return c.json({ success: true, data: { id } }, 201 as any);
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to create saved view'); }
+});
+
+crm.delete('/saved-views/:id', async (c) => {
+  try {
+    const session = await admin(c);
+    await getDb(c.env).query('DELETE FROM crm_saved_views WHERE id=$1', [c.req.param('id')]);
+    await audit(c, session, 'delete', 'crm_saved_view', c.req.param('id'), 'Deleted saved view');
+    return c.json({ success: true });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to delete saved view'); }
+});
+
+// Convert a lead into a user account with a set-password invite.
+crm.post('/leads/:id/convert', async (c) => {
+  try {
+    const session = await admin(c);
+    const db = getDb(c.env);
+    const lead = (await db.query<any>('SELECT * FROM crm_leads WHERE id=$1', [c.req.param('id')])).rows[0];
+    if (!lead) return fail(c, 404, 'Lead not found');
+    if (lead.converted_user_id) return fail(c, 400, 'Lead has already been converted');
+    if (!lead.email) return fail(c, 400, 'Lead needs an email address before conversion');
+    const existing = (await db.query<any>('SELECT id FROM users WHERE email=$1', [lead.email])).rows[0];
+    let userId = existing?.id;
+    if (!userId) {
+      const { hashPassword, randomToken } = await import('../auth-helpers');
+      const setupToken = randomToken(24);
+      const password = await hashPassword(c.env, randomToken(24));
+      const created = await db.query<any>(
+        `INSERT INTO users (name,email,password,role,is_verified,setup_token,setup_token_expires)
+         VALUES ($1,$2,$3,'student',0,$4,$5) RETURNING id`,
+        [lead.name, lead.email, password, setupToken, new Date(Date.now() + 24 * 3600 * 1000).toISOString()]
+      );
+      userId = created.rows[0]?.id;
+      const link = `${c.env.FRONTEND_URL}/set-password?token=${setupToken}`;
+      await sendEmail(c.env, {
+        to: lead.email,
+        subject: 'Your CareerCode account is ready',
+        html: `<p>Hi ${lead.name},</p><p>Your CareerCode account is ready. Set your password to get started.</p><p><a href="${link}">Set your password</a></p>`,
+      }).catch(() => {});
+    }
+    await db.query('UPDATE crm_leads SET converted_user_id=$1, stage=$2, updated_at=NOW() WHERE id=$3', [userId, 'converted', lead.id]);
+    await ensureProfiles(c.env);
+    await audit(c, session, 'convert', 'crm_lead', lead.id, `Converted lead to user ${userId}`);
+    return c.json({ success: true, data: { user_id: userId } });
+  } catch (e: any) { return fail(c, statusOf(e), e?.message || 'Failed to convert lead'); }
+});
+
+// ─────────────────────────────────────────────────────────────
 // Existing trial and access endpoints
 // ─────────────────────────────────────────────────────────────
 crm.put('/users/:id/courses/:courseId/trial', async (c) => {

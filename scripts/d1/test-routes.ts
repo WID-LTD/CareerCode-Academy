@@ -389,6 +389,28 @@ async function main() {
     }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['DELETE /api/v1/admin/crm/leads/:id (cleanup)', () => call(`/api/v1/admin/crm/leads/${(globalThis as any).__crmLead}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/instructor/crm/overview', () => call('/api/v1/instructor/crm/overview', { token: adminToken }), (r) => (r.json?.data?.students ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/success-plans', () => call('/api/v1/admin/crm/success-plans', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/referrals', () => call('/api/v1/admin/crm/referrals', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/surveys', () => call('/api/v1/admin/crm/surveys', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/contracts', () => call('/api/v1/admin/crm/contracts', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/playbooks', () => call('/api/v1/admin/crm/playbooks', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/approvals', () => call('/api/v1/admin/crm/approvals', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/targets', () => call('/api/v1/admin/crm/targets', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/automations', () => call('/api/v1/admin/crm/automations', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/custom-fields', () => call('/api/v1/admin/crm/custom-fields', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['GET /api/v1/admin/crm/saved-views', () => call('/api/v1/admin/crm/saved-views', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/admin/crm/surveys', async () => {
+      const r = await call('/api/v1/admin/crm/surveys', { method: 'POST', token: adminToken, body: { name: 'CRM test survey', type: 'nps' } });
+      (globalThis as any).__crmSurvey = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/admin/crm/surveys/:id (cleanup)', () => call(`/api/v1/admin/crm/surveys/${(globalThis as any).__crmSurvey}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['POST /api/v1/admin/crm/targets', async () => {
+      const r = await call('/api/v1/admin/crm/targets', { method: 'POST', token: adminToken, body: { period: '2026-11', metric: 'revenue', target_value: 100000 } });
+      (globalThis as any).__crmTarget = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/admin/crm/targets/:id (cleanup)', () => call(`/api/v1/admin/crm/targets/${(globalThis as any).__crmTarget}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/analytics (admin)', () => call('/api/v1/admin/analytics', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/courses (admin)', () => call('/api/v1/admin/courses?limit=3', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/admin/payments (admin)', () => call('/api/v1/admin/payments?limit=3', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
@@ -396,6 +418,13 @@ async function main() {
     ['GET /api/v1/instructor/dashboard/stats', () => call('/api/v1/instructor/dashboard/stats', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/instructor/students', () => call('/api/v1/instructor/students', { token: adminToken }), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/blogs', () => call('/api/v1/blogs?limit=3'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['POST /api/v1/blogs (admin)', async () => {
+      const r = await call('/api/v1/blogs', { method: 'POST', token: adminToken, body: { title: `CRM test post ${Date.now()}`, content: 'This is a test blog post body long enough to satisfy validation rules for the blog route.', category: 'Learning' } });
+      (globalThis as any).__blogId = r.json?.data?.id;
+      return r;
+    }, (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['PUT /api/v1/blogs/:id (admin)', () => call(`/api/v1/blogs/${(globalThis as any).__blogId}`, { method: 'PUT', token: adminToken, body: { published: true } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
+    ['DELETE /api/v1/blogs/:id (cleanup)', () => call(`/api/v1/blogs/${(globalThis as any).__blogId}`, { method: 'DELETE', token: adminToken }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 200))],
     ['GET /api/v1/student/assignments', () => call('/api/v1/student/assignments?page=1&limit=5', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/student/mentoring-slots', () => call('/api/v1/student/mentoring-slots', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/student/my-mentoring-slots', () => call('/api/v1/student/my-mentoring-slots', { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
