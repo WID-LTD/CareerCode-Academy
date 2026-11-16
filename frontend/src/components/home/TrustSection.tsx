@@ -3,6 +3,7 @@ import { Award, Briefcase, FolderGit2, Users, ShieldCheck, ArrowRight } from 'lu
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Link } from 'react-router-dom';
+import { usePageContent } from '@/hooks/usePageContent';
 
 const pillars = [
   {
@@ -31,14 +32,18 @@ const pillars = [
   },
 ];
 
+const defaultTrust = { heading: 'Built for real outcomes', subheading: 'No invented placement stats or borrowed logos — just the things we actually build into every programme.' };
+
 export function TrustSection() {
+  const page = usePageContent('home', { trust: defaultTrust });
+  const trust = { ...defaultTrust, ...((page as any)?.trust || {}) };
   return (
     <section className="py-16 sm:py-20">
       <div className="max-w-screen-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
           <Badge variant="primary" size="sm" className="mb-3"><ShieldCheck className="w-3 h-3" /> Why learners choose CareerCode</Badge>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Built for <span className="gradient-text">real outcomes</span></h2>
-          <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">No invented placement stats or borrowed logos — just the things we actually build into every programme.</p>
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">{trust.heading}</h2>
+          <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">{trust.subheading}</p>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">

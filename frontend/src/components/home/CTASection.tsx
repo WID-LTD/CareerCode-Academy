@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, BookOpen, MessageSquare, Briefcase, Sparkles } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
+import { usePageContent } from '@/hooks/usePageContent';
 
 const valueProps = [
   { icon: BookOpen, title: 'Project-Based Learning', desc: 'Build real-world projects that prove what you can do' },
@@ -9,7 +10,11 @@ const valueProps = [
   { icon: Briefcase, title: 'Career Support', desc: 'In-platform job applications, role matching, and a public portfolio to get discovered' },
 ];
 
+const defaultCta = { heading: 'Build Hire-Ready Skills', body: 'Join thousands of learners turning hands-on practice into a portfolio employers can verify — then apply to roles directly through our in-platform career pipeline.' };
+
 export function CTASection() {
+  const page = usePageContent('home', { cta: defaultCta });
+  const cta = { ...defaultCta, ...((page as any)?.cta || {}) };
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="absolute inset-0 gradient-bg opacity-5" />
@@ -37,11 +42,10 @@ export function CTASection() {
             </motion.div>
 
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
-              Build <span className="gradient-text">Hire-Ready</span> Skills
+              {cta.heading}
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-4">
-              Join thousands of learners turning hands-on practice into a portfolio employers can verify —
-              then apply to roles directly through our in-platform career pipeline.
+              {cta.body}
             </p>
 
             <div className="flex items-center justify-center gap-2 mb-10 text-sm text-gray-500">

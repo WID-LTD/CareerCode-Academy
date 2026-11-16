@@ -39,6 +39,7 @@ import {
   ListChecks,
   ToggleLeft,
   Activity,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -102,6 +103,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Relationships', path: '/admin/crm', icon: Target },
+    { label: 'Website', path: '/admin/website', icon: Globe },
     { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
     { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
     { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },
@@ -136,6 +138,7 @@ const roleSidebarLinks: Record<string, { label: string; path: string; icon: any 
   adminNarrow: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Relationships', path: '/admin/crm', icon: Target },
+    { label: 'Website', path: '/admin/website', icon: Globe },
     { label: 'To-Do', path: '/admin/todos', icon: ListChecks },
     { label: 'Learning Paths', path: '/admin/learning-paths', icon: GitBranch },
     { label: 'Feature Flags', path: '/admin/feature-flags', icon: ToggleLeft },

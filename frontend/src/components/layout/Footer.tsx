@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, Phone, Clock, Globe, Linkedin } from 'lucide-react';
+import { usePageContent } from '@/hooks/usePageContent';
 
 const footerLinks = {
   Platform: [
@@ -29,7 +30,15 @@ const footerLinks = {
   ],
 };
 
+const defaultFooter = {
+  description: 'CareerCode Academy is the education venture of WID LTD (RC 8824091) — practical, project-based learning for people building technology careers.',
+  tagline: 'WID LTD — The Motivation for Innovation. Registered in Nigeria, September 2025.',
+  copyright: 'CareerCode Academy. All rights reserved.',
+};
+
 export function Footer() {
+  const page = usePageContent('footer', defaultFooter);
+  const footer = { ...defaultFooter, ...(page as any) };
   return (
     <footer className="relative border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-xl">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-primary-500/5 pointer-events-none" />
@@ -41,11 +50,10 @@ export function Footer() {
               <span className="text-lg sm:text-xl font-bold gradient-text">CareerCode</span>
             </Link>
             <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed max-w-xs sm:max-w-sm mb-4">
-              CareerCode Academy is the education venture of <strong>WID LTD</strong> (RC 8824091) —
-              practical, project-based learning for people building technology careers.
+              {footer.description}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
-              WID LTD — “The Motivation for Innovation.” Registered in Nigeria, September 2025.
+              {footer.tagline}
             </p>
             <div className="flex items-center gap-3">
               <a
@@ -118,7 +126,7 @@ export function Footer() {
               </div>
             </div>
             <p className="text-xs sm:text-sm text-gray-400 text-center xs:text-left">
-              &copy; {new Date().getFullYear()} WID LTD. All rights reserved.
+              &copy; {new Date().getFullYear()} {footer.copyright}
             </p>
           </div>
         </div>

@@ -7,16 +7,29 @@ import { Input } from '@/components/ui/Input';
 import api from '@/lib/axios';
 import toast from 'react-hot-toast';
 import SEO from '@/components/seo/SEO';
+import { usePageContent } from '@/hooks/usePageContent';
 
-const contactInfo = [
-  { icon: Mail, label: 'Email', value: 'contact@widltd.com.ng', href: 'mailto:contact@widltd.com.ng' },
-  { icon: Mail, label: 'Learner support', value: 'hello@careercode.com.ng', href: 'mailto:hello@careercode.com.ng' },
-  { icon: Phone, label: 'Phone', value: '+234 816 496 1457', href: 'tel:+2348164961457' },
-  { icon: MapPin, label: 'Office', value: 'Agbara, Ogun State, Nigeria', href: 'https://maps.google.com/?q=Agbara,+Ogun+State,+Nigeria' },
-  { icon: Clock, label: 'Hours', value: 'Mon–Fri, 8:00 AM – 6:00 PM WAT', href: '' },
-];
+const defaultContact = {
+  heading: 'Get in Touch',
+  subheading: 'Have a question, feedback, or just want to say hello? We would love to hear from you.',
+  email: 'contact@widltd.com.ng',
+  supportEmail: 'hello@careercode.com.ng',
+  phone: '+234 816 496 1457',
+  office: 'Agbara, Ogun State, Nigeria',
+  hours: 'Mon–Fri, 8:00 AM – 6:00 PM WAT',
+  successMessage: 'We will get back to you within 24 hours.',
+};
 
 export default function Contact() {
+  const page = usePageContent('contact', defaultContact);
+  const contact = { ...defaultContact, ...(page as any) };
+  const contactInfo = [
+    { icon: Mail, label: 'Email', value: contact.email, href: `mailto:${contact.email}` },
+    { icon: Mail, label: 'Learner support', value: contact.supportEmail, href: `mailto:${contact.supportEmail}` },
+    { icon: Phone, label: 'Phone', value: contact.phone, href: `tel:${String(contact.phone).replace(/\s+/g, '')}` },
+    { icon: MapPin, label: 'Office', value: contact.office, href: `https://maps.google.com/?q=${encodeURIComponent(contact.office)}` },
+    { icon: Clock, label: 'Hours', value: contact.hours, href: '' },
+  ];
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
@@ -43,10 +56,10 @@ export default function Contact() {
         <div className="max-w-screen-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
             <h1 className="text-4xl sm:text-5xl font-bold mb-4">
-              Get in <span className="gradient-text">Touch</span>
+              {contact.heading}
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Have a question, feedback, or just want to say hello? We'd love to hear from you.
+              {contact.subheading}
             </p>
           </motion.div>
 
@@ -84,7 +97,7 @@ export default function Contact() {
                       <CheckCircle className="w-8 h-8 text-green-500" />
                     </div>
                     <h3 className="text-xl font-semibold mb-2">Message Sent!</h3>
-                    <p className="text-gray-500">We'll get back to you within 24 hours.</p>
+                    <p className="text-gray-500">{contact.successMessage}</p>
                   </motion.div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-5">

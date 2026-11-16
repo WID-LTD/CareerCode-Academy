@@ -6,13 +6,25 @@ import { NeonButton } from '@/components/ui/NeonButton';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { usePublicStats } from '@/hooks/usePublicStats';
+import { usePageContent } from '@/hooks/usePageContent';
 
-const typingTexts = [
+const defaultTypingTexts = [
   'Master In-Demand Skills',
   'Build Real-World Projects',
   'Ship Production Apps',
   'Earn Industry Certification',
 ];
+
+const defaultHero = {
+  badge: 'Skill-First, Career-Focused',
+  headline: 'Learn to Code,',
+  subheadline: 'Acquire job-ready skills through hands-on projects, guided mentorship, and a curriculum built by industry professionals — skills you can use from day one.',
+  typing: defaultTypingTexts,
+  primaryLabel: 'Start Building Skills',
+  primaryHref: '/signup',
+  secondaryLabel: 'Explore Programs',
+  secondaryHref: '/courses',
+};
 
 const floatingShapes = [
   { icon: Code2, color: 'text-neon-blue', delay: 0, x: '10%', y: '20%' },
@@ -67,6 +79,9 @@ function Marquee() {
 }
 
 export function Hero() {
+  const page = usePageContent('home', { hero: defaultHero });
+  const hero = { ...defaultHero, ...(page as any)?.hero };
+  const typingTexts = Array.isArray(hero.typing) && hero.typing.length ? hero.typing : defaultTypingTexts;
   const [textIndex, setTextIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -172,7 +187,7 @@ export function Hero() {
           <motion.div variants={itemVariants} className={styles.badgeWrapper}>
             <span className={styles.badge}>
               <Sparkles className={styles.badgeIcon} />
-              Skill-First, Career-Focused
+              {hero.badge}
             </span>
           </motion.div>
 
@@ -180,7 +195,7 @@ export function Hero() {
             variants={itemVariants}
             className={styles.heading}
           >
-            <span className="text-gray-900 dark:text-white">Learn to Code,</span>
+            <span className="text-gray-900 dark:text-white">{hero.headline}</span>
             <br />
             <span className="gradient-text">{typingTexts[textIndex].substring(0, charIndex)}</span>
             <span className="animate-pulse text-primary-500">|</span>
@@ -190,25 +205,23 @@ export function Hero() {
             variants={itemVariants}
             className={styles.subtitle}
           >
-            Acquire job-ready skills through hands-on projects, guided mentorship,
-            and a curriculum built by industry professionals — skills you can use
-            from day one.
+            {hero.subheadline}
           </motion.p>
 
           <motion.div
             variants={itemVariants}
             className={styles.buttonWrapper}
           >
-            <Link to="/signup">
+            <Link to={hero.primaryHref}>
               <NeonButton color="blue" size="lg" className={styles.button + " animate-glow"}>
-                Start Building Skills
+                {hero.primaryLabel}
                 <ArrowRight className={styles.buttonIcon} />
               </NeonButton>
             </Link>
-            <Link to="/courses">
+            <Link to={hero.secondaryHref}>
               <NeonButton color="purple" size="lg" className={styles.button}>
                 <Play className={styles.buttonIcon} />
-                Explore Programs
+                {hero.secondaryLabel}
               </NeonButton>
             </Link>
           </motion.div>

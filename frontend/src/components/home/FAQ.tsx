@@ -2,8 +2,9 @@ import React, { useState, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePageContent } from '@/hooks/usePageContent';
 
-const faqs = [
+const defaultFaqs = [
   {
     question: 'Do I need prior coding experience to join?',
     answer:
@@ -37,6 +38,8 @@ const faqs = [
 ];
 
 export function FAQ() {
+  const page = usePageContent('faq', { items: defaultFaqs });
+  const faqs = Array.isArray((page as any)?.items) && (page as any).items.length ? (page as any).items : defaultFaqs;
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const baseId = useId();
 
@@ -61,7 +64,7 @@ export function FAQ() {
         </motion.div>
 
         <div className="space-y-3">
-          {faqs.map((faq, index) => {
+          {faqs.map((faq: any, index: number) => {
             const isOpen = openIndex === index;
             const headingId = `${baseId}-h-${index}`;
             const panelId = `${baseId}-p-${index}`;

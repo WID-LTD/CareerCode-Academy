@@ -236,6 +236,7 @@ const AdminProjectAnalytics = lazy(() => import('@/pages/admin/ProjectAnalytics'
 const InstructorHubReview = lazy(() => import('@/pages/instructor/HubReview'));
 const InstructorCrm = lazy(() => import('@/pages/instructor/Crm'));
 const AdminCrm = lazy(() => import('@/pages/admin/Crm'));
+const AdminWebsite = lazy(() => import('@/pages/admin/Website'));
 const AdminTrialSettings = lazy(() => import('@/pages/admin/TrialSettings'));
 const AdminBoardOversight = lazy(() => import('@/pages/admin/BoardOversight'));
 const AdminPrograms = lazy(() => import('@/pages/admin/Programs'));
@@ -464,6 +465,7 @@ function App() {
           <Route path="feature-flags" element={<SuspenseWrapper><AdminFeatureFlags /></SuspenseWrapper>} />
           <Route path="system-health" element={<SuspenseWrapper><AdminSystemHealth /></SuspenseWrapper>} />
           <Route path="crm" element={<SuspenseWrapper><AdminCrm /></SuspenseWrapper>} />
+          <Route path="website" element={<SuspenseWrapper><AdminWebsite /></SuspenseWrapper>} />
           <Route path="users" element={<SuspenseWrapper><AdminUsers /></SuspenseWrapper>} />
           <Route path="courses" element={<SuspenseWrapper><AdminCourses /></SuspenseWrapper>} />
           <Route path="courses/:id" element={<SuspenseWrapper><AdminCourseDetail /></SuspenseWrapper>} />

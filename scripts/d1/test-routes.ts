@@ -348,6 +348,8 @@ async function main() {
     ['GET /api/v1/discussions', () => call('/api/v1/discussions'), (r) => (Array.isArray(r.json?.data) || r.json?.data?.discussions ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/forum/course/:id', () => call(`/api/v1/forum/course/${enrolled.course_id}`, { token }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/pages/:slug', () => call('/api/v1/pages/about'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['GET /api/v1/pages (admin)', () => call('/api/v1/pages', { token: adminToken }), (r) => (Array.isArray(r.json?.data) ? null : JSON.stringify(r.json).slice(0, 160))],
+    ['PUT /api/v1/pages/:slug (admin)', () => call('/api/v1/pages/about', { method: 'PUT', token: adminToken, body: { title: 'About', published: true } }), (r) => (r.json?.success ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/promotions/active', () => call('/api/v1/promotions/active'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/board/members', () => call('/api/v1/board/members'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],
     ['GET /api/v1/board/policies', () => call('/api/v1/board/policies'), (r) => (r.status < 500 ? null : JSON.stringify(r.json).slice(0, 160))],

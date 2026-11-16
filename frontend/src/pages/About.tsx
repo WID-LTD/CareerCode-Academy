@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Link } from 'react-router-dom';
 import SEO from '@/components/seo/SEO';
 import { usePublicStats } from '@/hooks/usePublicStats';
+import { usePageContent } from '@/hooks/usePageContent';
 
 const values = [
   { icon: ShieldCheck, title: 'Integrity in contracts', desc: 'We say what we will do, do what we said, and are clear when something changes.' },
@@ -26,8 +27,24 @@ const pillars = [
 
 const ventures = ['XperienceStore', 'GiGo', 'MedStack', 'Nova Flix', 'Flink'];
 
+const defaultAbout = {
+  hero: {
+    title: 'Practical Tech Education, Built by WID LTD',
+    paragraph1: 'CareerCode Academy is the education venture of WID LTD, a Nigerian technology company built on the philosophy of Unlimited Capability. We help beginners become job-ready developers through structured curriculum, real projects and human support.',
+    paragraph2: 'We believe technology education should be practical, honest and reachable. Our programmes combine engineering rigour with the support learners need to finish.',
+    location: 'Agbara, Ogun State, Nigeria',
+  },
+  mission: 'To engineer dependable systems and learning experiences that institutions and startups alike can stake their growth on.',
+  vision: 'A digitally self-reliant Africa delivering technology the world depends on — starting with the people who build it.',
+  contact: { email: 'contact@widltd.com.ng', phone: '+234 816 496 1457', office: 'Agbara, Ogun State, Nigeria', hours: 'Mon–Fri, 8:00 AM – 6:00 PM WAT' },
+};
+
 export default function About() {
   const stats = usePublicStats();
+  const page = usePageContent('about', defaultAbout);
+  const about = { ...defaultAbout, ...(page as any) };
+  const hero = { ...defaultAbout.hero, ...(about.hero || {}) };
+  const contact = { ...defaultAbout.contact, ...(about.contact || {}) };
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <SEO title="About" description="CareerCode Academy is the education venture of WID LTD (RC 8824091), a Nigerian technology company based in Agbara, Ogun State." />
@@ -40,15 +57,14 @@ export default function About() {
               <Code2 className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold mb-6">
-              Practical Tech Education, <span className="gradient-text">Built by WID LTD</span>
+              {hero.title}
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-              CareerCode Academy is the education venture of <strong>WID LTD</strong>, a Nigerian technology company
-              built on the philosophy of <strong>Unlimited Capability</strong>. We help beginners become job-ready
-              developers through structured curriculum, real projects and human support.
+              {hero.paragraph1}
             </p>
+            {hero.paragraph2 && <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mt-3">{hero.paragraph2}</p>}
             <p className="text-sm text-gray-500 mt-4 inline-flex items-center gap-1.5">
-              <MapPin className="w-4 h-4" /> Agbara, Ogun State, Nigeria
+              <MapPin className="w-4 h-4" /> {hero.location}
             </p>
           </motion.div>
 
@@ -59,8 +75,7 @@ export default function About() {
               </div>
               <h3 className="text-xl font-semibold mb-3">Our Mission</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                To engineer dependable systems and learning experiences that institutions and startups alike can
-                stake their growth on.
+                {about.mission}
               </p>
             </GlassCard>
             <GlassCard className="p-8">
@@ -69,8 +84,7 @@ export default function About() {
               </div>
               <h3 className="text-xl font-semibold mb-3">Our Vision</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                A digitally self-reliant Africa delivering technology the world depends on — starting with the people
-                who build it.
+                {about.vision}
               </p>
             </GlassCard>
           </div>
@@ -116,20 +130,20 @@ export default function About() {
             <GlassCard className="p-6" hover={false}>
               <h2 className="text-lg font-semibold mb-3">Contact WID LTD</h2>
               <div className="space-y-3 text-sm">
-                <a href="mailto:contact@widltd.com.ng" className="flex items-center gap-2 hover:text-primary-600">
-                  <Mail className="w-4 h-4 text-gray-400" /> contact@widltd.com.ng
+                <a href={`mailto:${contact.email}`} className="flex items-center gap-2 hover:text-primary-600">
+                  <Mail className="w-4 h-4 text-gray-400" /> {contact.email}
                 </a>
-                <a href="tel:+2348164961457" className="flex items-center gap-2 hover:text-primary-600">
-                  <Phone className="w-4 h-4 text-gray-400" /> +234 816 496 1457
+                <a href={`tel:${String(contact.phone).replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-primary-600">
+                  <Phone className="w-4 h-4 text-gray-400" /> {contact.phone}
                 </a>
                 <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5" /> Agbara, Ogun State, Nigeria
+                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5" /> {contact.office}
                 </div>
                 <a href="https://widltd.com.ng" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-primary-600">
                   <Globe className="w-4 h-4 text-gray-400" /> widltd.com.ng
                 </a>
               </div>
-              <p className="text-xs text-gray-500 mt-4">Office hours: Mon–Fri, 8:00 AM – 6:00 PM WAT.</p>
+              <p className="text-xs text-gray-500 mt-4">Office hours: {contact.hours}.</p>
             </GlassCard>
           </div>
         </div>
