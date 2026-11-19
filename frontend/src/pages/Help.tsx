@@ -60,7 +60,7 @@ export default function Help() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
               >
-                <Link to={cat.href} onClick={(e) => { if (cat.href === '#') { e.preventDefault(); startOnboarding(); } }}>
+                <Link to={cat.href} onClick={(e: React.MouseEvent<HTMLAnchorElement>) => { if (cat.href === '#') { e.preventDefault(); startOnboarding(); } }}>
                   <GlassCard hover className="p-6 h-full">
                     <div className="w-12 h-12 rounded-xl bg-primary-500/10 flex items-center justify-center mb-4">
                       <cat.icon className="w-6 h-6 text-primary-500" />
